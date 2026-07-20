@@ -55,6 +55,11 @@ public class WorkflowExecutor {
         this.contextBuilder = new ContextBuilder(workflow, runtimeIntent);
         this.lang = lang != null ? lang : "zh";
         try {
+            this.engineClient.setControlPoint(this.controlPoint);
+        } catch (Exception ignored) {
+            // Engine client may not support control point injection
+        }
+        try {
             this.engineClient.setEventCallback(this.eventCallback);
         } catch (Exception ignored) {
             // Engine client may not support event callback injection
@@ -99,18 +104,28 @@ public class WorkflowExecutor {
         Set<Integer> executed = new HashSet<>();
         boolean[] failed = {false};
 
-        Map<Integer, Integer> deferCount = new HashMap<>();
-        return executeSteps(pending, executed, failed, deferCount)
-                .thenApply(v -> {
-                    emit(EventType.WORKFLOW_COMPLETE, Map.of());
-                    log.info("[Executor] Workflow completed: {}, {} task(s) executed", workflow.getName(), executionHistory.size());
-                    return ExecutionResult.builder()
-                            .success(!failed[0])
-                            .history(new ArrayList<>(executionHistory))
-                            .stepOutputs(new HashMap<>(stepOutputs))
-                            .error(failed[0] ? "Step execution failed" : null)
-                            .build();
-                });
+       Map<Integer, Integer> deferCount = new HashMap<>();
+       return executeSteps(pending, executed, failed, deferCount)
+               .thenApply(v -> {
+                   emit(EventType.WORKFLOW_COMPLETE, Map.of());
+                   log.info("[Executor] Workflow completed: {}, {} task(s) executed", workflow.getName(), executionHistory.size());
+                   return ExecutionResult.builder()
+                           .success(!failed[0])
+                           .history(new ArrayList<>(executionHistory))
+                           .stepOutputs(new HashMap<>(stepOutputs))
+                           .error(failed[0] ? "Step execution failed" : null)
+                           .build();
+               })
+               .exceptionally(e -> {
+                   log.error("[Executor] DAG traversal error: {}", e.getMessage(), e);
+                   emit(EventType.ERROR, Map.of("error", e.getMessage()));
+                   return ExecutionResult.builder()
+                           .success(false)
+                           .history(new ArrayList<>(executionHistory))
+                           .stepOutputs(new HashMap<>(stepOutputs))
+                           .error(e.getMessage())
+                           .build();
+               });
     }
 
     private CompletableFuture<Void> executeSteps(

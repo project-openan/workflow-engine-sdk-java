@@ -577,12 +577,12 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
 
     @Override
     public CompletableFuture<SendMessageResult> sendMessageWithNegotiation(
-            String agentName, String message, int maxRounds,
+            String agentName, String message, String contextId, int maxRounds,
             NegotiationResolver negotiationResolver) {
         // Loop: send -> check INPUT_REQUIRED -> resolve -> re-send, up to maxRounds
-        return sendMessage(agentName, message, null, null)
+        return sendMessage(agentName, message, contextId, null)
                 .thenCompose(result -> resolveNegotiationLoop(
-                        agentName, message, result, 1, maxRounds, negotiationResolver));
+                        agentName, message, contextId, result, 1, maxRounds, negotiationResolver));
     }
 
     /**
@@ -591,14 +591,14 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
      * no longer needs input or max rounds is exceeded.
      */
     private CompletableFuture<SendMessageResult> resolveNegotiationLoop(
-            String agentName, String message, SendMessageResult result,
+            String agentName, String message, String contextId, SendMessageResult result,
             int currentRound, int maxRounds, NegotiationResolver resolver) {
         if (!isNegotiationNeeded(result) || currentRound > maxRounds) {
             return CompletableFuture.completedFuture(result);
         }
-        return resolveNegotiation(agentName, message, result, currentRound, maxRounds, resolver)
+        return resolveNegotiation(agentName, message, contextId, result, currentRound, maxRounds, resolver)
                 .thenCompose(newResult -> resolveNegotiationLoop(
-                        agentName, message, newResult, currentRound + 1, maxRounds, resolver));
+                        agentName, message, contextId, newResult, currentRound + 1, maxRounds, resolver));
     }
 
     private static boolean isNegotiationNeeded(SendMessageResult result) {
@@ -607,7 +607,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
 
     @SuppressWarnings("unchecked")
     private CompletableFuture<SendMessageResult> resolveNegotiation(
-            String agentName, String originalMessage, SendMessageResult result,
+            String agentName, String originalMessage, String contextId, SendMessageResult result,
             int round, int maxRounds, NegotiationResolver resolver) {
         Map<String, Object> negContext = result.getMetadata() != null
                 ? (Map<String, Object>) result.getMetadata().get("negotiation_context") : null;
@@ -630,16 +630,16 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                                         + "The engine has reviewed your negotiation request and provides "
                                         + "the following clarification:\n\n" + clarification
                                         + "\n\n---\nOriginal Task:\n" + originalMessage
-                                        + "\n\nPlease re-execute the task based on the clarification above.";
-                                return sendMessage(agentName, followUp, null, null);
-                            }
-                            emit(EventType.NEGOTIATION_FAILED, Map.of(
-                                    "agent", agentName, "round", round,
-                                    "reason", "no clarification from resolver"));
-                            String followUp = "Original task: " + originalMessage
-                                    + "\n\nClarification needed:\n" + negMsg;
-                            return sendMessage(agentName, followUp, null, null);
-                        });
+                                       + "\n\nPlease re-execute the task based on the clarification above.";
+                                return sendMessage(agentName, followUp, contextId, null);
+                           }
+                           emit(EventType.NEGOTIATION_FAILED, Map.of(
+                                   "agent", agentName, "round", round,
+                                   "reason", "no clarification from resolver"));
+                           String followUp = "Original task: " + originalMessage
+                                   + "\n\nClarification needed:\n" + negMsg;
+                            return sendMessage(agentName, followUp, contextId, null);
+                       });
             }
             return CompletableFuture.completedFuture(result);
         }
@@ -653,14 +653,21 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                                     "reason", "resolver returned empty"));
                             return CompletableFuture.completedFuture(result);
                         }
-                        emit(EventType.NEGOTIATION_RESOLVED, Map.of(
-                                "agent", agentName, "round", round,
-                                "clarification", clarification.substring(0, Math.min(200, clarification.length()))));
-                        String followUp = "[NEGOTIATION_RESOLUTION]\n" + clarification
-                                + "\n\n---\nOriginal Task:\n" + originalMessage
-                                + "\n\nPlease re-execute the task based on the clarification above.";
-                        return sendMessage(agentName, followUp, null, null);
-                    });
+                       emit(EventType.NEGOTIATION_RESOLVED, Map.of(
+                               "agent", agentName, "round", round,
+                               "clarification", clarification.substring(0, Math.min(200, clarification.length()))));
+                       // Advance the A2A-T negotiation state machine (mirrors Python's continue_negotiation)
+                       if (!continueNegotiation(negContext, clarification)) {
+                           emit(EventType.NEGOTIATION_FAILED, Map.of(
+                                   "agent", agentName, "round", round,
+                                   "reason", "continue_negotiation failed"));
+                           return CompletableFuture.completedFuture(result);
+                       }
+                       String followUp = "[NEGOTIATION_RESOLUTION]\n" + clarification
+                               + "\n\n---\nOriginal Task:\n" + originalMessage
+                               + "\n\nPlease re-execute the task based on the clarification above.";
+                       return sendMessage(agentName, followUp, contextId, null);
+                   });
         }
         return CompletableFuture.completedFuture(result);
     }
@@ -668,6 +675,63 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     @Override
     public void close() {
         log.info("[EngineClient] Closing");
+    }
+
+    /**
+     * Advance the A2A-T negotiation state machine.
+     * Mirrors Python's {@code a2at_client.continue_negotiation()}.
+     * Uses reflection to call A2ATClient.continueNegotiation(context, status, contentText).
+     *
+     * @param negContext  the negotiation context payload (a Map)
+     * @param contentText the clarification text
+     * @return true if the negotiation was successfully continued
+     */
+    @SuppressWarnings("unchecked")
+    private boolean continueNegotiation(Map<String, Object> negContext, String contentText) {
+        if (a2atClient == null || negContext == null) {
+            return true; // No A2AT client, skip state machine advance
+        }
+        try {
+            // Build NegotiationContext record from the context map
+            Class<?> ctxClass = Class.forName(
+                    "net.openan.a2at.sdk.negotiation.types.model.NegotiationContext");
+            Class<?> typeClass = Class.forName(
+                    "net.openan.a2at.sdk.negotiation.types.model.NegotiationType");
+            Class<?> statusClass = Class.forName(
+                    "net.openan.a2at.sdk.negotiation.types.model.NegotiationStatus");
+
+            // Extract fields from the negotiation context map
+            String typeStr = negContext.getOrDefault("negotiationType",
+                    negContext.getOrDefault("negotiation_type", "CLARIFICATION")).toString();
+            Object negType = typeClass.getMethod("valueOf", String.class)
+                    .invoke(null, typeStr.toUpperCase());
+            String negId = String.valueOf(negContext.getOrDefault("negotiationId",
+                    negContext.getOrDefault("negotiation_id", "")));
+            int round = negContext.get("round") instanceof Number num
+                    ? num.intValue() : 0;
+            Object curStatus = statusClass.getMethod("valueOf", String.class)
+                    .invoke(null, String.valueOf(negContext.getOrDefault("status", "PENDING"))
+                            .toUpperCase());
+
+            // Construct NegotiationContext record
+            java.lang.reflect.Constructor<?> ctxCtor = ctxClass.getConstructor(
+                    typeClass, String.class, int.class, statusClass);
+            Object ctxObj = ctxCtor.newInstance(negType, negId, round, curStatus);
+
+            // NegotiationStatus.AGREED
+            Object agreedStatus = statusClass.getMethod("valueOf", String.class)
+                    .invoke(null, "AGREED");
+
+            // a2atClient.continueNegotiation(ctxObj, agreedStatus, contentText)
+            java.lang.reflect.Method continueMethod = a2atClient.getClass()
+                    .getMethod("continueNegotiation", ctxClass, statusClass, String.class);
+            continueMethod.invoke(a2atClient, ctxObj, agreedStatus, contentText);
+            log.info("[Negotiation] continue_negotiation succeeded");
+            return true;
+        } catch (Exception e) {
+            log.error("[Negotiation] continue_negotiation failed: {}", e.getMessage());
+            return false;
+        }
     }
 
     @Override

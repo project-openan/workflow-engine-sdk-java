@@ -4,14 +4,20 @@ import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
-import com.openan.a2at.engine.model.*;
+import com.openan.a2at.engine.model.ExecutionResult;
+import com.openan.a2at.engine.model.JumpCondition;
+import com.openan.a2at.engine.model.RouteDecision;
+import com.openan.a2at.engine.model.TaskRequest;
+import com.openan.a2at.engine.model.TaskResponse;
+import com.openan.a2at.engine.model.Workflow;
 import com.openan.a2at.engine.runner.ExecutePsop;
 import com.openan.a2at.engine.registry.RegistryClient;
 import com.openan.a2at.engine.registry.LoadPsop;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -119,6 +125,10 @@ public class ExecutePsopDemo {
                 null,              // engineClient (null = auto-create)
                 "Diagnose SPN cross-city fault",
                 "zh",
+                null,              // a2atEnvPath (null = no Task-T prompt generation)
+                null,              // credentialsConfigPath (null = no agent auth)
+                sslVerify,         // sslVerify
+                null,              // caCertsPath
                 a2aRuntime,        // A2A client runtime
                 eventCallback,     // event sink
                 onFinishRef.fn,   // on_finish persistence hook
