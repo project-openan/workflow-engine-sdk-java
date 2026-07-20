@@ -105,7 +105,7 @@ public class ExecutePsopDemo {
 
         // on_finish: print summary
         var onFinishRef = new Object() {
-            java.util.function.BiConsumer<ExecutionResult, List<Map<String, Object>>> fn =
+            java.util.function.BiFunction<ExecutionResult, List<Map<String, Object>>, java.util.concurrent.CompletableFuture<Void>> fn =
                 (result, events) -> {
                     log.info("--- on_finish ---");
                     log.info("Success: {}", result.isSuccess());
@@ -114,6 +114,7 @@ public class ExecutePsopDemo {
                     if (result.getError() != null) {
                         log.info("Error: {}", result.getError());
                     }
+                    return java.util.concurrent.CompletableFuture.completedFuture(null);
                 };
         };
 

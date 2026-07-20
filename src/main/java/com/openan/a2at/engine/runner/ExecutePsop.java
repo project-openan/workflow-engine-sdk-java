@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
@@ -43,10 +44,10 @@ public class ExecutePsop {
      * @param lang            language hint (zh/en)
      * @param a2aClientRuntime  the A2A client runtime from a2a-java-sdk
      * @param eventCallback   optional event callback (null = no-op)
-     * @param onFinish        optional persistence hook: (result, collectedEvents) -> void
-     * @param onEvent         optional event transformer: event -> event | null | List<event>
-     * @return CompletableFuture<ExecutionResult>
-     */
+     * @param onFinish        optional persistence hook: (result, collectedEvents) -> CompletableFuture<Void> (async)
+    * @param onEvent         optional event transformer: event -> event | null | List<event>
+    * @return CompletableFuture<ExecutionResult>
+    */
     public static CompletableFuture<ExecutionResult> execute(
             Object psop,
             List<?> agentCards,
@@ -60,7 +61,7 @@ public class ExecutePsop {
             String caCertsPath,
             Object a2aClientRuntime,
             EventCallback eventCallback,
-            BiConsumer<ExecutionResult, List<Map<String, Object>>> onFinish,
+            BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish,
             Function<Map<String, Object>, Object> onEvent) {
 
         Workflow workflow = psop instanceof Workflow ? (Workflow) psop : Workflow.fromMap((Map<String, Object>) psop);
@@ -130,18 +131,18 @@ public class ExecutePsop {
         // Emit start
         collectingCallback.onEvent(EventType.START, Map.of("workflow", workflow.getName(), "steps", workflow.getSteps().size()));
 
-        // Run + finalize
+       // Run + finalize
         return executor.run()
-                .handle((result, error) -> {
-                    if (error != null) {
-                        log.error("[execute_psop] Execution failed: {}", error.getMessage());
-                        result = ExecutionResult.builder()
-                                .success(false)
-                                .error(error.getMessage())
-                                .history(List.of())
-                                .stepOutputs(Map.of())
-                                .build();
-                    }
+                .exceptionally(error -> {
+                    log.error("[execute_psop] Execution failed: {}", error.getMessage());
+                    return ExecutionResult.builder()
+                            .success(false)
+                            .error(error.getMessage())
+                            .history(List.of())
+                            .stepOutputs(Map.of())
+                            .build();
+                })
+                .thenCompose(result -> {
                     // Emit complete or error
                     if (result.isSuccess()) {
                         collectingCallback.onEvent(EventType.COMPLETE, Map.of(
@@ -153,29 +154,33 @@ public class ExecutePsop {
                                 "history", result.getHistory(),
                                 "step_outputs", result.getStepOutputs()));
                     }
-                    // on_finish hook
+                    // on_finish hook (async)
+                    CompletableFuture<Void> finishFuture;
                     if (onFinish != null) {
+                        finishFuture = onFinish.apply(result, new ArrayList<>(collected))
+                                .exceptionally(e -> {
+                                    log.error("[execute_psop] on_finish failed: {}", e.getMessage());
+                                    return null;
+                                });
+                    } else {
+                        finishFuture = CompletableFuture.completedFuture(null);
+                    }
+                    return finishFuture.thenApply(v -> {
+                        // Emit close
+                        collectingCallback.onEvent(EventType.CLOSE, Map.of());
+                        // Close engine client
                         try {
-                            onFinish.accept(result, new ArrayList<>(collected));
-                        } catch (Exception e) {
-                            log.error("[execute_psop] on_finish failed: {}", e.getMessage());
+                            client.close();
+                        } catch (Exception ignored) {
+                            // Close failures are non-fatal during shutdown
                         }
-                    }
-                    // Emit close
-                    collectingCallback.onEvent(EventType.CLOSE, Map.of());
-                    // Close engine client
-                    try {
-                        client.close();
-                    } catch (Exception ignored) {
-                        // Close failures are non-fatal during shutdown
-                    }
-                   return result;
+                        return result;
+                    });
                 });
     }
 
-    /** Make event data JSON-serializable. */
     /**
-     * Simplified overload without SSL/auth/A2AT config (legacy compatibility).
+    * Simplified overload without SSL/auth/A2AT config (legacy compatibility).
      */
     public static CompletableFuture<ExecutionResult> execute(
             Object psop,
@@ -188,10 +193,15 @@ public class ExecutePsop {
             EventCallback eventCallback,
             BiConsumer<ExecutionResult, List<Map<String, Object>>> onFinish,
             Function<Map<String, Object>, Object> onEvent) {
+        BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> asyncOnFinish =
+                onFinish != null ? (r, e) -> {
+                    onFinish.accept(r, e);
+                    return CompletableFuture.completedFuture(null);
+                } : null;
         return execute(psop, agentCards, controlPoint, engineClient,
                 runtimeIntent, lang,
                 null, null, false, null,
-                a2aClientRuntime, eventCallback, onFinish, onEvent);
+                a2aClientRuntime, eventCallback, asyncOnFinish, onEvent);
     }
 
     @SuppressWarnings("unchecked")

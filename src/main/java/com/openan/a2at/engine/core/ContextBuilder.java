@@ -10,9 +10,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Context assembly from upstream step outputs. Mirrors Python ContextBuilder. */
 public class ContextBuilder {
+    private static final Logger log = LoggerFactory.getLogger(ContextBuilder.class);
     private final Workflow workflow;
     private final String runtimeIntent;
     private final Map<String, Integer> stepIndex;
@@ -64,6 +67,7 @@ public class ContextBuilder {
 
     public String buildContext(WorkflowStep step, Map<String, Map<String, Object>> stepOutputs) {
         if (step.getLayer() <= 0) {
+            log.info("[Context] Step {}: layer 0, using runtime intent only", step.getName());
             return runtimeIntent.isEmpty() ? "" : "## Runtime Context\n\n" + runtimeIntent;
         }
         List<String> parts = new ArrayList<>();
@@ -98,7 +102,9 @@ public class ContextBuilder {
                 parts.add("**Task**: " + taskEntry.getKey() + "\n**Output**: " + text + "\n\n");
             }
         }
-        return String.join("\n", parts).trim();
+        String result = String.join("\n", parts).trim();
+        log.info("[Context] Step {}: built context ({} chars)", step.getName(), result.length());
+        return result;
     }
 
     public String buildTaskMessage(String taskDescription, String contextMessage, String lang) {

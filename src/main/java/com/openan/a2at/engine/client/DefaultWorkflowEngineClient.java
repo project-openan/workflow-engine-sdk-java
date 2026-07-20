@@ -361,20 +361,25 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                 .timeout(Duration.ofSeconds(60));
 
-        // Apply auth + extension interceptors to build headers
+        // Auth: directly get credentials from AgentAuthManager (bypasses
+        // ClientCallInterceptor.intercept which needs typed AgentCard)
         Map<String, Object> cardAsMap = toMap(agentCard);
+        Map<String, String> headerMap = new HashMap<>();
+        applyAuthHeaders(cardAsMap, agentName, headerMap);
+        // Extension: ExtensionInterceptor does not depend on AgentCard, safe to use
         List<org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallInterceptor> interceptors =
                 authManager.buildInterceptors(cardAsMap, agentName);
-        Map<String, String> headerMap = new HashMap<>();
         for (org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallInterceptor interceptor : interceptors) {
-            try {
-                org.a2aproject.sdk.client.transport.spi.interceptors.PayloadAndHeaders ph =
-                        interceptor.intercept("message/send", requestBody, headerMap, null,
-                                new org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext(
-                                        new HashMap<>(), new HashMap<>()));
-                headerMap.putAll(ph.getHeaders());
-            } catch (Exception e) {
-                log.warn("[EngineClient] Interceptor failed: {}", e.getMessage());
+            if (interceptor instanceof ExtensionInterceptor) {
+                try {
+                    org.a2aproject.sdk.client.transport.spi.interceptors.PayloadAndHeaders ph =
+                            interceptor.intercept("message/send", requestBody, headerMap, null,
+                                    new org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext(
+                                            new HashMap<>(), new HashMap<>()));
+                    headerMap.putAll(ph.getHeaders());
+                } catch (Exception e) {
+                    log.warn("[EngineClient] Extension interceptor failed: {}", e.getMessage());
+                }
             }
         }
         for (Map.Entry<String, String> h : headerMap.entrySet()) {
@@ -611,12 +616,15 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             int round, int maxRounds, NegotiationResolver resolver) {
         Map<String, Object> negContext = result.getMetadata() != null
                 ? (Map<String, Object>) result.getMetadata().get("negotiation_context") : null;
-        String negMsg = result.getMetadata() != null
-                ? (String) result.getMetadata().getOrDefault("negotiation_message", "") : "";
+       String negMsg = result.getMetadata() != null
+               ? (String) result.getMetadata().getOrDefault("negotiation_message", "") : "";
 
+       String concernText = negMsg != null && !negMsg.isEmpty()
+               ? negMsg.substring(0, Math.min(200, negMsg.length()))
+               : "(Agent expressed uncertainty)";
         emit(EventType.NEGOTIATION_REQUEST, Map.of(
                 "agent", agentName, "round", round,
-                "concern", negMsg.substring(0, Math.min(200, negMsg.length()))));
+                "concern", concernText));
 
         if (negContext == null) {
             if (!negMsg.isEmpty() && resolver != null) {
@@ -643,33 +651,133 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             }
             return CompletableFuture.completedFuture(result);
         }
-        // A2AT negotiation path
-        if (resolver != null) {
-            return resolver.resolve(agentName, negMsg, null)
-                    .thenCompose(clarification -> {
-                        if (clarification == null || clarification.isEmpty()) {
-                            emit(EventType.NEGOTIATION_FAILED, Map.of(
-                                    "agent", agentName, "round", round,
-                                    "reason", "resolver returned empty"));
-                            return CompletableFuture.completedFuture(result);
-                        }
-                       emit(EventType.NEGOTIATION_RESOLVED, Map.of(
-                               "agent", agentName, "round", round,
-                               "clarification", clarification.substring(0, Math.min(200, clarification.length()))));
-                       // Advance the A2A-T negotiation state machine (mirrors Python's continue_negotiation)
-                       if (!continueNegotiation(negContext, clarification)) {
-                           emit(EventType.NEGOTIATION_FAILED, Map.of(
-                                   "agent", agentName, "round", round,
-                                   "reason", "continue_negotiation failed"));
-                           return CompletableFuture.completedFuture(result);
-                       }
-                       String followUp = "[NEGOTIATION_RESOLUTION]\n" + clarification
-                               + "\n\n---\nOriginal Task:\n" + originalMessage
-                               + "\n\nPlease re-execute the task based on the clarification above.";
-                       return sendMessage(agentName, followUp, contextId, null);
-                   });
+        // A2AT negotiation path: receive_negotiation -> check needResponse ->
+        // resolve clarification (resolver or default) -> continue_negotiation -> re-send
+        return resolveA2atNegotiation(agentName, originalMessage, contextId,
+                result, round, negContext, negMsg, resolver);
+    }
+
+    @SuppressWarnings("unchecked")
+    private CompletableFuture<SendMessageResult> resolveA2atNegotiation(
+            String agentName, String originalMessage, String contextId,
+            SendMessageResult result, int round,
+            Map<String, Object> negContext, String negMsg,
+            NegotiationResolver resolver) {
+        // Step 1: receive_negotiation to parse the negotiation state
+        Map<String, Object> receiveResult;
+        try {
+            Object rr = a2atClient.getClass()
+                    .getMethod("receiveNegotiation", String.class, Map.class)
+                    .invoke(a2atClient, result.getText(), negContext);
+            if (!(rr instanceof Map)) {
+                emit(EventType.NEGOTIATION_FAILED, Map.of(
+                        "agent", agentName, "round", round,
+                        "reason", "receive_negotiation returned non-Map"));
+                return CompletableFuture.completedFuture(result);
+            }
+            receiveResult = (Map<String, Object>) rr;
+        } catch (Exception e) {
+            log.warn("[Negotiation] receive_negotiation failed: {}", e.getMessage());
+            emit(EventType.NEGOTIATION_FAILED, Map.of(
+                    "agent", agentName, "round", round,
+                    "reason", "receive_negotiation failed: " + e.getMessage()));
+            return CompletableFuture.completedFuture(result);
         }
-        return CompletableFuture.completedFuture(result);
+        // Step 2: check needResponse
+        Boolean needResponse = (Boolean) receiveResult.get("needResponse");
+        if (!Boolean.TRUE.equals(needResponse)) {
+            log.warn("[Negotiation] Agent '{}' does not need a response", agentName);
+            emit(EventType.NEGOTIATION_FAILED, Map.of(
+                    "agent", agentName, "round", round,
+                    "reason", "agent did not require a response"));
+            return CompletableFuture.completedFuture(result);
+        }
+        // Step 3: resolve clarification (resolver or default)
+        String clarification;
+        if (resolver != null) {
+            try {
+                clarification = resolver.resolve(agentName, negMsg, receiveResult).join();
+            } catch (Exception e) {
+                log.warn("[Negotiation] resolver raised: {}", e.getMessage());
+                emit(EventType.NEGOTIATION_FAILED, Map.of(
+                        "agent", agentName, "round", round,
+                        "reason", "resolver raised: " + e.getMessage()));
+                return CompletableFuture.completedFuture(result);
+            }
+        } else {
+            clarification = "Please proceed with the original task using the information "
+                    + "available. If you have specific questions, state them clearly.";
+        }
+        if (clarification == null || clarification.isEmpty()) {
+            emit(EventType.NEGOTIATION_FAILED, Map.of(
+                    "agent", agentName, "round", round,
+                    "reason", "resolver returned empty"));
+            return CompletableFuture.completedFuture(result);
+        }
+        // Step 4: continue_negotiation to advance state machine
+        emit(EventType.NEGOTIATION_RESOLVED, Map.of(
+                "agent", agentName, "round", round,
+                "clarification", clarification.substring(0, Math.min(200, clarification.length()))));
+        if (!continueNegotiation(negContext, clarification)) {
+            emit(EventType.NEGOTIATION_FAILED, Map.of(
+                    "agent", agentName, "round", round,
+                    "reason", "continue_negotiation failed"));
+            return CompletableFuture.completedFuture(result);
+        }
+        // Step 5: re-send with clarification
+        String followUp = "[NEGOTIATION_RESOLUTION]\n"
+                + "The engine has reviewed your negotiation request and provides "
+                + "the following clarification:\n\n" + clarification
+                + "\n\n---\nOriginal Task:\n" + originalMessage
+                + "\n\nPlease re-execute the task based on the clarification above.";
+        return sendMessage(agentName, followUp, contextId, null);
+    }
+    /**
+     * Directly set auth headers from AgentAuthManager credential service.
+     * Bypasses ClientCallInterceptor.intercept (which needs typed AgentCard).
+     */
+    @SuppressWarnings("unchecked")
+    private void applyAuthHeaders(Map<String, Object> cardAsMap, String agentName, Map<String, String> headerMap) {
+        AgentCredentialService credSvc = authManager.getService(agentName);
+        if (credSvc == null) {
+            return;
+        }
+        Map<String, Map<String, Object>> schemeConfigs = authManager.getConfig(agentName);
+        if (schemeConfigs == null) {
+            schemeConfigs = Map.of();
+        }
+        Map<String, Object> secSchemes = (Map<String, Object>) cardAsMap.get("securitySchemes");
+        Object secReqsObj = cardAsMap.get("securityRequirements");
+        List<Map<String, Object>> secReqs = secReqsObj instanceof List ? (List<Map<String, Object>>) secReqsObj : List.of();
+        if (secSchemes == null || secSchemes.isEmpty() || secReqs.isEmpty()) {
+            return;
+        }
+        for (Map<String, Object> req : secReqs) {
+            Object schemes = req.get("schemes");
+            if (schemes instanceof Map) {
+                for (String schemeName : ((Map<String, Object>) schemes).keySet()) {
+                    Map<String, Object> schemeCfg = schemeConfigs.getOrDefault(schemeName, Map.of());
+                    String credential = credSvc.getCredential(schemeName, null);
+                    if (credential == null) {
+                        continue;
+                    }
+                    String authHeader = (String) schemeCfg.get("auth_header");
+                    if (authHeader != null && !authHeader.isEmpty()) {
+                        String prefix = (String) schemeCfg.getOrDefault("auth_header_prefix", "");
+                        headerMap.put(authHeader, prefix + credential);
+                        log.info("[Auth] Set header {} for agent {}", authHeader, agentName);
+                    } else {
+                        headerMap.put("Authorization", "Bearer " + credential);
+                        log.info("[Auth] Set Bearer header for agent {}", agentName);
+                    }
+                    String acceptHeader = (String) schemeCfg.get("accept_header");
+                    if (acceptHeader != null && !acceptHeader.isEmpty()) {
+                        headerMap.put("Accept", acceptHeader);
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     @Override

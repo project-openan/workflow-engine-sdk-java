@@ -64,6 +64,9 @@ public class WorkflowExecutor {
         } catch (Exception ignored) {
             // Engine client may not support event callback injection
         }
+        log.info("[Executor] Workflow: {}, steps={}, intent={}, lang={}",
+                workflow.getName(), workflow.getSteps().size(),
+                runtimeIntent != null ? runtimeIntent.substring(0, Math.min(80, runtimeIntent.length())) : null, lang);
     }
 
     /**
