@@ -75,9 +75,13 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                                        WorkflowEngineClientConfig config) {
         this.a2aClientRuntime = a2aClientRuntime;
         this.contextId = UUID.randomUUID().toString();
-        this.authManager = config.getCredentialsConfigPath() != null
-                ? new AgentAuthManager(config.getCredentialsConfigPath())
-                : new AgentAuthManager();
+        if (config.getCredentialsConfigPath() != null) {
+            this.authManager = new AgentAuthManager(config.getCredentialsConfigPath());
+        } else if (config.getCredentialsConfig() != null) {
+            this.authManager = new AgentAuthManager(config.getCredentialsConfig());
+        } else {
+            this.authManager = new AgentAuthManager();
+        }
         this.extensionRegistry = new ExtensionRegistry();
         if (config.getCustomHandlers() != null) {
             for (ExtensionHandler h : config.getCustomHandlers()) {
@@ -557,15 +561,30 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     public CompletableFuture<SendMessageResult> sendMessageWithNegotiation(
             String agentName, String message, int maxRounds,
             NegotiationResolver negotiationResolver) {
+        // Loop: send -> check INPUT_REQUIRED -> resolve -> re-send, up to maxRounds
         return sendMessage(agentName, message, null, null)
-                .thenCompose(result -> {
-                    if (result.getTaskState() != null
-                            && result.getTaskState().contains("INPUT_REQUIRED")
-                            && maxRounds > 0) {
-                        return resolveNegotiation(agentName, message, result, 1, maxRounds, negotiationResolver);
-                    }
-                    return CompletableFuture.completedFuture(result);
-                });
+                .thenCompose(result -> resolveNegotiationLoop(
+                        agentName, message, result, 1, maxRounds, negotiationResolver));
+    }
+
+    /**
+     * Recursive negotiation loop. Mirrors Python's {@code while} loop in
+     * {@code send_message_with_negotiation}: keeps resolving until the agent
+     * no longer needs input or max rounds is exceeded.
+     */
+    private CompletableFuture<SendMessageResult> resolveNegotiationLoop(
+            String agentName, String message, SendMessageResult result,
+            int currentRound, int maxRounds, NegotiationResolver resolver) {
+        if (!isNegotiationNeeded(result) || currentRound > maxRounds) {
+            return CompletableFuture.completedFuture(result);
+        }
+        return resolveNegotiation(agentName, message, result, currentRound, maxRounds, resolver)
+                .thenCompose(newResult -> resolveNegotiationLoop(
+                        agentName, message, newResult, currentRound + 1, maxRounds, resolver));
+    }
+
+    private static boolean isNegotiationNeeded(SendMessageResult result) {
+        return result.getTaskState() != null && result.getTaskState().contains("INPUT_REQUIRED");
     }
 
     @SuppressWarnings("unchecked")
@@ -648,5 +667,21 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     @Override
     public void registerHandler(ExtensionHandler handler) {
         extensionRegistry.register(handler);
+    }
+
+    /**
+     * Get the A2ATClient instance (for advanced Task-T / Negotiation-T usage).
+     * Mirrors Python SDK's {@code get_a2at_client()}.
+     */
+    public Object getA2atClient() {
+        return a2atClient;
+    }
+
+    /**
+     * Static utility to normalize an AgentCard dict to a compatible format.
+     * Mirrors Python SDK's {@code WorkflowEngineClient.normalize_agent_dict()}.
+     */
+    public static Map<String, Object> normalizeAgentDict(Map<String, Object> agentDict) {
+        return AgentCardNormalizer.normalize(agentDict);
     }
 }

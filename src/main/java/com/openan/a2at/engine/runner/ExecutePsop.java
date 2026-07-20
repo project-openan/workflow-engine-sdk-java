@@ -67,7 +67,7 @@ public class ExecutePsop {
         EventCallback emitter = eventCallback != null ? eventCallback : new EventCallback();
         List<Map<String, Object>> collected = Collections.synchronizedList(new ArrayList<>());
 
-        // Wrap the callback to collect events
+        // Wrap the callback to collect events + apply on_event transformer
         EventCallback collectingCallback = new EventCallback() {
             @Override
             public void onEvent(String eventType, Map<String, Object> data) {
@@ -75,8 +75,39 @@ public class ExecutePsop {
                 event.put("type", eventType);
                 event.put("data", serialize(data));
                 event.put("timestamp", System.currentTimeMillis() / 1000.0);
-                collected.add(event);
-                emitter.onEvent(eventType, data);
+                // Apply on_event transformer (same semantics as Python):
+                // null = skip, single event = replace, list = inject multiple
+                Object transformed = event;
+                if (onEvent != null) {
+                    try {
+                        transformed = onEvent.apply(event);
+                    } catch (Exception e) {
+                        log.warn("[execute_psop] on_event raised: {}", e.getMessage());
+                        transformed = event;
+                    }
+                }
+                if (transformed == null) {
+                    return;
+                }
+                if (transformed instanceof List<?> list) {
+                    for (Object e : list) {
+                        if (e instanceof Map<?, ?> m) {
+                            collected.add((Map<String, Object>) m);
+                            Object typeObj = m.get("type");
+                            Object dataObj = m.get("data");
+                            emitter.onEvent(
+                                    typeObj != null ? typeObj.toString() : eventType,
+                                    dataObj instanceof Map ? (Map<String, Object>) dataObj : Map.of());
+                        }
+                    }
+                } else if (transformed instanceof Map<?, ?> m) {
+                    collected.add((Map<String, Object>) m);
+                    Object typeObj = m.get("type");
+                    Object dataObj = m.get("data");
+                    emitter.onEvent(
+                            typeObj != null ? typeObj.toString() : eventType,
+                            dataObj instanceof Map ? (Map<String, Object>) dataObj : Map.of());
+                }
             }
         };
 

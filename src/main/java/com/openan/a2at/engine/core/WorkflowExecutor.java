@@ -61,6 +61,22 @@ public class WorkflowExecutor {
         }
     }
 
+    /**
+     * Current step outputs (mutable, updated during execution).
+     * Mirrors Python SDK's {@code current_step_outputs} property.
+     */
+    public Map<String, Map<String, Object>> getCurrentStepOutputs() {
+        return new HashMap<>(stepOutputs);
+    }
+
+    /**
+     * Execution history (mutable, updated during execution).
+     * Mirrors Python SDK's {@code history} property.
+     */
+    public List<Map<String, Object>> getHistory() {
+        return new ArrayList<>(executionHistory);
+    }
+
     private void emit(String type, Map<String, Object> data) {
         try {
             eventCallback.onEvent(type, data);
@@ -83,7 +99,8 @@ public class WorkflowExecutor {
         Set<Integer> executed = new HashSet<>();
         boolean[] failed = {false};
 
-        return executeSteps(pending, executed, failed)
+        Map<Integer, Integer> deferCount = new HashMap<>();
+        return executeSteps(pending, executed, failed, deferCount)
                 .thenApply(v -> {
                     emit(EventType.WORKFLOW_COMPLETE, Map.of());
                     log.info("[Executor] Workflow completed: {}, {} task(s) executed", workflow.getName(), executionHistory.size());
@@ -96,19 +113,29 @@ public class WorkflowExecutor {
                 });
     }
 
-    private CompletableFuture<Void> executeSteps(Deque<Integer> pending, Set<Integer> executed, boolean[] failed) {
+    private CompletableFuture<Void> executeSteps(
+            Deque<Integer> pending, Set<Integer> executed,
+            boolean[] failed, Map<Integer, Integer> deferCount) {
         if (pending.isEmpty() || failed[0]) {
             return CompletableFuture.completedFuture(null);
         }
         int idx = pending.pollFirst();
         if (idx >= workflow.getSteps().size() || executed.contains(idx)) {
-            return executeSteps(pending, executed, failed);
+            return executeSteps(pending, executed, failed, deferCount);
         }
         var step = workflow.getSteps().get(idx);
         var preds = contextBuilder.getStepPredecessors(step.getName());
         if (!preds.stream().allMatch(stepOutputs::containsKey)) {
+            int dc = deferCount.getOrDefault(idx, 0) + 1;
+            if (dc > workflow.getSteps().size()) {
+                log.warn("Step {} deferred too many times, skipping", step.getName());
+                executed.add(idx);
+                return executeSteps(pending, executed, failed, deferCount);
+            }
+            deferCount.put(idx, dc);
             pending.addLast(idx);
-            return CompletableFuture.completedFuture(null).thenComposeAsync(v -> executeSteps(pending, executed, failed));
+            return CompletableFuture.completedFuture(null)
+                    .thenComposeAsync(v -> executeSteps(pending, executed, failed, deferCount));
         }
         executed.add(idx);
         emit(EventType.STEP_START, Map.of("step", step.getName()));
@@ -134,7 +161,7 @@ public class WorkflowExecutor {
                                 }
                             });
                 })
-                .thenCompose(v -> executeSteps(pending, executed, failed));
+                .thenCompose(v -> executeSteps(pending, executed, failed, deferCount));
     }
 
     private record StepResult(String taskDesc, Object output, boolean success, Map<String, Object> results) {}
@@ -161,7 +188,7 @@ public class WorkflowExecutor {
 
             futures.add(controlPoint.onTask(request, engineClient).thenApply(response -> {
                 task.setStatus(response.isSuccess() ? TaskStatus.SUCCESS : TaskStatus.FAILED);
-                emit(EventType.TASK_STATUS_CHANGED, Map.of("step", step.getName(), "subtask_index", subtaskIndex, "agent", task.getAgent(), "status", task.getStatus().name()));
+                emit(EventType.TASK_STATUS_CHANGED, Map.of("step", step.getName(), "subtask_index", subtaskIndex, "agent", task.getAgent(), "status", task.getStatus().getValue()));
                 String status = response.isSuccess() ? "success" : "failed";
                 log.info("[Executor] Task {} -> {}: {}", task.getDescription().substring(0, Math.min(60, task.getDescription().length())), task.getAgent(), status);
                 executionHistory.add(Map.of("step", step.getName(), "task", task.getDescription(), "agent", task.getAgent(), "status", status, "output", response.isSuccess() ? response.getOutput() : (response.getError() != null ? response.getError() : "")));
@@ -169,7 +196,7 @@ public class WorkflowExecutor {
                 return new StepResult(task.getDescription(), response.isSuccess() ? response.getOutput() : response.getError(), response.isSuccess(), null);
             }).exceptionally(e -> {
                 task.setStatus(TaskStatus.FAILED);
-                emit(EventType.TASK_STATUS_CHANGED, Map.of("step", step.getName(), "subtask_index", subtaskIndex, "agent", task.getAgent(), "status", TaskStatus.FAILED.name()));
+                emit(EventType.TASK_STATUS_CHANGED, Map.of("step", step.getName(), "subtask_index", subtaskIndex, "agent", task.getAgent(), "status", TaskStatus.FAILED.getValue()));
                 log.error("[Executor] Task {} -> {}: exception: {}", task.getDescription(), task.getAgent(), e.getMessage());
                 executionHistory.add(Map.of("step", step.getName(), "task", task.getDescription(), "agent", task.getAgent(), "status", "failed", "output", e.getMessage()));
                 return new StepResult(task.getDescription(), e.getMessage(), false, null);

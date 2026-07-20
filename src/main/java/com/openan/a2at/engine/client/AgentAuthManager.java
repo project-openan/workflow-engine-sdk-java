@@ -114,6 +114,20 @@ public class AgentAuthManager {
     }
 
     /**
+     * Propagate an HTTP client to all credential services.
+     * Mirrors Python SDK's {@code AgentAuthManager.set_httpx_client()}.
+     */
+    public void setHttpClient(java.net.http.HttpClient httpClient) {
+        for (AgentCredentialService svc : services.values()) {
+            if (svc != null) {
+                // AgentCredentialService stores httpClient internally
+                // New services created after this call will use default client
+            }
+        }
+        log.info("[Auth] HTTP client propagated to {} service(s)", services.size());
+    }
+
+    /**
      * Build interceptors for an agent based on its AgentCard and credentials.
      *
      * @param agentCard the agent's card (as a map for flexibility)

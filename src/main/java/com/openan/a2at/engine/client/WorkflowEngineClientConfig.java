@@ -19,6 +19,7 @@
 package com.openan.a2at.engine.client;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Configuration for DefaultWorkflowEngineClient.
@@ -31,6 +32,7 @@ public class WorkflowEngineClientConfig {
     private final boolean sslVerify;
     private final String caCertsPath;
     private final String credentialsConfigPath;
+    private final Map<String, Map<String, Map<String, Object>>> credentialsConfig;
     private final String a2atEnvPath;
     private final List<ExtensionHandler> customHandlers;
 
@@ -38,6 +40,7 @@ public class WorkflowEngineClientConfig {
         this.sslVerify = b.sslVerify;
         this.caCertsPath = b.caCertsPath;
         this.credentialsConfigPath = b.credentialsConfigPath;
+        this.credentialsConfig = b.credentialsConfig;
         this.a2atEnvPath = b.a2atEnvPath;
         this.customHandlers = b.customHandlers;
     }
@@ -52,6 +55,10 @@ public class WorkflowEngineClientConfig {
 
     public String getCredentialsConfigPath() {
         return credentialsConfigPath;
+    }
+
+    public Map<String, Map<String, Map<String, Object>>> getCredentialsConfig() {
+        return credentialsConfig;
     }
 
     public String getA2atEnvPath() {
@@ -70,6 +77,7 @@ public class WorkflowEngineClientConfig {
         private boolean sslVerify = true;
         private String caCertsPath = null;
         private String credentialsConfigPath = null;
+        private Map<String, Map<String, Map<String, Object>>> credentialsConfig = null;
         private String a2atEnvPath = null;
         private List<ExtensionHandler> customHandlers = null;
 
@@ -85,6 +93,11 @@ public class WorkflowEngineClientConfig {
 
         public Builder credentialsConfigPath(String v) {
             this.credentialsConfigPath = v;
+            return this;
+        }
+
+        public Builder credentialsConfig(Map<String, Map<String, Map<String, Object>>> v) {
+            this.credentialsConfig = v;
             return this;
         }
 
