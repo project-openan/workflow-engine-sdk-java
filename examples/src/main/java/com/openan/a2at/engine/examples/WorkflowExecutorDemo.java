@@ -1,6 +1,7 @@
 package com.openan.a2at.engine.examples;
 
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
+import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
@@ -38,8 +39,13 @@ public class WorkflowExecutorDemo {
         // 2. Load workflow
         Workflow workflow = LoadPsop.load(orchUrl, "psop_cross_city_fault", null, false);
 
-        // 3. Create engine client (use try-with-resources for cleanup)
-        try (var client = new DefaultWorkflowEngineClient((List) agentCards, null)) {
+        // 3. Create engine client with config (use try-with-resources for cleanup)
+        try (var client = new DefaultWorkflowEngineClient(
+                (List) agentCards, null,
+                WorkflowEngineClientConfig.builder()
+                        .sslVerify(false)
+                        .a2atEnvPath(".env")
+                        .build())) {
             // 4. Create executor with event callback
             EventCallback callback = new EventCallback() {
                 @Override

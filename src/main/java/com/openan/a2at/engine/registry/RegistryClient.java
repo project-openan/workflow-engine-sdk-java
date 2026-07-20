@@ -1,5 +1,6 @@
 package com.openan.a2at.engine.registry;
 
+import com.openan.a2at.engine.client.AgentCardNormalizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +46,8 @@ public class RegistryClient {
         }
         Map<String, Object> data = mapper.readValue(resp.body(), Map.class);
         List<Map<String, Object>> cards = (List<Map<String, Object>>) data.getOrDefault("agentCards", data.getOrDefault("data", List.of()));
+        // Normalize each card's security schemes to a compatible format
+        cards = cards.stream().map(AgentCardNormalizer::normalize).toList();
         log.info("[Registry] Received {} agent card(s)", cards.size());
         return cards;
     }
@@ -68,7 +71,7 @@ public class RegistryClient {
             return null;
         }
         log.info("[Registry] Agent card found: name={}", name);
-        return cards.get(0);
+        return AgentCardNormalizer.normalize(cards.get(0));
     }
 
     public String getBaseUrl() {

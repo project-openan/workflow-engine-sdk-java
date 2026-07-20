@@ -49,4 +49,14 @@ public interface WorkflowEngineClient {
     void setEventCallback(EventCallback callback);
     void close();
     java.util.List<String> getAgentNames();
+
+    /** Update the agent card map (e.g. after fetching new cards). */
+    default void updateAgentCards(java.util.List<?> agentCards) {
+        // Default no-op; implementations override
+    }
+
+    /** Register a custom extension handler. */
+    default void registerHandler(ExtensionHandler handler) {
+        // Default no-op; implementations override
+    }
 }

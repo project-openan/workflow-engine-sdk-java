@@ -1,6 +1,7 @@
 package com.openan.a2at.engine.runner;
 
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
+import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
@@ -53,6 +54,10 @@ public class ExecutePsop {
             WorkflowEngineClient engineClient,
             String runtimeIntent,
             String lang,
+            String a2atEnvPath,
+            String credentialsConfigPath,
+            boolean sslVerify,
+            String caCertsPath,
             Object a2aClientRuntime,
             EventCallback eventCallback,
             BiConsumer<ExecutionResult, List<Map<String, Object>>> onFinish,
@@ -77,7 +82,13 @@ public class ExecutePsop {
 
         // Create engine client if not provided
         WorkflowEngineClient client = engineClient != null ? engineClient
-                : new DefaultWorkflowEngineClient(agentCards, a2aClientRuntime);
+                : new DefaultWorkflowEngineClient(agentCards, a2aClientRuntime,
+                        WorkflowEngineClientConfig.builder()
+                                .sslVerify(sslVerify)
+                                .caCertsPath(caCertsPath)
+                                .credentialsConfigPath(credentialsConfigPath)
+                                .a2atEnvPath(a2atEnvPath)
+                                .build());
         client.setEventCallback(collectingCallback);
 
         // Create executor
@@ -127,11 +138,31 @@ public class ExecutePsop {
                     } catch (Exception ignored) {
                         // Close failures are non-fatal during shutdown
                     }
-                    return result;
+                   return result;
                 });
     }
 
     /** Make event data JSON-serializable. */
+    /**
+     * Simplified overload without SSL/auth/A2AT config (legacy compatibility).
+     */
+    public static CompletableFuture<ExecutionResult> execute(
+            Object psop,
+            List<?> agentCards,
+            ControlPoint controlPoint,
+            WorkflowEngineClient engineClient,
+            String runtimeIntent,
+            String lang,
+            Object a2aClientRuntime,
+            EventCallback eventCallback,
+            BiConsumer<ExecutionResult, List<Map<String, Object>>> onFinish,
+            Function<Map<String, Object>, Object> onEvent) {
+        return execute(psop, agentCards, controlPoint, engineClient,
+                runtimeIntent, lang,
+                null, null, false, null,
+                a2aClientRuntime, eventCallback, onFinish, onEvent);
+    }
+
     @SuppressWarnings("unchecked")
     private static Object serialize(Object data) {
         if (data == null) {
