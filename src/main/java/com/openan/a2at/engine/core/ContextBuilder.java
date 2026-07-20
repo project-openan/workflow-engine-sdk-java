@@ -2,7 +2,14 @@ package com.openan.a2at.engine.core;
 
 import com.openan.a2at.engine.model.Workflow;
 import com.openan.a2at.engine.model.WorkflowStep;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /** Context assembly from upstream step outputs. Mirrors Python ContextBuilder. */
 public class ContextBuilder {
@@ -96,8 +103,12 @@ public class ContextBuilder {
 
     public String buildTaskMessage(String taskDescription, String contextMessage, String lang) {
         String langHint = "";
-        if ("en".equals(lang)) langHint = "\n\nPlease respond in English.";
-        if ("zh".equals(lang)) langHint = "\n\n\u8bf7\u7528\u4e2d\u6587\u56de\u590d\u3002";
+        if ("en".equals(lang)) {
+            langHint = "\n\nPlease respond in English.";
+        }
+        if ("zh".equals(lang)) {
+            langHint = "\n\n\u8bf7\u7528\u4e2d\u6587\u56de\u590d\u3002";
+        }
         if (contextMessage != null && !contextMessage.isEmpty()) {
             return contextMessage + "\n\n## Current Task\n" + taskDescription + langHint;
         }

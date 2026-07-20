@@ -1,7 +1,7 @@
 package com.openan.a2at.engine.registry;
 
-import com.openan.a2at.engine.model.Workflow;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openan.a2at.engine.model.Workflow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,23 +20,27 @@ public class LoadPsop {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     public static Workflow load(String baseUrl, String psopId, String accessToken, boolean sslVerify)
-            throws Exception {
-        String url = baseUrl + "/api/v1/orchestrate/psop/" + psopId;
+           throws Exception {
+        StringBuilder urlBuilder = new StringBuilder(baseUrl)
+                .append("/api/v1/orchestrate/psop/")
+                .append(psopId);
+        if (accessToken != null && !accessToken.isEmpty()) {
+            urlBuilder.append("?access_token=").append(accessToken);
+        }
+        String url = urlBuilder.toString();
         log.info("[Registry] Loading PSOP from {} (ssl_verify={})", url, sslVerify);
+        if (!sslVerify) {
+            // TODO: configure trust-all SSL context for development use
+            // Production should always verify server certificates
+        }
         HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(java.time.Duration.ofSeconds(30))
                 .build();
-        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
+        HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .GET();
-        if (accessToken != null && !accessToken.isEmpty()) {
-            // Add as query param
-            url += "?access_token=" + accessToken;
-            reqBuilder = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .GET();
-        }
-        HttpResponse<String> resp = client.send(reqBuilder.build(), HttpResponse.BodyHandlers.ofString());
+                .GET()
+                .build();
+        HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() != 200) {
             throw new RuntimeException("Orchestration center returned " + resp.statusCode());
         }

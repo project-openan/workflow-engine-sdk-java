@@ -7,7 +7,10 @@ import lombok.Builder;
 import java.util.List;
 import java.util.Map;
 
-@Data @NoArgsConstructor @AllArgsConstructor @Builder
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class ExecutionResult {
     private boolean success;
     private List<Map<String, Object>> history;

@@ -5,9 +5,13 @@ import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.SendMessageResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Default implementation of WorkflowEngineClient.
@@ -78,7 +82,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private void emit(String type, Map<String, Object> data) {
         try {
             eventCallback.onEvent(type, data);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            // Event callback failures are non-fatal
+        }
     }
 
     @Override
@@ -199,13 +205,17 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 Object first = ((List<?>) interfaces).get(0);
                 return (String) first.getClass().getMethod("getUrl").invoke(first);
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            // AgentCard shape not reflectable; URL resolution skipped
+        }
         return null;
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> toMap(Object card) {
-        if (card instanceof Map) return (Map<String, Object>) card;
+        if (card instanceof Map) {
+            return (Map<String, Object>) card;
+        }
         return Map.of();
     }
 
@@ -215,7 +225,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         Map<String, Object> params = new HashMap<>();
         params.put("message", message);
         params.put("contextId", contextId);
-        if (metadata != null) params.put("metadata", metadata);
+        if (metadata != null) {
+            params.put("metadata", metadata);
+        }
         return params;
     }
 
@@ -237,14 +249,20 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                             for (Object part : (List<?>) parts) {
                                 try {
                                     String text = (String) part.getClass().getMethod("getText").invoke(part);
-                                    if (text != null && !text.isEmpty()) return text;
-                                } catch (Exception ignored) {}
+                                    if (text != null && !text.isEmpty()) {
+                                        return text;
+                                    }
+                                } catch (Exception ignored) {
+                                    // Part shape mismatch, skip
+                                }
                             }
                         }
                     }
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            // Task path extraction failed, try message path
+        }
         try {
             Object msg = event.getClass().getMethod("getMessage").invoke(event);
             if (msg != null) {
@@ -252,11 +270,15 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 if (parts instanceof List) {
                     for (Object part : (List<?>) parts) {
                         String text = (String) part.getClass().getMethod("getText").invoke(part);
-                        if (text != null && !text.isEmpty()) return text;
+                        if (text != null && !text.isEmpty()) {
+                            return text;
+                        }
                     }
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            // Message path extraction failed
+        }
         return null;
     }
 
@@ -265,9 +287,13 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             Object task = event.getClass().getMethod("getTask").invoke(event);
             if (task != null) {
                 Object metadata = task.getClass().getMethod("getMetadata").invoke(task);
-                if (metadata instanceof Map) return (Map<String, Object>) metadata;
+                if (metadata instanceof Map) {
+                    return (Map<String, Object>) metadata;
+                }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            // Metadata not reflectable
+        }
         return null;
     }
 

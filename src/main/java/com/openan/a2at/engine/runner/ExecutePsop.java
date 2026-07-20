@@ -11,8 +11,13 @@ import com.openan.a2at.engine.model.Workflow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -117,7 +122,11 @@ public class ExecutePsop {
                     // Emit close
                     collectingCallback.onEvent(EventType.CLOSE, Map.of());
                     // Close engine client
-                    try { client.close(); } catch (Exception ignored) {}
+                    try {
+                        client.close();
+                    } catch (Exception ignored) {
+                        // Close failures are non-fatal during shutdown
+                    }
                     return result;
                 });
     }
@@ -125,8 +134,12 @@ public class ExecutePsop {
     /** Make event data JSON-serializable. */
     @SuppressWarnings("unchecked")
     private static Object serialize(Object data) {
-        if (data == null) return null;
-        if (data instanceof String || data instanceof Number || data instanceof Boolean) return data;
+        if (data == null) {
+            return null;
+        }
+        if (data instanceof String || data instanceof Number || data instanceof Boolean) {
+            return data;
+        }
         if (data instanceof Map) {
             Map<String, Object> result = new LinkedHashMap<>();
             for (var entry : ((Map<String, Object>) data).entrySet()) {

@@ -3,12 +3,27 @@ package com.openan.a2at.engine.core;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
-import com.openan.a2at.engine.model.*;
+import com.openan.a2at.engine.model.ExecutionResult;
+import com.openan.a2at.engine.model.JumpCondition;
+import com.openan.a2at.engine.model.StepType;
+import com.openan.a2at.engine.model.Task;
+import com.openan.a2at.engine.model.TaskRequest;
+import com.openan.a2at.engine.model.TaskStatus;
+import com.openan.a2at.engine.model.Workflow;
+import com.openan.a2at.engine.model.WorkflowStep;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -41,7 +56,9 @@ public class WorkflowExecutor {
         this.lang = lang != null ? lang : "zh";
         try {
             this.engineClient.setEventCallback(this.eventCallback);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            // Engine client may not support event callback injection
+        }
     }
 
     private void emit(String type, Map<String, Object> data) {
@@ -165,13 +182,17 @@ public class WorkflowExecutor {
                         @SuppressWarnings("unchecked")
                         var firstResult = (StepResult) obj;
                         Map<String, Object> results = new HashMap<>();
-                        for (var f : futures) {
-                            if (!f.isDone()) f.cancel(true);
+                       for (var f : futures) {
+                            if (!f.isDone()) {
+                                f.cancel(true);
+                            }
                             if (f.isDone() && !f.isCompletedExceptionally()) {
                                 try {
                                     var r = f.join();
                                     results.put(r.taskDesc(), r.output());
-                                } catch (Exception ignored) {}
+                                } catch (Exception ignored) {
+                                    // Cancellation race, skip
+                                }
                             }
                         }
                         return new StepResult(null, null, true, results);
@@ -181,10 +202,12 @@ public class WorkflowExecutor {
                 .thenApply(v -> {
                     Map<String, Object> results = new HashMap<>();
                     boolean anyFailed = false;
-                    for (var f : futures) {
-                        var r = f.join();
-                        results.put(r.taskDesc(), r.output());
-                        if (!r.success()) anyFailed = true;
+                   for (var f : futures) {
+                       var r = f.join();
+                       results.put(r.taskDesc(), r.output());
+                        if (!r.success()) {
+                            anyFailed = true;
+                        }
                     }
                     return new StepResult(null, null, !anyFailed, results);
                 });
@@ -197,9 +220,13 @@ public class WorkflowExecutor {
         if (step.getNext().stream().allMatch(jc -> jc.getCondition() == null || jc.getCondition().isEmpty())) {
             List<Integer> indices = new ArrayList<>();
             for (var jc : step.getNext()) {
-                if (jc.getStep().equals("end") || jc.getStep().equals("retry") || jc.getStep().equals("endNode")) continue;
+                if (jc.getStep().equals("end") || jc.getStep().equals("retry") || jc.getStep().equals("endNode")) {
+                    continue;
+                }
                 Integer idx = contextBuilder.findStepIndex(jc.getStep());
-                if (idx != null) indices.add(idx);
+                if (idx != null) {
+                    indices.add(idx);
+                }
             }
             return CompletableFuture.completedFuture(indices);
         }

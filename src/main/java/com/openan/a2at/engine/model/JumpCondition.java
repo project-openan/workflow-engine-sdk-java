@@ -5,8 +5,12 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 
-@Data @NoArgsConstructor @AllArgsConstructor @Builder
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class JumpCondition {
     private String step;
-    @Builder.Default private String condition = "";
+    @Builder.Default
+    private String condition = "";
 }

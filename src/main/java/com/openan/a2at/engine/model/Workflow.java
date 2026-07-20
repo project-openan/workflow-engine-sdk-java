@@ -4,14 +4,23 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
-@Data @NoArgsConstructor @AllArgsConstructor @Builder
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Workflow {
-    @Builder.Default private String id = "";
-    @Builder.Default private String name = "";
-    @Builder.Default private String description = "";
-    @Builder.Default private List<WorkflowStep> steps = List.of();
+    @Builder.Default
+    private String id = "";
+    @Builder.Default
+    private String name = "";
+    @Builder.Default
+    private String description = "";
+    @Builder.Default
+    private List<WorkflowStep> steps = List.of();
 
     @SuppressWarnings("unchecked")
     public static Workflow fromMap(Map<String, Object> data) {
