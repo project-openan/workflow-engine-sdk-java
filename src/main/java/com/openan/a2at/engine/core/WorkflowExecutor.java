@@ -204,40 +204,91 @@ public class WorkflowExecutor {
         }
 
         if (step.getStepType() == StepType.ANY_SUCCESS) {
-            return CompletableFuture.anyOf(futures.toArray(new CompletableFuture[0]))
-                    .thenApply(obj -> {
-                        @SuppressWarnings("unchecked")
-                        var firstResult = (StepResult) obj;
-                        Map<String, Object> results = new HashMap<>();
-                       for (var f : futures) {
-                            if (!f.isDone()) {
-                                f.cancel(true);
-                            }
-                            if (f.isDone() && !f.isCompletedExceptionally()) {
-                                try {
-                                    var r = f.join();
-                                    results.put(r.taskDesc(), r.output());
-                                } catch (Exception ignored) {
-                                    // Cancellation race, skip
-                                }
-                            }
-                        }
-                        return new StepResult(null, null, true, results);
-                    });
+            // ANY_SUCCESS: wait until the first subtask succeeds, then cancel the rest.
+            // Mirrors Python's asyncio.as_completed loop that returns on first success.
+            return anySuccess(futures);
         }
         return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                 .thenApply(v -> {
                     Map<String, Object> results = new HashMap<>();
                     boolean anyFailed = false;
-                   for (var f : futures) {
-                       var r = f.join();
-                       results.put(r.taskDesc(), r.output());
+                    for (var f : futures) {
+                        var r = f.join();
+                        results.put(r.taskDesc(), r.output());
                         if (!r.success()) {
                             anyFailed = true;
                         }
                     }
                     return new StepResult(null, null, !anyFailed, results);
                 });
+    }
+
+    /**
+     * ANY_SUCCESS logic: iterate futures as they complete; on the first
+     * success, cancel the rest and return success=true. If all fail,
+     * return success=false. Mirrors Python's asyncio.as_completed loop.
+     */
+    private CompletableFuture<StepResult> anySuccess(List<CompletableFuture<StepResult>> futures) {
+        if (futures.isEmpty()) {
+            return CompletableFuture.completedFuture(new StepResult(null, null, true, Map.of()));
+        }
+        CompletableFuture<StepResult> result = new CompletableFuture<>();
+        int total = futures.size();
+        int[] completed = {0};
+        int[] failedCount = {0};
+
+        for (CompletableFuture<StepResult> f : futures) {
+            f.handle((sr, ex) -> {
+                synchronized (completed) {
+                    completed[0]++;
+                    boolean success = (ex == null && sr != null && sr.success());
+                    if (success && !result.isDone()) {
+                        // Cancel all remaining
+                        for (CompletableFuture<StepResult> other : futures) {
+                            if (!other.isDone()) {
+                                other.cancel(true);
+                            }
+                        }
+                        // Collect results from completed futures
+                        Map<String, Object> results = new HashMap<>();
+                        for (CompletableFuture<StepResult> cf : futures) {
+                            if (cf.isDone() && !cf.isCompletedExceptionally()) {
+                                try {
+                                    var r = cf.join();
+                                    if (r != null && r.taskDesc() != null) {
+                                        results.put(r.taskDesc(), r.output());
+                                    }
+                                } catch (Exception ignored) {
+                                    // Cancellation race, skip
+                                }
+                            }
+                        }
+                        result.complete(new StepResult(null, null, true, results));
+                    } else if (!success) {
+                        failedCount[0]++;
+                        if (completed[0] == total && !result.isDone()) {
+                            // All failed
+                            Map<String, Object> results = new HashMap<>();
+                            for (CompletableFuture<StepResult> cf : futures) {
+                                if (cf.isDone() && !cf.isCompletedExceptionally()) {
+                                    try {
+                                        var r = cf.join();
+                                        if (r != null && r.taskDesc() != null) {
+                                            results.put(r.taskDesc(), r.output());
+                                        }
+                                    } catch (Exception ignored) {
+                                        // Cancellation race, skip
+                                    }
+                                }
+                            }
+                            result.complete(new StepResult(null, null, false, results));
+                        }
+                    }
+                }
+                return null;
+            });
+        }
+        return result;
     }
 
     private CompletableFuture<List<Integer>> determineNextSteps(WorkflowStep step, Map<String, Object> stepResult) {

@@ -60,6 +60,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private final AgentAuthManager authManager;
     private final ExtensionRegistry extensionRegistry;
     private final Object a2atClient;
+    private final boolean sslVerify;
     private final String contextId;
     private EventCallback eventCallback = new EventCallback();
     private Object controlPoint;
@@ -75,6 +76,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                                        WorkflowEngineClientConfig config) {
         this.a2aClientRuntime = a2aClientRuntime;
         this.contextId = UUID.randomUUID().toString();
+        this.sslVerify = config.isSslVerify();
         if (config.getCredentialsConfigPath() != null) {
             this.authManager = new AgentAuthManager(config.getCredentialsConfigPath());
         } else if (config.getCredentialsConfig() != null) {
@@ -313,9 +315,25 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             throw new RuntimeException("Cannot resolve agent URL for: " + agentName);
         }
         log.info("[EngineClient] Raw HTTP POST to {}", url);
-        HttpClient client = HttpClient.newBuilder()
+        HttpClient.Builder clientBuilder = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(60))
-                .build();
+                .followRedirects(HttpClient.Redirect.ALWAYS);
+        if (!sslVerify) {
+            try {
+                javax.net.ssl.SSLContext trustAllCtx = javax.net.ssl.SSLContext.getInstance("TLS");
+                trustAllCtx.init(null, new javax.net.ssl.TrustManager[]{new javax.net.ssl.X509TrustManager() {
+                    public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+                    public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                        return new java.security.cert.X509Certificate[0];
+                    }
+                }}, null);
+                clientBuilder.sslContext(trustAllCtx);
+            } catch (Exception e) {
+                log.warn("[EngineClient] Failed to disable TLS: {}", e.getMessage());
+            }
+        }
+        HttpClient client = clientBuilder.build();
 
         // Build JSON-RPC message/send request body
         Map<String, Object> requestBody = new HashMap<>();

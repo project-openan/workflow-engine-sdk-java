@@ -27,9 +27,26 @@ public class RegistryClient {
     public RegistryClient(String url, boolean verifySsl) {
         this.baseUrl = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
         this.verifySsl = verifySsl;
-        this.httpClient = HttpClient.newBuilder()
+        HttpClient.Builder clientBuilder = HttpClient.newBuilder()
                 .connectTimeout(java.time.Duration.ofSeconds(30))
-                .build();
+                .followRedirects(HttpClient.Redirect.ALWAYS);
+        if (!verifySsl) {
+            try {
+                javax.net.ssl.SSLContext trustAllCtx = javax.net.ssl.SSLContext.getInstance("TLS");
+                trustAllCtx.init(null, new javax.net.ssl.TrustManager[]{new javax.net.ssl.X509TrustManager() {
+                    public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+                    public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                        return new java.security.cert.X509Certificate[0];
+                    }
+                }}, null);
+                clientBuilder.sslContext(trustAllCtx);
+                log.warn("[Registry] TLS verification disabled (development only)");
+            } catch (Exception e) {
+                log.warn("[Registry] Failed to disable TLS: {}", e.getMessage());
+            }
+        }
+        this.httpClient = clientBuilder.build();
     }
 
     @SuppressWarnings("unchecked")
@@ -54,8 +71,20 @@ public class RegistryClient {
 
     @SuppressWarnings("unchecked")
     public Map<String, Object> fetchAgentCard(String name) throws Exception {
-        String url = baseUrl + "/rest/v1/registry-center/agent-cards?name=" + name;
-        log.info("[Registry] Fetching agent card: name={}", name);
+        return fetchAgentCard(name, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> fetchAgentCard(String name, String organization) throws Exception {
+        StringBuilder urlBuilder = new StringBuilder(baseUrl)
+                .append("/rest/v1/registry-center/agent-cards?name=")
+                .append(java.net.URLEncoder.encode(name != null ? name : "", java.nio.charset.StandardCharsets.UTF_8));
+        if (organization != null && !organization.isEmpty()) {
+            urlBuilder.append("&organization=")
+                    .append(java.net.URLEncoder.encode(organization, java.nio.charset.StandardCharsets.UTF_8));
+        }
+        String url = urlBuilder.toString();
+        log.info("[Registry] Fetching agent card: name={}, org={}", name, organization);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .GET()

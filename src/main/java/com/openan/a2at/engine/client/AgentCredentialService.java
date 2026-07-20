@@ -57,9 +57,28 @@ public class AgentCredentialService implements CredentialService {
                                   HttpClient httpClient) {
         this.agentName = agentName;
         this.schemeConfigs = schemeConfigs != null ? schemeConfigs : Map.of();
-        this.httpClient = httpClient != null ? httpClient : HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(30))
-                .build();
+        if (httpClient != null) {
+            this.httpClient = httpClient;
+        } else {
+            HttpClient.Builder b = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .followRedirects(HttpClient.Redirect.ALWAYS);
+            // Disable TLS verification (mirrors Python's verify=False for login endpoints)
+            try {
+                javax.net.ssl.SSLContext trustAllCtx = javax.net.ssl.SSLContext.getInstance("TLS");
+                trustAllCtx.init(null, new javax.net.ssl.TrustManager[]{new javax.net.ssl.X509TrustManager() {
+                    public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+                    public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                        return new java.security.cert.X509Certificate[0];
+                    }
+                }}, null);
+                b.sslContext(trustAllCtx);
+            } catch (Exception e) {
+                log.warn("[Auth] Failed to disable TLS for login endpoint: {}", e.getMessage());
+            }
+            this.httpClient = b.build();
+        }
     }
 
     @Override
@@ -108,7 +127,7 @@ public class AgentCredentialService implements CredentialService {
         }
 
         try {
-            log.info("[Auth] Login attempt: agent={}, method={}, url={}", agentName, method, loginUrl);
+            log.info("[Auth] Login attempt: agent={}, method={}, url={}, params={}", agentName, method, loginUrl, sanitizeBody(body));
             HttpRequest.BodyPublisher bodyPublisher;
             if ("application/x-www-form-urlencoded".equals(contentType)) {
                 StringBuilder form = new StringBuilder();
@@ -182,5 +201,22 @@ public class AgentCredentialService implements CredentialService {
         boolean isExpired() {
             return System.currentTimeMillis() / 1000 >= expiresAt - 60;
         }
+    }
+
+    /**
+     * Mask sensitive fields (password, value, accessSession) for safe logging.
+     * Mirrors Python SDK's {@code _sanitize_body()}.
+     */
+    private static Map<String, Object> sanitizeBody(Map<String, Object> body) {
+        Map<String, Object> sanitized = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : body.entrySet()) {
+            String key = e.getKey().toLowerCase();
+            if (key.equals("password") || key.equals("value") || key.equals("accesssession")) {
+                sanitized.put(e.getKey(), "***");
+            } else {
+                sanitized.put(e.getKey(), e.getValue());
+            }
+        }
+        return sanitized;
     }
 }

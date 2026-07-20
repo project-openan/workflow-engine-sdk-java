@@ -48,15 +48,29 @@ public class Workflow {
                         .condition((String) jc.getOrDefault("condition", ""))
                         .build());
             }
-            String stValue = (String) s.getOrDefault("step_type", s.getOrDefault("type", "AllSuccess"));
-            steps.add(WorkflowStep.builder()
-                    .name((String) s.getOrDefault("name", ""))
-                    .subtasks(subtasks)
-                    .next(nextList)
-                    .layer((Integer) s.getOrDefault("layer", 0))
-                    .contextFrom((List<String>) s.get("context_from"))
-                    .stepType(StepType.fromValue(stValue))
-                    .build());
+           String stValue = (String) s.getOrDefault("step_type", s.getOrDefault("type", "AllSuccess"));
+            // Handle context_from: may be a single string instead of a list
+            List<String> contextFrom = null;
+            Object cfRaw = s.get("context_from");
+            if (cfRaw instanceof List) {
+                contextFrom = (List<String>) cfRaw;
+            } else if (cfRaw instanceof String cfStr && !cfStr.isEmpty()) {
+                contextFrom = List.of(cfStr);
+            }
+            // Handle layer: may be Integer or Number
+            int layer = 0;
+            Object layerRaw = s.get("layer");
+            if (layerRaw instanceof Number num) {
+                layer = num.intValue();
+            }
+           steps.add(WorkflowStep.builder()
+                   .name((String) s.getOrDefault("name", ""))
+                   .subtasks(subtasks)
+                   .next(nextList)
+                    .layer(layer)
+                    .contextFrom(contextFrom)
+                   .stepType(StepType.fromValue(stValue))
+                   .build());
         }
         wf.setSteps(steps);
         return wf;
