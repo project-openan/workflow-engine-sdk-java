@@ -145,6 +145,32 @@ ExecutePsop.execute(
 > returning the event unchanged, `null` (skip this event), or a `List` of
 > events (inject multiple). Semantics match the Python `on_event`.
 
+### 4.1 Builder API (recommended)
+
+Prefer the fluent `Builder` over the 14-argument static `execute()`. It is
+type-safe, readable, and validates required fields at call time:
+
+```java
+ExecutionResult result = ExecutePsop.builder()
+    .psop(workflow)
+    .agentCards(agentCards)
+    .controlPoint(new MyControlPoint())
+    .engineClient(myClient)        // optional, auto-created if omitted
+    .runtimeIntent("Diagnose SPN fault")
+    .lang("zh")
+    .sslVerify(false)              // self-signed cert in dev
+    .a2atEnvPath(".env")           // A2A-T SDK config (Task-T prompts)
+    .credentialsConfigPath("agent_credentials.json") // agent auth
+    .eventCallback(new EventCallback())
+    .onFinish((r, e) -> { persist(r); return CompletableFuture.completedFuture(null); })
+    .execute()
+    .join();
+```
+
+Required: `psop`, `controlPoint`. All others have sensible defaults.
+`onFinish` accepts both the async `BiFunction<..., CompletableFuture<Void>>`
+and a sync `BiConsumer` overload.
+
 ## 5. Event Types
 
 Events come from three layers: the runner (lifecycle bracket), the

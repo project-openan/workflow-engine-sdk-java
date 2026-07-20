@@ -94,7 +94,9 @@ public class WorkflowExecutor {
     }
 
     public CompletableFuture<ExecutionResult> run() {
-        emit(EventType.START, Map.of("workflow", workflow.getName(), "steps", workflow.getSteps().size()));
+        // NOTE: START lifecycle event is emitted by the runner (ExecutePsop),
+        // not here. Mirrors Python SDK where the executor emits only
+        // step/task/route events and the runner emits start/complete/error/close.
         log.info("[Executor] Starting workflow: {} ({} steps)", workflow.getName(), workflow.getSteps().size());
 
         Deque<Integer> pending = new ArrayDeque<>();

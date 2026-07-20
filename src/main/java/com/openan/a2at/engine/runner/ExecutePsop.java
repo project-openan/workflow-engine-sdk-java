@@ -25,7 +25,7 @@ import java.util.function.Function;
 
 /**
  * High-level PSOP runner -- execute + emit events + persistence hook.
- *
+ * <p>
  * Java equivalent of Python's execute_psop(). Returns a CompletableFuture
  * that completes when the workflow ends. Events are emitted via EventCallback
  * during execution. The onFinish hook is called with (result, collectedEvents).
@@ -36,18 +36,18 @@ public class ExecutePsop {
     /**
      * Execute a PSOP workflow end-to-end.
      *
-     * @param psop            workflow as Map or Workflow object
-     * @param agentCards      list of AgentCard objects
-     * @param controlPoint    user's decision callbacks
-     * @param engineClient    optional pre-created client (null = auto-create)
-     * @param runtimeIntent   original user intent
-     * @param lang            language hint (zh/en)
-     * @param a2aClientRuntime  the A2A client runtime from a2a-java-sdk
-     * @param eventCallback   optional event callback (null = no-op)
-     * @param onFinish        optional persistence hook: (result, collectedEvents) -> CompletableFuture<Void> (async)
-    * @param onEvent         optional event transformer: event -> event | null | List<event>
-    * @return CompletableFuture<ExecutionResult>
-    */
+     * @param psop             workflow as Map or Workflow object
+     * @param agentCards       list of AgentCard objects
+     * @param controlPoint     user's decision callbacks
+     * @param engineClient     optional pre-created client (null = auto-create)
+     * @param runtimeIntent    original user intent
+     * @param lang             language hint (zh/en)
+     * @param a2aClientRuntime the A2A client runtime from a2a-java-sdk
+     * @param eventCallback    optional event callback (null = no-op)
+     * @param onFinish         optional persistence hook: (result, collectedEvents) -> CompletableFuture<Void> (async)
+     * @param onEvent          optional event transformer: event -> event | null | List<event>
+     * @return CompletableFuture<ExecutionResult>
+     */
     public static CompletableFuture<ExecutionResult> execute(
             Object psop,
             List<?> agentCards,
@@ -115,12 +115,12 @@ public class ExecutePsop {
         // Create engine client if not provided
         WorkflowEngineClient client = engineClient != null ? engineClient
                 : new DefaultWorkflowEngineClient(agentCards, a2aClientRuntime,
-                        WorkflowEngineClientConfig.builder()
-                                .sslVerify(sslVerify)
-                                .caCertsPath(caCertsPath)
-                                .credentialsConfigPath(credentialsConfigPath)
-                                .a2atEnvPath(a2atEnvPath)
-                                .build());
+                WorkflowEngineClientConfig.builder()
+                        .sslVerify(sslVerify)
+                        .caCertsPath(caCertsPath)
+                        .credentialsConfigPath(credentialsConfigPath)
+                        .a2atEnvPath(a2atEnvPath)
+                        .build());
         client.setEventCallback(collectingCallback);
 
         // Create executor
@@ -131,7 +131,7 @@ public class ExecutePsop {
         // Emit start
         collectingCallback.onEvent(EventType.START, Map.of("workflow", workflow.getName(), "steps", workflow.getSteps().size()));
 
-       // Run + finalize
+        // Run + finalize
         return executor.run()
                 .exceptionally(error -> {
                     log.error("[execute_psop] Execution failed: {}", error.getMessage());
@@ -180,7 +180,7 @@ public class ExecutePsop {
     }
 
     /**
-    * Simplified overload without SSL/auth/A2AT config (legacy compatibility).
+     * Simplified overload without SSL/auth/A2AT config (legacy compatibility).
      */
     public static CompletableFuture<ExecutionResult> execute(
             Object psop,
@@ -202,6 +202,118 @@ public class ExecutePsop {
                 runtimeIntent, lang,
                 null, null, false, null,
                 a2aClientRuntime, eventCallback, asyncOnFinish, onEvent);
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static final class Builder {
+        private Object psop;
+        private List<?> agentCards = List.of();
+        private ControlPoint controlPoint;
+        private WorkflowEngineClient engineClient;
+        private String runtimeIntent = "";
+        private String lang = "zh";
+        private String a2atEnvPath;
+        private String credentialsConfigPath;
+        private boolean sslVerify = true;
+        private String caCertsPath;
+        private Object a2aClientRuntime;
+        private EventCallback eventCallback;
+        private BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish;
+        private Function<Map<String, Object>, Object> onEvent;
+
+        public Builder psop(Object psop) {
+            this.psop = psop;
+            return this;
+        }
+
+        public Builder agentCards(List<?> agentCards) {
+            this.agentCards = agentCards;
+            return this;
+        }
+
+        public Builder controlPoint(ControlPoint controlPoint) {
+            this.controlPoint = controlPoint;
+            return this;
+        }
+
+        public Builder engineClient(WorkflowEngineClient engineClient) {
+            this.engineClient = engineClient;
+            return this;
+        }
+
+        public Builder runtimeIntent(String runtimeIntent) {
+            this.runtimeIntent = runtimeIntent;
+            return this;
+        }
+
+        public Builder lang(String lang) {
+            this.lang = lang;
+            return this;
+        }
+
+        public Builder a2atEnvPath(String a2atEnvPath) {
+            this.a2atEnvPath = a2atEnvPath;
+            return this;
+        }
+
+        public Builder credentialsConfigPath(String credentialsConfigPath) {
+            this.credentialsConfigPath = credentialsConfigPath;
+            return this;
+        }
+
+        public Builder sslVerify(boolean sslVerify) {
+            this.sslVerify = sslVerify;
+            return this;
+        }
+
+        public Builder caCertsPath(String caCertsPath) {
+            this.caCertsPath = caCertsPath;
+            return this;
+        }
+
+        public Builder a2aClientRuntime(Object a2aClientRuntime) {
+            this.a2aClientRuntime = a2aClientRuntime;
+            return this;
+        }
+
+        public Builder eventCallback(EventCallback eventCallback) {
+            this.eventCallback = eventCallback;
+            return this;
+        }
+
+        public Builder onFinish(BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish) {
+            this.onFinish = onFinish;
+            return this;
+        }
+
+        public Builder onFinish(BiConsumer<ExecutionResult, List<Map<String, Object>>> onFinish) {
+            this.onFinish = onFinish != null ? (r, e) -> {
+                onFinish.accept(r, e);
+                return CompletableFuture.completedFuture(null);
+            } : null;
+            return this;
+        }
+
+        public Builder onEvent(Function<Map<String, Object>, Object> onEvent) {
+            this.onEvent = onEvent;
+            return this;
+        }
+
+        public CompletableFuture<ExecutionResult> execute() {
+            if (psop == null) {
+                throw new IllegalArgumentException("psop is required");
+            }
+            if (controlPoint == null) {
+                throw new IllegalArgumentException("controlPoint is required");
+            }
+            return ExecutePsop.execute(psop, agentCards, controlPoint, engineClient,
+                    runtimeIntent, lang, a2atEnvPath, credentialsConfigPath,
+                    sslVerify, caCertsPath, a2aClientRuntime,
+                    eventCallback, onFinish, onEvent);
+        }
     }
 
     @SuppressWarnings("unchecked")

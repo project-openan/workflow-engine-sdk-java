@@ -66,7 +66,9 @@ public class ExtensionRegistry {
                 continue;
             }
             for (Map.Entry<String, ExtensionHandler> entry : handlers.entrySet()) {
-                if (uri.contains(entry.getKey()) && !seen.contains(entry.getKey())) {
+                // Case-insensitive: URIs commonly use uppercase (NEGOTIATION-T)
+                // while the handler keyword uses mixed case (Negotiation-T).
+                if (uri.toLowerCase().contains(entry.getKey().toLowerCase()) && !seen.contains(entry.getKey())) {
                     matched.add(entry.getValue());
                     seen.add(entry.getKey());
                     break;
