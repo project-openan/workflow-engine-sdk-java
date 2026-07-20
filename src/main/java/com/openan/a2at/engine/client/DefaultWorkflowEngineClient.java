@@ -22,7 +22,7 @@ import java.util.concurrent.*;
  * The actual A2A transport is delegated to the a2a-java-sdk
  * (org.a2aproject.sdk) via an injected A2AClientRuntime.
  */
-public class DefaultWorkflowEngineClient implements WorkflowEngineClient {
+public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(DefaultWorkflowEngineClient.class);
 
     private final Map<String, Object> cardMap = new ConcurrentHashMap<>();
