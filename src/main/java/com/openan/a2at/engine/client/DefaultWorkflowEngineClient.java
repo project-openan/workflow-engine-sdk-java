@@ -36,7 +36,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
      * @param a2aClientRuntime  the A2A client runtime from a2a-java-sdk
      *                          (implements the transport: REST, JSON-RPC, etc.)
      */
-    public DefaultWorkflowEngineClient(List<Object> agentCards, Object a2aClientRuntime) {
+    public DefaultWorkflowEngineClient(List<?> agentCards, Object a2aClientRuntime) {
         this.a2aClientRuntime = a2aClientRuntime;
         this.contextId = UUID.randomUUID().toString();
         for (Object card : agentCards) {

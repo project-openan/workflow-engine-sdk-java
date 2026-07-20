@@ -33,7 +33,7 @@ public class WorkflowExecutorDemo {
         Workflow workflow = LoadPsop.load(orchUrl, "psop_cross_city_fault", null, false);
 
         // 3. Create engine client (use try-with-resources for cleanup)
-        try (var client = new DefaultWorkflowEngineClient(agentCards, null)) {
+        try (var client = new DefaultWorkflowEngineClient((List) agentCards, null)) {
             // 4. Create executor with event callback
             EventCallback callback = new EventCallback() {
                 @Override

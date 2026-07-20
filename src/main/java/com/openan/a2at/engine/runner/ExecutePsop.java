@@ -43,7 +43,7 @@ public class ExecutePsop {
      */
     public static CompletableFuture<ExecutionResult> execute(
             Object psop,
-            List<Object> agentCards,
+            List<?> agentCards,
             ControlPoint controlPoint,
             WorkflowEngineClient engineClient,
             String runtimeIntent,
@@ -71,14 +71,13 @@ public class ExecutePsop {
         };
 
         // Create engine client if not provided
-        if (engineClient == null) {
-            engineClient = new DefaultWorkflowEngineClient(agentCards, a2aClientRuntime);
-        }
-        engineClient.setEventCallback(collectingCallback);
+        WorkflowEngineClient client = engineClient != null ? engineClient
+                : new DefaultWorkflowEngineClient(agentCards, a2aClientRuntime);
+        client.setEventCallback(collectingCallback);
 
         // Create executor
         WorkflowExecutor executor = new WorkflowExecutor(
-                workflow, controlPoint, engineClient, collectingCallback,
+                workflow, controlPoint, client, collectingCallback,
                 runtimeIntent != null ? runtimeIntent : "", lang != null ? lang : "zh");
 
         // Emit start
@@ -118,7 +117,7 @@ public class ExecutePsop {
                     // Emit close
                     collectingCallback.onEvent(EventType.CLOSE, Map.of());
                     // Close engine client
-                    try { engineClient.close(); } catch (Exception ignored) {}
+                    try { client.close(); } catch (Exception ignored) {}
                     return result;
                 });
     }

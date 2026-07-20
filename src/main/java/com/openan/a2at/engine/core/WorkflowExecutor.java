@@ -99,15 +99,15 @@ public class WorkflowExecutor {
 
         return executeSubtasks(step)
                 .thenCompose(result -> {
-                    stepOutputs.put(step.getName(), result.results);
-                    if (!result.success) {
+                    stepOutputs.put(step.getName(), result.results());
+                    if (!result.success()) {
                         log.error("Step {} failed, stopping.", step.getName());
-                        emit(EventType.ERROR, Map.of("step", step.getName(), "results", result.results));
+                        emit(EventType.ERROR, Map.of("step", step.getName(), "results", result.results()));
                         failed[0] = true;
                         return CompletableFuture.completedFuture(null);
                     }
-                    emit(EventType.STEP_COMPLETE, Map.of("step", step.getName(), "results", result.results));
-                    return determineNextSteps(step, result.results)
+                    emit(EventType.STEP_COMPLETE, Map.of("step", step.getName(), "results", result.results()));
+                    return determineNextSteps(step, result.results())
                             .thenAccept(nextIndices -> {
                                 for (int i = nextIndices.size() - 1; i >= 0; i--) {
                                     int nxt = nextIndices.get(i);
@@ -120,7 +120,7 @@ public class WorkflowExecutor {
                 .thenCompose(v -> executeSteps(pending, executed, failed));
     }
 
-    private record StepResult(Map<String, Object> results, boolean success) {}
+    private record StepResult(String taskDesc, Object output, boolean success, Map<String, Object> results) {}
 
     private CompletableFuture<StepResult> executeSubtasks(WorkflowStep step) {
         String contextMessage = contextBuilder.buildContext(step, stepOutputs);
@@ -149,13 +149,13 @@ public class WorkflowExecutor {
                 log.info("[Executor] Task {} -> {}: {}", task.getDescription().substring(0, Math.min(60, task.getDescription().length())), task.getAgent(), status);
                 executionHistory.add(Map.of("step", step.getName(), "task", task.getDescription(), "agent", task.getAgent(), "status", status, "output", response.isSuccess() ? response.getOutput() : (response.getError() != null ? response.getError() : "")));
                 emit(EventType.TASK_RESPONSE, Map.of("step", step.getName(), "agent", task.getAgent(), "task", task.getDescription(), "output", response.isSuccess() ? response.getOutput() : (response.getError() != null ? response.getError() : "")));
-                return new StepResult(task.getDescription(), response.isSuccess() ? response.getOutput() : response.getError(), response.isSuccess());
+                return new StepResult(task.getDescription(), response.isSuccess() ? response.getOutput() : response.getError(), response.isSuccess(), null);
             }).exceptionally(e -> {
                 task.setStatus(TaskStatus.FAILED);
                 emit(EventType.TASK_STATUS_CHANGED, Map.of("step", step.getName(), "subtask_index", subtaskIndex, "agent", task.getAgent(), "status", TaskStatus.FAILED.name()));
                 log.error("[Executor] Task {} -> {}: exception: {}", task.getDescription(), task.getAgent(), e.getMessage());
                 executionHistory.add(Map.of("step", step.getName(), "task", task.getDescription(), "agent", task.getAgent(), "status", "failed", "output", e.getMessage()));
-                return new StepResult(task.getDescription(), e.getMessage(), false);
+                return new StepResult(task.getDescription(), e.getMessage(), false, null);
             }));
         }
 
@@ -174,7 +174,7 @@ public class WorkflowExecutor {
                                 } catch (Exception ignored) {}
                             }
                         }
-                        return new StepResult(results, true);
+                        return new StepResult(null, null, true, results);
                     });
         }
         return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
@@ -186,7 +186,7 @@ public class WorkflowExecutor {
                         results.put(r.taskDesc(), r.output());
                         if (!r.success()) anyFailed = true;
                     }
-                    return new StepResult(results, !anyFailed);
+                    return new StepResult(null, null, !anyFailed, results);
                 });
     }
 
