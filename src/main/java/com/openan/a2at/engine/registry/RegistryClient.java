@@ -21,16 +21,16 @@ public class RegistryClient {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     private final String baseUrl;
-    private final boolean verifySsl;
+    private final boolean sslVerify;
     private final HttpClient httpClient;
 
-    public RegistryClient(String url, boolean verifySsl) {
+    public RegistryClient(String url, boolean sslVerify) {
         this.baseUrl = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-        this.verifySsl = verifySsl;
+        this.sslVerify = sslVerify;
         HttpClient.Builder clientBuilder = HttpClient.newBuilder()
                 .connectTimeout(java.time.Duration.ofSeconds(30))
                 .followRedirects(HttpClient.Redirect.ALWAYS);
-        if (!verifySsl) {
+        if (!sslVerify) {
             try {
                 javax.net.ssl.SSLContext trustAllCtx = javax.net.ssl.SSLContext.getInstance("TLS");
                 trustAllCtx.init(null, new javax.net.ssl.TrustManager[]{new javax.net.ssl.X509TrustManager() {
