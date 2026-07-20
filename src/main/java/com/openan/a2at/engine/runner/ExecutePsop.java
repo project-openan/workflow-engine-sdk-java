@@ -1,0 +1,143 @@
+package com.openan.a2at.engine.runner;
+
+import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
+import com.openan.a2at.engine.client.WorkflowEngineClient;
+import com.openan.a2at.engine.control.ControlPoint;
+import com.openan.a2at.engine.control.EventCallback;
+import com.openan.a2at.engine.control.EventType;
+import com.openan.a2at.engine.core.WorkflowExecutor;
+import com.openan.a2at.engine.model.ExecutionResult;
+import com.openan.a2at.engine.model.Workflow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+
+/**
+ * High-level PSOP runner -- execute + emit events + persistence hook.
+ *
+ * Java equivalent of Python's execute_psop(). Returns a CompletableFuture
+ * that completes when the workflow ends. Events are emitted via EventCallback
+ * during execution. The onFinish hook is called with (result, collectedEvents).
+ */
+public class ExecutePsop {
+    private static final Logger log = LoggerFactory.getLogger(ExecutePsop.class);
+
+    /**
+     * Execute a PSOP workflow end-to-end.
+     *
+     * @param psop            workflow as Map or Workflow object
+     * @param agentCards      list of AgentCard objects
+     * @param controlPoint    user's decision callbacks
+     * @param engineClient    optional pre-created client (null = auto-create)
+     * @param runtimeIntent   original user intent
+     * @param lang            language hint (zh/en)
+     * @param a2aClientRuntime  the A2A client runtime from a2a-java-sdk
+     * @param eventCallback   optional event callback (null = no-op)
+     * @param onFinish        optional persistence hook: (result, collectedEvents) -> void
+     * @param onEvent         optional event transformer: event -> event | null | List<event>
+     * @return CompletableFuture<ExecutionResult>
+     */
+    public static CompletableFuture<ExecutionResult> execute(
+            Object psop,
+            List<Object> agentCards,
+            ControlPoint controlPoint,
+            WorkflowEngineClient engineClient,
+            String runtimeIntent,
+            String lang,
+            Object a2aClientRuntime,
+            EventCallback eventCallback,
+            BiConsumer<ExecutionResult, List<Map<String, Object>>> onFinish,
+            Function<Map<String, Object>, Object> onEvent) {
+
+        Workflow workflow = psop instanceof Workflow ? (Workflow) psop : Workflow.fromMap((Map<String, Object>) psop);
+        EventCallback emitter = eventCallback != null ? eventCallback : new EventCallback();
+        List<Map<String, Object>> collected = Collections.synchronizedList(new ArrayList<>());
+
+        // Wrap the callback to collect events
+        EventCallback collectingCallback = new EventCallback() {
+            @Override
+            public void onEvent(String eventType, Map<String, Object> data) {
+                Map<String, Object> event = new HashMap<>();
+                event.put("type", eventType);
+                event.put("data", serialize(data));
+                event.put("timestamp", System.currentTimeMillis() / 1000.0);
+                collected.add(event);
+                emitter.onEvent(eventType, data);
+            }
+        };
+
+        // Create engine client if not provided
+        if (engineClient == null) {
+            engineClient = new DefaultWorkflowEngineClient(agentCards, a2aClientRuntime);
+        }
+        engineClient.setEventCallback(collectingCallback);
+
+        // Create executor
+        WorkflowExecutor executor = new WorkflowExecutor(
+                workflow, controlPoint, engineClient, collectingCallback,
+                runtimeIntent != null ? runtimeIntent : "", lang != null ? lang : "zh");
+
+        // Emit start
+        collectingCallback.onEvent(EventType.START, Map.of("workflow", workflow.getName(), "steps", workflow.getSteps().size()));
+
+        // Run + finalize
+        return executor.run()
+                .handle((result, error) -> {
+                    if (error != null) {
+                        log.error("[execute_psop] Execution failed: {}", error.getMessage());
+                        result = ExecutionResult.builder()
+                                .success(false)
+                                .error(error.getMessage())
+                                .history(List.of())
+                                .stepOutputs(Map.of())
+                                .build();
+                    }
+                    // Emit complete or error
+                    if (result.isSuccess()) {
+                        collectingCallback.onEvent(EventType.COMPLETE, Map.of(
+                                "history", result.getHistory(),
+                                "step_outputs", result.getStepOutputs()));
+                    } else {
+                        collectingCallback.onEvent(EventType.ERROR, Map.of(
+                                "error", result.getError() != null ? result.getError() : "Execution failed",
+                                "history", result.getHistory(),
+                                "step_outputs", result.getStepOutputs()));
+                    }
+                    // on_finish hook
+                    if (onFinish != null) {
+                        try {
+                            onFinish.accept(result, new ArrayList<>(collected));
+                        } catch (Exception e) {
+                            log.error("[execute_psop] on_finish failed: {}", e.getMessage());
+                        }
+                    }
+                    // Emit close
+                    collectingCallback.onEvent(EventType.CLOSE, Map.of());
+                    // Close engine client
+                    try { engineClient.close(); } catch (Exception ignored) {}
+                    return result;
+                });
+    }
+
+    /** Make event data JSON-serializable. */
+    @SuppressWarnings("unchecked")
+    private static Object serialize(Object data) {
+        if (data == null) return null;
+        if (data instanceof String || data instanceof Number || data instanceof Boolean) return data;
+        if (data instanceof Map) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            for (var entry : ((Map<String, Object>) data).entrySet()) {
+                result.put(entry.getKey(), serialize(entry.getValue()));
+            }
+            return result;
+        }
+        if (data instanceof List) {
+            return ((List<?>) data).stream().map(ExecutePsop::serialize).toList();
+        }
+        return data.toString();
+    }
+}
