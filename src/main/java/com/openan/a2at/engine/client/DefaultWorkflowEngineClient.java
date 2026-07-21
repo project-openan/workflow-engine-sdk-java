@@ -343,9 +343,18 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         AgentInterface agentIface = resolveAgentInterface(agentCard);
         String protocolBinding = agentIface != null ? agentIface.protocolBinding : "HTTP+JSON";
         boolean isJsonRpc = "JSONRPC".equalsIgnoreCase(protocolBinding);
-        // REST endpoint path: {url}/message:send (colon notation per A2A spec)
-        // JSONRPC endpoint: {url} (root path, JSON-RPC envelope)
-        String requestUrl = isJsonRpc ? url : url + "/message:send";
+        // Check if the agent supports streaming
+        boolean streaming = isStreamingEnabled(agentCard);
+        // REST: {url}/message:stream (SSE) when streaming, else {url}/message:send
+        // JSONRPC: {url} (root path, JSON-RPC envelope)
+        String requestUrl;
+        if (isJsonRpc) {
+            requestUrl = url;
+        } else if (streaming) {
+            requestUrl = url + "/message:stream";
+        } else {
+            requestUrl = url + "/message:send";
+        }
 
         // Build message payload (shared by both protocols)
         // Matches protobuf SendMessageRequest JSON format:
@@ -413,38 +422,75 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
 
         HttpResponse<String> resp = client.send(reqBuilder.build(),
                 HttpResponse.BodyHandlers.ofString());
-        Map<String, Object> respData = mapper.readValue(resp.body(), Map.class);
-        respData = SseNormalization.normalize(respData);
+        if (resp.statusCode() != 200) {
+            throw new RuntimeException("Agent returned " + resp.statusCode() + ": " + resp.body());
+        }
+        String respBody = resp.body();
 
+        // SSE streaming response: multiple "data: {json}" lines
+        // Single JSON response: one JSON object (message:send or JSONRPC)
         String responseText = "";
         Map<String, Object> respMetadata = new HashMap<>();
         String taskState = "";
-        Object result = respData.get("result");
-        if (result == null) {
-            // Response might be a bare task
-            result = respData.get("task");
-        }
-        if (result instanceof Map) {
-            Map<String, Object> resultMap = (Map<String, Object>) result;
-            Object status = resultMap.get("status");
-            if (status instanceof Map) {
-                Object state = ((Map<String, Object>) status).get("state");
-                if (state instanceof String) {
-                    taskState = (String) state;
+
+        if (streaming && !isJsonRpc && respBody.contains("data:")) {
+            // Parse SSE events
+            StringBuilder textBuilder = new StringBuilder();
+            for (String line : respBody.split("\n")) {
+                line = line.trim();
+                if (!line.startsWith("data:")) continue;
+                String json = line.substring(5).trim();
+                if (json.isEmpty()) continue;
+                try {
+                    Map<String, Object> eventData = mapper.readValue(json, Map.class);
+                    eventData = SseNormalization.normalize(eventData);
+                    Object task = eventData.get("task");
+                    if (task instanceof Map) {
+                        Map<String, Object> taskMap = (Map<String, Object>) task;
+                        Object status = taskMap.get("status");
+                        if (status instanceof Map) {
+                            Object state = ((Map<String, Object>) status).get("state");
+                            if (state instanceof String) taskState = (String) state;
+                        }
+                        Object meta = taskMap.get("metadata");
+                        if (meta instanceof Map) respMetadata = (Map<String, Object>) meta;
+                        String t = extractTextFromResultMap(taskMap);
+                        if (t != null && !t.isEmpty()) textBuilder.append(t);
+                    }
+                    Object msgEvent = eventData.get("message");
+                    if (msgEvent instanceof Map) {
+                        String t = extractTextFromResultMap((Map<String, Object>) msgEvent);
+                        if (t != null && !t.isEmpty()) textBuilder.append(t);
+                    }
+                } catch (Exception ignored) {
                 }
             }
-            Object meta = resultMap.get("metadata");
-            if (meta instanceof Map) {
-                respMetadata = (Map<String, Object>) meta;
+            responseText = textBuilder.toString();
+        } else {
+            // Single JSON response (message:send or JSONRPC)
+            Map<String, Object> respData = mapper.readValue(respBody, Map.class);
+            respData = SseNormalization.normalize(respData);
+            Object result = respData.get("result");
+            if (result == null) {
+                result = respData.get("task");
             }
-            responseText = extractTextFromResultMap(resultMap);
-        }
-        // Fallback: extract text from metadata
-        if (responseText.isEmpty() && respMetadata != null) {
-            for (Object val : respMetadata.values()) {
-                if (val instanceof String s && s.length() > 20) {
-                    responseText = s;
-                    break;
+            if (result instanceof Map) {
+                Map<String, Object> resultMap = (Map<String, Object>) result;
+                Object status = resultMap.get("status");
+                if (status instanceof Map) {
+                    Object state = ((Map<String, Object>) status).get("state");
+                    if (state instanceof String) taskState = (String) state;
+                }
+                Object meta = resultMap.get("metadata");
+                if (meta instanceof Map) respMetadata = (Map<String, Object>) meta;
+                responseText = extractTextFromResultMap(resultMap);
+            }
+            if (responseText.isEmpty() && respMetadata != null) {
+                for (Object val : respMetadata.values()) {
+                    if (val instanceof String s && s.length() > 20) {
+                        responseText = s;
+                        break;
+                    }
                 }
             }
         }
@@ -485,6 +531,16 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     // ------------------------------------------------------------------
 
     @SuppressWarnings("unchecked")
+    private boolean isStreamingEnabled(Object agentCard) {
+        Map<String, Object> card = toMap(agentCard);
+        Object caps = card.get("capabilities");
+        if (caps instanceof Map) {
+            Object streaming = ((Map<String, Object>) caps).get("streaming");
+            return Boolean.TRUE.equals(streaming);
+        }
+        return false;
+    }
+
     private static final class AgentInterface {
         final String url;
         final String protocolBinding;
