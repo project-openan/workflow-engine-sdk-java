@@ -666,7 +666,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                ? (String) result.getMetadata().getOrDefault("negotiation_message", "") : "";
 
        String concernText = negMsg != null && !negMsg.isEmpty()
-               ? negMsg.substring(0, Math.min(200, negMsg.length()))
+               ? negMsg
                : "(Agent expressed uncertainty)";
         emit(EventType.NEGOTIATION_REQUEST, Map.of(
                 "agent", agentName, "round", round,
@@ -679,7 +679,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                             if (clarification != null && !clarification.isEmpty()) {
                                 emit(EventType.NEGOTIATION_RESOLVED, Map.of(
                                         "agent", agentName, "round", round,
-                                        "clarification", clarification.substring(0, Math.min(200, clarification.length()))));
+                                        "clarification", clarification));
                                 String followUp = "[NEGOTIATION_RESOLUTION]\n"
                                         + "The engine has reviewed your negotiation request and provides "
                                         + "the following clarification:\n\n" + clarification
@@ -763,7 +763,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         // Step 4: continue_negotiation to advance state machine
         emit(EventType.NEGOTIATION_RESOLVED, Map.of(
                 "agent", agentName, "round", round,
-                "clarification", clarification.substring(0, Math.min(200, clarification.length()))));
+                "clarification", clarification));
         if (!continueNegotiation(negContext, clarification)) {
             emit(EventType.NEGOTIATION_FAILED, Map.of(
                     "agent", agentName, "round", round,
