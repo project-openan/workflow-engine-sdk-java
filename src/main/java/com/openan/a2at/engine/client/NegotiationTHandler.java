@@ -63,13 +63,15 @@ public class NegotiationTHandler implements ExtensionHandler {
             Object controlPoint,
             Object eventCallback
     ) {
-        if (a2atClient == null) {
-            return CompletableFuture.completedFuture(result);
-        }
-        if (result.getTaskState() == null || !result.getTaskState().contains("INPUT_REQUIRED")) {
-            return CompletableFuture.completedFuture(result);
-        }
-        if (!supportsNegotiation(agentCard)) {
+        // Only process if ALL three conditions are met:
+        //   1. a2atClient available (for receive_negotiation API)
+        //   2. Agent returned INPUT_REQUIRED (wants to negotiate)
+        //   3. AgentCard declares Negotiation-T extension
+        // Otherwise pass through unchanged.
+        if (a2atClient == null
+                || result.getTaskState() == null
+                || !result.getTaskState().contains("INPUT_REQUIRED")
+                || !supportsNegotiation(agentCard)) {
             return CompletableFuture.completedFuture(result);
         }
         Map<String, Object> metadata = result.getMetadata() != null
