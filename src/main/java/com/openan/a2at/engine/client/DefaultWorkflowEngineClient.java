@@ -213,6 +213,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private CompletableFuture<SendMessageResult> runAfterReceiveHandlers(Object agentCard, SendMessageResult result) {
         Map<String, Object> cardAsMap = toMap(agentCard);
         List<String> extUris = extractExtensionUris(cardAsMap);
+
         List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
         CompletableFuture<SendMessageResult> future = CompletableFuture.completedFuture(result);
         for (ExtensionHandler handler : handlers) {

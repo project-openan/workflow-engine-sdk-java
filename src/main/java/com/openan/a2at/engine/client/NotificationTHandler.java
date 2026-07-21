@@ -117,6 +117,12 @@ public class NotificationTHandler implements ExtensionHandler {
     @SuppressWarnings("unchecked")
     private static CompletableFuture<Void> callOnNotification(
             Object controlPoint, String agentName, Object notification) {
+        if (controlPoint instanceof com.openan.a2at.engine.control.ControlPoint cp) {
+            Map<String, Object> notifMap = notification instanceof Map
+                    ? (Map<String, Object>) notification : Map.of();
+            return cp.onNotification(agentName, notifMap);
+        }
+        // Fallback: reflection for non-ControlPoint objects
         try {
             Object future = controlPoint.getClass()
                     .getMethod("onNotification", String.class, Map.class)

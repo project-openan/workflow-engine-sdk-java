@@ -112,6 +112,12 @@ public class AuthorizationTHandler implements ExtensionHandler {
     @SuppressWarnings("unchecked")
     private static CompletableFuture<Boolean> callOnAuthorization(
             Object controlPoint, String agentName, Object authRequest) {
+        if (controlPoint instanceof com.openan.a2at.engine.control.ControlPoint cp) {
+            Map<String, Object> authMap = authRequest instanceof Map
+                    ? (Map<String, Object>) authRequest : Map.of();
+            return cp.onAuthorization(agentName, authMap);
+        }
+        // Fallback: reflection for non-ControlPoint objects
         try {
             Object future = controlPoint.getClass()
                     .getMethod("onAuthorization", String.class, Map.class)
