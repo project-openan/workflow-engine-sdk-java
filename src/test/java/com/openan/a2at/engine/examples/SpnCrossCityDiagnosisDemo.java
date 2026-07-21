@@ -1,8 +1,8 @@
 package com.openan.a2at.engine.examples;
 
-import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClient.NegotiationResolver;
 import com.openan.a2at.engine.control.ControlPoint;
+import com.openan.a2at.engine.control.DefaultControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.*;
@@ -67,98 +67,40 @@ public class SpnCrossCityDiagnosisDemo {
         log.info("Credentials file: {}", credPath);
 
         // ========== 4. Implement ControlPoint ==========
-        log.info("=== Step 4: Implement ControlPoint ===");
+        log.info("=== Step 4: ControlPoint (based on DefaultControlPoint) ===");
         AtomicBoolean authorizationCalled = new AtomicBoolean(false);
         AtomicBoolean notificationCalled = new AtomicBoolean(false);
 
-        ControlPoint controlPoint = new ControlPoint() {
+        // DefaultControlPoint handles: onTask (auto-send+negotiate),
+        // onRoute (first non-terminal branch). Only override what we customize.
+        ControlPoint controlPoint = new DefaultControlPoint() {
             @Override
-            public CompletableFuture<TaskResponse> onTask(
-                    TaskRequest req, WorkflowEngineClient ec) {
-                log.info("[onTask] step={} agent={}", req.getStepName(), req.getAgentName());
-                String stepName = req.getStepName();
-
-                // Both parallel_diagnosis and recovery send to OMC agents.
-                // SDK automatically handles:
-                //   - Authorization-T in OMC diagnosis response -> onAuthorization
-                //   - Notification-T in OMC recovery response -> onNotification
-                // ControlPoint only decides how to send (with negotiation support).
-                return ec.sendMessageWithNegotiation(
-                        req.getAgentName(), req.getMessage(),
-                        NEGOTIATION_MAX_ROUNDS,
-                        this::resolveNegotiation
-                ).thenApply(r -> {
-                    log.info("[onTask] Response from {}: {} chars, state={}",
-                            req.getAgentName(),
-                            r.getText() != null ? r.getText().length() : 0,
-                            r.getTaskState());
-                    boolean success = r.getText() != null && !r.getText().isEmpty()
-                            && !"INPUT_REQUIRED".equals(r.getTaskState());
-                    if (stepName.equals("parallel_diagnosis")) {
-                        log.info("[onTask] Diagnosis complete for {}", req.getAgentName());
-                    } else if (stepName.equals("recovery")) {
-                        log.info("[onTask] Recovery complete for {}", req.getAgentName());
-                    }
-                    return TaskResponse.builder()
-                            .success(success)
-                            .output(r.getText())
-                            .build();
-                }).exceptionally(e -> {
-                    log.error("[onTask] Failed for {}: {}", req.getAgentName(), e.getMessage());
-                    return TaskResponse.builder()
-                            .success(false)
-                            .error("Agent call failed: " + e.getMessage())
-                            .build();
-                });
-            }
-
-            CompletableFuture<String> resolveNegotiation(
+            public CompletableFuture<String> resolveNegotiation(
                     String agentName, String negotiationText,
                     Map<String, Object> receiveResult) {
-                log.info("[NegotiationResolver] agent={}, concern={}",
+                log.info("[resolveNegotiation] agent={}: {}",
                         agentName,
                         negotiationText != null ? negotiationText.substring(0, Math.min(100, negotiationText.length())) : "(empty)");
-                String clarification = "根据上层工作台上下文，客户A的上海-广州间SPN专线中断，"
-                        + "上海OMC告警端口Down，光功率-28dBm。端口所属单板为line-card-03，"
-                        + "端口编号port-7，最近一次维护时间为2026-07-15。";
-                return CompletableFuture.completedFuture(clarification);
+                return CompletableFuture.completedFuture(
+                        "根据工作台上下文，客户A上海-广州间SPN专线中断，上海OMC告警端口Down，"
+                        + "光功率-28dBm。端口所属单板line-card-03，端口编号port-7，最近维护2026-07-15。");
             }
 
             @Override
             public CompletableFuture<Boolean> onAuthorization(
                     String agentName, Map<String, Object> authRequest) {
                 authorizationCalled.set(true);
-                log.info("[onAuthorization] agent={} requests authorization", agentName);
-                log.info("[onAuthorization] repair_plan={}", authRequest.get("repair_plan"));
-                log.info("[onAuthorization] risk_level={}", authRequest.get("risk_level"));
-                log.info("[onAuthorization] Waiting for user confirmation...");
-                // In production: show dialog, wait for human approval
-                // For demo: auto-approve after a brief pause to simulate human interaction
+                log.info("[onAuthorization] agent={}, repair_plan={}, risk={}",
+                        agentName, authRequest.get("repair_plan"), authRequest.get("risk_level"));
                 log.info("[onAuthorization] User approved (demo auto-approve)");
                 return CompletableFuture.completedFuture(true);
-            }
-
-            @Override
-            public CompletableFuture<RouteDecision> onRoute(
-                    String stepName, Map<String, Object> results,
-                    List<JumpCondition> conditions) {
-                log.info("[onRoute] step={}, conditions={}", stepName,
-                        conditions.stream().map(JumpCondition::getStep).toList());
-                // After parallel_diagnosis, route to recovery (the only branch)
-                return CompletableFuture.completedFuture(
-                        RouteDecision.builder()
-                                .nextStep(conditions.get(0).getStep())
-                                .reason("diagnosis complete, proceeding to recovery")
-                                .build());
             }
 
             @Override
             public CompletableFuture<Void> onNotification(
                     String agentName, Map<String, Object> notification) {
                 notificationCalled.set(true);
-                log.info("[onNotification] agent={} reports: {}", agentName, notification.get("message"));
-                log.info("[onNotification] Recovery status: {}", notification.get("status"));
-                // Workbench received recovery success — original Task-T SSE stream can now end
+                log.info("[onNotification] {} reports: {}", agentName, notification.get("message"));
                 return CompletableFuture.completedFuture(null);
             }
         };
