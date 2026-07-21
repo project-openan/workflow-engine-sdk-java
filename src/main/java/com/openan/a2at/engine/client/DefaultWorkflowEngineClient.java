@@ -316,6 +316,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         log.info("[EngineClient] Raw HTTP POST to {}", url);
         HttpClient.Builder clientBuilder = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)  // avoid HTTP/2 upgrade header (causes uvicorn warning)
                 .connectTimeout(Duration.ofSeconds(60))
                 .followRedirects(HttpClient.Redirect.ALWAYS);
         if (!sslVerify) {
