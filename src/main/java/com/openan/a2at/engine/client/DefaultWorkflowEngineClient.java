@@ -338,13 +338,23 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         HttpClient client = clientBuilder.build();
 
-        // Build JSON-RPC message/send request body
-        Map<String, Object> requestBody = new HashMap<>();
+        // Determine protocol binding and build request accordingly
+        AgentInterface agentIface = resolveAgentInterface(agentCard);
+        String protocolBinding = agentIface != null ? agentIface.protocolBinding : "HTTP+JSON";
+        boolean isJsonRpc = "JSONRPC".equalsIgnoreCase(protocolBinding);
+        // REST endpoint path: {url}/message:send (colon notation per A2A spec)
+        // JSONRPC endpoint: {url} (root path, JSON-RPC envelope)
+        String requestUrl = isJsonRpc ? url : url + "/message:send";
+
+        // Build message payload (shared by both protocols)
+        // Matches protobuf SendMessageRequest JSON format:
+        //   messageId (required), role="ROLE_AGENT", parts:[{text:...}],
+        //   contextId, optional metadata
         Map<String, Object> msg = new HashMap<>();
-        msg.put("role", "user");
+        msg.put("messageId", UUID.randomUUID().toString());
+        msg.put("role", "ROLE_AGENT");
         List<Map<String, Object>> parts = new ArrayList<>();
         Map<String, Object> textPart = new HashMap<>();
-        textPart.put("type", "text");
         textPart.put("text", message);
         parts.add(textPart);
         msg.put("parts", parts);
@@ -352,15 +362,26 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         if (metadata != null && !metadata.isEmpty()) {
             msg.put("metadata", metadata);
         }
-        requestBody.put("jsonrpc", "2.0");
-        requestBody.put("method", "message/send");
-        requestBody.put("params", Map.of("message", msg));
-        requestBody.put("id", UUID.randomUUID().toString());
 
-        String jsonBody = mapper.writeValueAsString(requestBody);
+        String jsonBody;
+        if (isJsonRpc) {
+            // JSON-RPC envelope: {jsonrpc, method, params:{message}, id}
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("jsonrpc", "2.0");
+            requestBody.put("method", "message/send");
+            requestBody.put("params", Map.of("message", msg));
+            requestBody.put("id", UUID.randomUUID().toString());
+            jsonBody = mapper.writeValueAsString(requestBody);
+        } else {
+            // REST: raw SendMessageRequest (message object at top level)
+            jsonBody = mapper.writeValueAsString(Map.of("message", msg));
+        }
+
+        log.info("[EngineClient] Raw HTTP POST to {} ({})", requestUrl, protocolBinding);
         HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
+                .uri(URI.create(requestUrl))
                 .header("Content-Type", "application/json")
+                .header("A2A-Version", "1.0")
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                 .timeout(Duration.ofSeconds(60));
 
@@ -376,7 +397,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             if (interceptor instanceof ExtensionInterceptor) {
                 try {
                     org.a2aproject.sdk.client.transport.spi.interceptors.PayloadAndHeaders ph =
-                            interceptor.intercept("message/send", requestBody, headerMap, null,
+                            interceptor.intercept("message/send", msg, headerMap, null,
                                     new org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext(
                                             new HashMap<>(), new HashMap<>()));
                     headerMap.putAll(ph.getHeaders());
@@ -463,25 +484,46 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     // ------------------------------------------------------------------
 
     @SuppressWarnings("unchecked")
-    private String resolveAgentUrl(Object agentCard) {
+    private static final class AgentInterface {
+        final String url;
+        final String protocolBinding;
+        AgentInterface(String url, String protocolBinding) {
+            this.url = url;
+            this.protocolBinding = protocolBinding != null ? protocolBinding : "HTTP+JSON";
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private AgentInterface resolveAgentInterface(Object agentCard) {
         if (agentCard instanceof Map) {
             Map<String, Object> card = (Map<String, Object>) agentCard;
             List<Map<String, Object>> interfaces =
                     (List<Map<String, Object>>) card.get("supportedInterfaces");
             if (interfaces != null && !interfaces.isEmpty()) {
-                return (String) interfaces.get(0).get("url");
+                Map<String, Object> iface = interfaces.get(0);
+                return new AgentInterface(
+                        (String) iface.get("url"),
+                        (String) iface.get("protocolBinding"));
             }
         }
         try {
             Object interfaces = agentCard.getClass().getMethod("getSupportedInterfaces").invoke(agentCard);
             if (interfaces instanceof List && !((List<?>) interfaces).isEmpty()) {
                 Object first = ((List<?>) interfaces).get(0);
-                return (String) first.getClass().getMethod("getUrl").invoke(first);
+                String url = (String) first.getClass().getMethod("getUrl").invoke(first);
+                String binding = null;
+                try { binding = (String) first.getClass().getMethod("getProtocolBinding").invoke(first); }
+                    catch (Exception ignored) {}
+                return new AgentInterface(url, binding);
             }
         } catch (Exception ignored) {
-            // AgentCard shape not reflectable; URL resolution skipped
         }
         return null;
+    }
+
+    private String resolveAgentUrl(Object agentCard) {
+        AgentInterface iface = resolveAgentInterface(agentCard);
+        return iface != null ? iface.url : null;
     }
 
     @SuppressWarnings("unchecked")
