@@ -7,3 +7,7 @@
 .settings/
 .project
 .classpath
+.env
+QuickTest*.java
+_*.py
+verify_sdk.py
