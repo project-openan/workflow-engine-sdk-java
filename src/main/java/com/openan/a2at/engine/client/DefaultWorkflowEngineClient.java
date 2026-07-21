@@ -328,6 +328,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                         return new java.security.cert.X509Certificate[0];
                     }
                 }}, null);
+                // Disable hostname verification: self-signed certs
+                // have no SAN, so endpoint identification fails.
+                System.setProperty("jdk.internal.httpclient.disableHostnameVerification", "true");
                 clientBuilder.sslContext(trustAllCtx);
             } catch (Exception e) {
                 log.warn("[EngineClient] Failed to disable TLS: {}", e.getMessage());

@@ -73,6 +73,7 @@ public class AgentCredentialService implements CredentialService {
                         return new java.security.cert.X509Certificate[0];
                     }
                 }}, null);
+                System.setProperty("jdk.internal.httpclient.disableHostnameVerification", "true");
                 b.sslContext(trustAllCtx);
             } catch (Exception e) {
                 log.warn("[Auth] Failed to disable TLS for login endpoint: {}", e.getMessage());

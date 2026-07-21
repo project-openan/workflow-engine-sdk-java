@@ -40,6 +40,9 @@ public class RegistryClient {
                         return new java.security.cert.X509Certificate[0];
                     }
                 }}, null);
+                // Disable hostname verification: self-signed certs
+                // have no SAN, so endpoint identification fails.
+                System.setProperty("jdk.internal.httpclient.disableHostnameVerification", "true");
                 clientBuilder.sslContext(trustAllCtx);
                 log.warn("[Registry] TLS verification disabled (development only)");
             } catch (Exception e) {
