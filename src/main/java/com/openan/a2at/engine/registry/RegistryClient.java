@@ -106,7 +106,34 @@ public class RegistryClient {
         return AgentCardNormalizer.normalize(cards.get(0));
     }
 
-    public String getBaseUrl() {
-        return baseUrl;
+   public String getBaseUrl() {
+       return baseUrl;
+   }
+
+    /**
+     * Register or update an AgentCard in the registry.
+     *
+     * @param agentCard the agent card to register (must include name, supportedInterfaces, etc.)
+     * @return the registry response as a Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> registerAgentCard(Map<String, Object> agentCard) throws Exception {
+        String url = baseUrl + "/rest/v1/registry-center/agent-cards";
+        Map<String, Object> payload = Map.of("agentCards", List.of(agentCard));
+        String json = mapper.writeValueAsString(payload);
+        log.info("[Registry] Registering agent card: name={}", agentCard.get("name"));
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+        HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        Map<String, Object> result = mapper.readValue(resp.body(), Map.class);
+        if (resp.statusCode() == 200 || resp.statusCode() == 201) {
+            log.info("[Registry] Agent card registered: name={}", agentCard.get("name"));
+        } else {
+            log.warn("[Registry] Registration returned {}: {}", resp.statusCode(), resp.body());
+        }
+        return result;
     }
 }

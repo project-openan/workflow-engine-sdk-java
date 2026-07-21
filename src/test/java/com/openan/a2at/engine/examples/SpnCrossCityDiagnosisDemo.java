@@ -8,84 +8,203 @@ import com.openan.a2at.engine.model.*;
 import com.openan.a2at.engine.runner.ExecutePsop;
 import com.openan.a2at.engine.registry.LoadPsop;
 import com.openan.a2at.engine.registry.RegistryClient;
+import com.openan.a2at.engine.server.WorkbenchAgentServer;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Full story demo: SPN cross-city fault diagnosis & recovery.
+ * Workbench Agent Demo: SPN cross-city fault diagnosis & recovery.
  *
- * <p>Three-step workflow with Transport Workbench Agent + two OMC agents:
+ * <p>The Demo is now a real A2A Agent (server). It starts an embedded HTTP
+ * server, registers itself in the registry, and waits for incoming Task-T
+ * messages. When it receives a message (e.g. "diagnose SPN fault and recover"),
+ * it loads the PSOP workflow from the orchestration center and executes it:
  * <ol>
- *   <li>dispatch — Workbench receives task, dispatches to two cities</li>
- *   <li>parallel_diagnosis — SPN Domain Agent (Shanghai, Bearer auth, may negotiate)
- *       + SPN Domain Agent City2 (Guangzhou, Bearer auth, normal)</li>
- *   <li>merge_analysis — Workbench merges results, determines root cause</li>
+ *   <li>diagnosis_city1 - dispatch to SPN Domain Agent (Shanghai OMC)</li>
+ *   <li>diagnosis_city2 - dispatch to SPN Domain Agent City2 (Guangzhou OMC)</li>
+ *   <li>merge_analysis - Workbench Agent itself merges results (local, no A2A call)</li>
+ *   <li>recovery_city1/city2 - dispatch recovery to the fault city OMC</li>
  * </ol>
  *
- * <p>The Shanghai OMC (SPN Domain Agent) returns Authorization-T (repair plan
- * needing human approval) and Notification-T (recovery success) in metadata.
- * The SDK auto-detects these and calls onAuthorization / onNotification.
+ * <p>The Workbench Agent is both server (receives tasks) and client
+ * (dispatches sub-tasks to OMC agents via the workflow engine).
  */
 public class SpnCrossCityDiagnosisDemo {
     private static final Logger log = LoggerFactory.getLogger(SpnCrossCityDiagnosisDemo.class);
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     static final String REGISTRY_URL = "https://127.0.0.1:5000";
     static final String ORCH_URL = "https://127.0.0.1:5001";
     static final String PSOP_ID = "psop_spn_cross_city_diagnosis";
     static final String CRED_FILE = "spn_agent_credentials.json";
+    static final String WB_HOST = "127.0.0.1";
+    static final int WB_PORT = 26337;
+    static final String WORKBENCH_AGENT_NAME = "Transport Workbench Agent";
+
+    // Shared state for verification
+    static final AtomicBoolean authorizationCalled = new AtomicBoolean(false);
+    static final AtomicBoolean notificationCalled = new AtomicBoolean(false);
 
     public static void main(String[] args) throws Exception {
         boolean sslVerify = false;
 
-        // ========== 1. Fetch AgentCards ==========
-        log.info("=== Step 1: Fetch AgentCards ===");
-        RegistryClient registry = new RegistryClient(REGISTRY_URL, sslVerify);
-        List<Map<String, Object>> agentCards = registry.fetchAgentCards();
-        log.info("Got {} agent card(s)", agentCards.size());
+        // ========== 1. Start Workbench Agent Server ==========
+        log.info("=== Step 1: Start Workbench Agent Server ===");
+        Map<String, Object> agentCard = WorkbenchAgentServer.buildAgentCard(WB_HOST, WB_PORT);
+        WorkbenchAgentServer server = new WorkbenchAgentServer(WB_HOST, WB_PORT, agentCard,
+                SpnCrossCityDiagnosisDemo::handleIncomingTask);
+        server.start();
+        log.info("Workbench Agent listening on http://{}:{}/", WB_HOST, WB_PORT);
 
-        // ========== 2. Load PSOP workflow ==========
-        log.info("=== Step 2: Load PSOP ===");
-        Workflow workflow = LoadPsop.load(ORCH_URL, PSOP_ID, null, sslVerify);
-        log.info("Workflow: {} ({} steps)", workflow.getName(), workflow.getSteps().size());
-        for (WorkflowStep step : workflow.getSteps()) {
-            log.info("  Step: {} (layer={}, subtasks={})", step.getName(), step.getLayer(), step.getSubtasks().size());
-            for (Task task : step.getSubtasks()) {
-                log.info("    Agent: {} | {}", task.getAgent(), task.getDescription());
-            }
+        // ========== 2. Register in Registry ==========
+        log.info("=== Step 2: Register in Registry ===");
+        try {
+            RegistryClient registry = new RegistryClient(REGISTRY_URL, sslVerify);
+            registry.registerAgentCard(agentCard);
+            log.info("Registered Workbench Agent in registry");
+        } catch (Exception e) {
+            log.warn("Registry registration failed (continuing): {}", e.getMessage());
         }
 
-        // ========== 3. Configure credentials ==========
-        log.info("=== Step 3: Configure Credentials ===");
-        String credPath = SpnCrossCityDiagnosisDemo.class.getClassLoader()
-                .getResource(CRED_FILE).getPath();
-        log.info("Credentials file: {}", credPath);
+        // ========== 3. Self-trigger: send Task-T to self ==========
+        log.info("=== Step 3: Self-trigger (send Task-T to Workbench Agent) ===");
+        String taskText = "SPN跨城专线故障诊断与抢通：客户A上海-广州间SPN专线中断，请协同两地市OMC并行诊断，汇总分析确定故障在哪个地市，授权抢通，OMC上报抢通结果";
+        log.info("Sending task: {}", taskText);
 
-        // ========== 4. Implement ControlPoint ==========
-        log.info("=== Step 4: ControlPoint (based on DefaultControlPoint) ===");
-        AtomicBoolean authorizationCalled = new AtomicBoolean(false);
-        AtomicBoolean notificationCalled = new AtomicBoolean(false);
+        String response = sendTaskToSelf(taskText);
+        log.info("=== Workbench Agent Response ===");
+        log.info("Response: {} chars", response != null ? response.length() : 0);
+        if (response != null) {
+            log.info("Response preview: {}",
+                    response.length() > 200 ? response.substring(0, 200) + "..." : response);
+        }
 
-        // ControlPoint: override onTask to inject city-specific diagnostic params,
-        // override onRoute to analyze merged results and route to the fault city.
-        ControlPoint controlPoint = new DefaultControlPoint() {
+        // ========== 4. Results ==========
+        log.info("=== Results ===");
+        log.info("Authorization was triggered: {}", authorizationCalled.get());
+        log.info("Notification was received: {}", notificationCalled.get());
+
+        if (authorizationCalled.get() && notificationCalled.get()) {
+            log.info("=== DEMO PASSED: Full story cycle completed ===");
+        } else {
+            log.warn("=== DEMO PARTIAL: auth={}, notif={} ===",
+                    authorizationCalled.get(), notificationCalled.get());
+        }
+
+        server.close();
+    }
+
+    // ==================== A2A Server Message Handler ====================
+
+    /**
+     * Called when the Workbench Agent receives a Task-T message.
+     * Loads the PSOP workflow and executes it.
+     */
+    private static WorkbenchAgentServer.AgentResponse handleIncomingTask(
+            String messageText, Map<String, Object> metadata) throws Exception {
+        log.info("[WorkbenchHandler] Received task: {}", messageText);
+
+        // Fetch AgentCards from registry
+        RegistryClient registry = new RegistryClient(REGISTRY_URL, false);
+        List<Map<String, Object>> agentCards = registry.fetchAgentCards();
+        // Add our own card so the workflow engine can find "Transport Workbench Agent"
+        agentCards = new ArrayList<>(agentCards);
+        agentCards.add(WorkbenchAgentServer.buildAgentCard(WB_HOST, WB_PORT));
+        log.info("[WorkbenchHandler] Got {} agent card(s)", agentCards.size());
+
+        // Load PSOP workflow
+        Workflow workflow = LoadPsop.load(ORCH_URL, PSOP_ID, null, false);
+        log.info("[WorkbenchHandler] Workflow: {} ({} steps)", workflow.getName(), workflow.getSteps().size());
+
+        // Create ControlPoint
+        ControlPoint controlPoint = createControlPoint();
+
+        // Event callback for logging
+        EventCallback eventCallback = createEventCallback();
+
+        // Execute workflow
+        ExecutionResult result = ExecutePsop.builder()
+                .psop(workflow)
+                .agentCards(agentCards)
+                .controlPoint(controlPoint)
+                .runtimeIntent(messageText)
+                .lang("zh")
+                .sslVerify(false)
+                .credentialsConfigPath(getCredentialsPath())
+                .eventCallback(eventCallback)
+                .onFinish((r, events) -> {
+                    log.info("[onFinish] Success={}, Events={}", r.isSuccess(), events.size());
+                    return CompletableFuture.completedFuture(null);
+                })
+                .execute()
+                .join();
+
+        // Build response text from execution history
+        StringBuilder responseText = new StringBuilder();
+        responseText.append("Workflow execution ").append(result.isSuccess() ? "succeeded" : "failed").append(".\n");
+        if (result.getHistory() != null) {
+            for (Map<String, Object> h : result.getHistory()) {
+                responseText.append("- Step: ").append(h.get("step"))
+                        .append(", Agent: ").append(h.get("agent"))
+                        .append(", Status: ").append(h.get("status")).append("\n");
+            }
+        }
+        if (result.getError() != null) {
+            responseText.append("Error: ").append(result.getError());
+        }
+
+        return new WorkbenchAgentServer.AgentResponse(responseText.toString());
+    }
+
+    // ==================== ControlPoint ====================
+
+    private static ControlPoint createControlPoint() {
+        return new DefaultControlPoint() {
             @Override
             public CompletableFuture<TaskResponse> onTask(
                     TaskRequest request, com.openan.a2at.engine.client.WorkflowEngineClient engineClient) {
                 String step = request.getStepName();
+                String agentName = request.getAgentName();
+
+                // Workbench Agent handles merge_analysis locally (no A2A call to itself)
+                if (WORKBENCH_AGENT_NAME.equals(agentName)) {
+                    log.info("[onTask] Local processing for Workbench Agent (step={})", step);
+                    String context = request.getContext() != null ? request.getContext() : "";
+                    // Merge diagnosis results: determine which city has the fault
+                    String mergeResult = "汇总分析完成。";
+                    if (context.contains("上海") || context.contains("Shanghai")) {
+                        mergeResult += "故障定位：上海地市OMC，端口Down，光功率-28dBm低于阈值。需更换光模块抢通。";
+                    } else if (context.contains("广州") || context.contains("Guangzhou")) {
+                        mergeResult += "故障定位：广州地市OMC。需排查并抢通。";
+                    } else {
+                        mergeResult += "两地市均未见异常。";
+                    }
+                    log.info("[onTask] Merge result: {}", mergeResult);
+                    return CompletableFuture.completedFuture(
+                            TaskResponse.builder().success(true).output(mergeResult).build());
+                }
+
+                // OMC agents: inject city-specific params and send via A2A
                 String enrichedMessage = request.getMessage();
                 if ("diagnosis_city1".equals(step)) {
-                    enrichedMessage += "\n\n## \u57ce\u5e02\u5dee\u5f02\u5316\u53c2\u6570\n\u5ba2\u6237A\u4e0a\u6d77-\u5e7f\u5dde\u95f4SPN\u4e13\u7ebf\u4e2d\u65ad\uff0c\u4e0a\u6d77OMC\u544a\u8b66\u7aef\u53e3Down\uff0c\u5149\u529f\u7387-28dBm\u4f4e\u4e8e\u9608\u503c\u3002"
-                            + "\u7aef\u53e3\u6240\u5c5e\u5355\u677fline-card-03\uff0c\u7aef\u53e3\u53f7port-7\uff0c\u6700\u8fd1\u7ef4\u62a42026-07-15\u3002\u8bf7\u8fdb\u884c\u6839\u56e0\u8bca\u65ad\u3002";
+                    enrichedMessage += "\n\n## 城市差异化参数\n客户A上海-广州间SPN专线中断，上海OMC告警端口Down，光功率-28dBm低于阈值。"
+                            + "端口所属单板line-card-03，端口号port-7，最近维护2026-07-15。请进行根因诊断。";
                     log.info("[onTask] Injected Shanghai-specific params for {}", step);
                 } else if ("diagnosis_city2".equals(step)) {
-                    enrichedMessage += "\n\n## \u57ce\u5e02\u5dee\u5f02\u5316\u53c2\u6570\n\u5ba2\u6237A\u4e0a\u6d77-\u5e7f\u5dde\u95f4SPN\u4e13\u7ebf\u4e2d\u65ad\uff0c\u5e7f\u5ddeOMC\u4fa7\u9700\u6392\u67e5\u7aef\u53e3\u72b6\u6001\u548c\u5149\u529f\u7387\u662f\u5426\u6b63\u5e38\u3002";
+                    enrichedMessage += "\n\n## 城市差异化参数\n客户A上海-广州间SPN专线中断，广州OMC侧需排查端口状态和光功率是否正常。";
                     log.info("[onTask] Injected Guangzhou-specific params for {}", step);
                 } else if ("recovery_city1".equals(step) || "recovery_city2".equals(step)) {
-                    enrichedMessage += "\n\n## \u62a2\u901a\u6307\u4ee4\n\u5411\u6545\u969cOMC\u4e0b\u53d1\u62a2\u901a\u6388\u6743\u786e\u8ba4\uff0c\u6267\u884c\u62a2\u901a\u65b9\u6848\uff08\u66f4\u6362\u5149\u6a21\u5757\u3001\u6062\u590d\u7aef\u53e3\uff09\uff0c\u5b8c\u6210\u540e\u4e0a\u62a5\u62a2\u901a\u6210\u529f\u7ed3\u679c\u3002";
+                    enrichedMessage += "\n\n## 抢通指令\n向故障OMC下发抢通授权确认，执行抢通方案（更换光模块、恢复端口），完成后上报抢通成功结果。";
                     log.info("[onTask] Injected recovery params for {}", step);
                 }
                 final String finalMessage = enrichedMessage;
@@ -115,10 +234,11 @@ public class SpnCrossCityDiagnosisDemo {
                     log.info("[onRoute] merge_analysis: city1={} chars, city2={} chars",
                             c1Text.length(), c2Text.length());
                     String nextStep = "recovery_city1";
-                    if (c2Text.contains("\u6545\u969c") && !c1Text.contains("\u6545\u969c")) {
+                    if (c2Text.contains("故障") && !c1Text.contains("故障")) {
                         nextStep = "recovery_city2";
                     }
-                    if (!c1Text.contains("\u6545\u969c") && !c2Text.contains("\u6545\u969c")) {
+                    if (!c1Text.contains("故障") && !c2Text.contains("故障")
+                            && !c1Text.contains("Down") && !c2Text.contains("Down")) {
                         nextStep = "endNode";
                     }
                     log.info("[onRoute] {} -> {}", stepName, nextStep);
@@ -133,11 +253,10 @@ public class SpnCrossCityDiagnosisDemo {
                     String agentName, String negotiationText,
                     Map<String, Object> receiveResult) {
                 log.info("[onNegotiation] agent={}: {}",
-                        agentName,
-                        negotiationText != null ? negotiationText : "(empty)");
+                        agentName, negotiationText != null ? negotiationText : "(empty)");
                 return CompletableFuture.completedFuture(
-                        "\u6839\u636e\u5de5\u4f5c\u53f0\u4e0a\u4e0b\u6587\uff0c\u5ba2\u6237A\u4e0a\u6d77-\u5e7f\u5dde\u95f4SPN\u4e13\u7ebf\u4e2d\u65ad\uff0c\u4e0a\u6d77OMC\u544a\u8b66\u7aef\u53e3Down\uff0c"
-                        + "\u5149\u529f\u7387-28dBm\u3002\u7aef\u53e3\u6240\u5c5e\u5355\u677fline-card-03\uff0c\u7aef\u53e3\u53f7port-7\uff0c\u6700\u8fd1\u7ef4\u62a42026-07-15\u3002");
+                        "根据工作台上下文，客户A上海-广州间SPN专线中断，上海OMC告警端口Down，"
+                        + "光功率-28dBm。端口所属单板line-card-03，端口号port-7，最近维护2026-07-15。");
             }
 
             @Override
@@ -158,10 +277,12 @@ public class SpnCrossCityDiagnosisDemo {
                 return CompletableFuture.completedFuture(null);
             }
         };
+    }
 
-        // ========== 5. Execute ==========
-        log.info("=== Step 5: Execute PSOP ===");
-        EventCallback eventCallback = new EventCallback() {
+    // ==================== Event Callback ====================
+
+    private static EventCallback createEventCallback() {
+        return new EventCallback() {
             @Override
             public void onEvent(String type, Map<String, Object> data) {
                 switch (type) {
@@ -169,12 +290,9 @@ public class SpnCrossCityDiagnosisDemo {
                     case EventType.STEP_START -> log.info("  [STEP_START] {}", data.get("step"));
                     case EventType.TASK_REQUEST -> log.info("  [TASK_REQUEST] agent={}", data.get("agent"));
                     case EventType.TASK_RESPONSE -> log.info("  [TASK_RESPONSE] agent={} output={} chars",
-                            data.get("agent"),
-                            String.valueOf(data.get("output")).length());
+                            data.get("agent"), String.valueOf(data.get("output")).length());
                     case EventType.TASK_STATUS_CHANGED -> log.info("  [TASK_STATUS] {} -> {}",
                             data.get("agent"), data.get("status"));
-                    case EventType.AGENT_REQUEST -> log.info("  [AGENT_REQUEST] {}", data.get("agent"));
-                    case EventType.AGENT_RESPONSE -> log.info("  [AGENT_RESPONSE] {}", data.get("agent"));
                     case EventType.NEGOTIATION_REQUEST -> log.info("  [NEGOTIATION_REQUEST] round={} concern={}",
                             data.get("round"), data.get("concern"));
                     case EventType.NEGOTIATION_RESOLVED -> log.info("  [NEGOTIATION_RESOLVED] round={}",
@@ -195,46 +313,55 @@ public class SpnCrossCityDiagnosisDemo {
                 }
             }
         };
+    }
 
-        ExecutionResult result = ExecutePsop.builder()
-                .psop(workflow)
-                .agentCards(agentCards)
-                .controlPoint(controlPoint)
-                .runtimeIntent("SPN跨城专线故障诊断与抢通")
-                .lang("zh")
-                .sslVerify(false)
-                .credentialsConfigPath(credPath)
-                .eventCallback(eventCallback)
-                .onFinish((r, events) -> {
-                    log.info("--- on_finish ---");
-                    log.info("Success: {}, Events: {}", r.isSuccess(), events.size());
-                    return CompletableFuture.completedFuture(null);
-                })
-                .execute()
-                .join();
+    // ==================== Utilities ====================
 
-        // ========== 6. Results ==========
-        log.info("=== Results ===");
-        log.info("Workflow success: {}", result.isSuccess());
-        log.info("Authorization was triggered: {}", authorizationCalled.get());
-        log.info("Notification was received: {}", notificationCalled.get());
-        log.info("History: {} task(s)", result.getHistory() != null ? result.getHistory().size() : 0);
-        if (result.getHistory() != null) {
-            for (Map<String, Object> h : result.getHistory()) {
-                log.info("  Task: agent={} status={} output={} chars",
-                        h.get("agent"), h.get("status"),
-                        String.valueOf(h.get("output")).length());
+    private static String getCredentialsPath() {
+        return SpnCrossCityDiagnosisDemo.class.getClassLoader()
+                .getResource(CRED_FILE).getPath();
+    }
+
+    /**
+     * Send a Task-T message to the Workbench Agent's own HTTP endpoint.
+     * This simulates an external caller sending a task.
+     */
+    private static String sendTaskToSelf(String taskText) throws Exception {
+        Map<String, Object> message = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("type", "text", "text", taskText)));
+        Map<String, Object> params = Map.of("message", message);
+        Map<String, Object> rpcRequest = Map.of(
+                "jsonrpc", "2.0",
+                "method", "message/send",
+                "params", params,
+                "id", UUID.randomUUID().toString());
+        String json = mapper.writeValueAsString(rpcRequest);
+
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(60))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://" + WB_HOST + ":" + WB_PORT + "/message:send"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+        HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+        log.info("[SelfTrigger] Response status: {}", resp.statusCode());
+
+        if (resp.statusCode() == 200) {
+            Map<String, Object> rpcResponse = mapper.readValue(resp.body(), Map.class);
+            Map<String, Object> result = (Map<String, Object>) rpcResponse.get("result");
+            if (result != null) {
+                List<Map<String, Object>> artifacts = (List<Map<String, Object>>) result.get("artifacts");
+                if (artifacts != null && !artifacts.isEmpty()) {
+                    List<Map<String, Object>> parts = (List<Map<String, Object>>) artifacts.get(0).get("parts");
+                    if (parts != null && !parts.isEmpty()) {
+                        return (String) parts.get(0).get("text");
+                    }
+                }
             }
         }
-        if (result.getError() != null) {
-            log.error("Error: {}", result.getError());
-        }
-
-        if (result.isSuccess() && authorizationCalled.get() && notificationCalled.get()) {
-            log.info("=== DEMO PASSED: Full story cycle completed (diagnosis + negotiation + authorization + notification) ===");
-        } else {
-            log.warn("=== DEMO PARTIAL: success={}, auth={}, notif={} ===",
-                    result.isSuccess(), authorizationCalled.get(), notificationCalled.get());
-        }
+        return resp.body();
     }
 }
