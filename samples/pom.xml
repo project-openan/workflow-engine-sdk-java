@@ -22,7 +22,7 @@
         <!-- The workflow execution SDK -->
         <dependency>
             <groupId>com.openan.a2at</groupId>
-            <artifactId>a2at-engine-java</artifactId>
+            <artifactId>a2at-engine</artifactId>
             <version>${project.version}</version>
         </dependency>
 

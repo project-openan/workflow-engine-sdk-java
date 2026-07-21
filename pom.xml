@@ -8,10 +8,10 @@
     <groupId>com.openan.a2at</groupId>
     <artifactId>a2at-engine-java-parent</artifactId>
     <version>0.3.0</version>
-    <packaging>pom</packaging>
+        <packaging>pom</packaging>
 
     <name>a2at-engine-java-parent</name>
-    <description>A2A-T workflow execution SDK for multi-agent orchestration (Java) - parent</description>
+    <description>A2A-T workflow execution engine for multi-agent orchestration (Java) - parent</description>
     <url>https://github.com/project-openan/workflow-exec-engine</url>
 
     <licenses>
@@ -22,7 +22,7 @@
     </licenses>
 
     <modules>
-        <module>sdk</module>
+        <module>a2at-engine</module>
         <module>samples</module>
     </modules>
 
