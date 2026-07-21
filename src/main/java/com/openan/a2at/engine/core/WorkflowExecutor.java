@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.stream.Collectors;
 
 /**
@@ -99,17 +100,17 @@ public class WorkflowExecutor {
         // step/task/route events and the runner emits start/complete/error/close.
         log.info("[Executor] Starting workflow: {} ({} steps)", workflow.getName(), workflow.getSteps().size());
 
-        Deque<Integer> pending = new ArrayDeque<>();
+        Deque<Integer> pending = new ConcurrentLinkedDeque<>();
         for (int i = 0; i < workflow.getSteps().size(); i++) {
             var s = workflow.getSteps().get(i);
             if (s.getLayer() == 0 && contextBuilder.getStepPredecessors(s.getName()).isEmpty()) {
                 pending.add(i);
             }
         }
-        Set<Integer> executed = new HashSet<>();
+        Set<Integer> executed = ConcurrentHashMap.newKeySet();
         boolean[] failed = {false};
 
-       Map<Integer, Integer> deferCount = new HashMap<>();
+        Map<Integer, Integer> deferCount = new ConcurrentHashMap<>();
        return executeSteps(pending, executed, failed, deferCount)
                .thenApply(v -> {
                    emit(EventType.WORKFLOW_COMPLETE, Map.of());
@@ -139,28 +140,57 @@ public class WorkflowExecutor {
         if (pending.isEmpty() || failed[0]) {
             return CompletableFuture.completedFuture(null);
         }
-        int idx = pending.pollFirst();
-        if (idx >= workflow.getSteps().size() || executed.contains(idx)) {
-            return executeSteps(pending, executed, failed, deferCount);
-        }
-        var step = workflow.getSteps().get(idx);
-        var preds = contextBuilder.getStepPredecessors(step.getName());
-        if (!preds.stream().allMatch(stepOutputs::containsKey)) {
-            int dc = deferCount.getOrDefault(idx, 0) + 1;
-            if (dc > workflow.getSteps().size()) {
-                log.warn("Step {} deferred too many times, skipping", step.getName());
-                executed.add(idx);
-                return executeSteps(pending, executed, failed, deferCount);
+
+        // Collect all ready steps (predecessors complete) and deferred steps
+        List<Integer> readySteps = new ArrayList<>();
+        List<Integer> deferredSteps = new ArrayList<>();
+        while (!pending.isEmpty()) {
+            int idx = pending.pollFirst();
+            if (idx >= workflow.getSteps().size() || executed.contains(idx)) {
+                continue;
             }
-            deferCount.put(idx, dc);
-            pending.addLast(idx);
-            return CompletableFuture.completedFuture(null)
-                    .thenComposeAsync(v -> executeSteps(pending, executed, failed, deferCount));
+            var step = workflow.getSteps().get(idx);
+            var preds = contextBuilder.getStepPredecessors(step.getName());
+            if (preds.stream().allMatch(stepOutputs::containsKey)) {
+                readySteps.add(idx);
+            } else {
+                int dc = deferCount.getOrDefault(idx, 0) + 1;
+                if (dc > workflow.getSteps().size()) {
+                    log.warn("Step {} deferred too many times, skipping", step.getName());
+                    executed.add(idx);
+                } else {
+                    deferCount.put(idx, dc);
+                    deferredSteps.add(idx);
+                }
+            }
         }
-        executed.add(idx);
+        // Add deferred steps back
+        for (int idx : deferredSteps) {
+            pending.addLast(idx);
+        }
+        if (readySteps.isEmpty()) {
+            if (!deferredSteps.isEmpty()) {
+                return CompletableFuture.completedFuture(null)
+                        .thenComposeAsync(v -> executeSteps(pending, executed, failed, deferCount));
+                    }
+            return CompletableFuture.completedFuture(null);
+        }
+        // Execute all ready steps in parallel
+        List<CompletableFuture<Void>> stepFutures = new ArrayList<>();
+        for (int idx : readySteps) {
+            executed.add(idx);
+            var step = workflow.getSteps().get(idx);
+            stepFutures.add(executeStep(step, executed, pending, failed));
+        }
+        return CompletableFuture.allOf(stepFutures.toArray(new CompletableFuture[0]))
+                .thenCompose(v -> executeSteps(pending, executed, failed, deferCount));
+    }
+
+    private CompletableFuture<Void> executeStep(
+            WorkflowStep step, Set<Integer> executed,
+            Deque<Integer> pending, boolean[] failed) {
         emit(EventType.STEP_START, Map.of("step", step.getName()));
         log.info("--- Executing step: {} ---", step.getName());
-
         return executeSubtasks(step)
                 .thenCompose(result -> {
                     stepOutputs.put(step.getName(), result.results());
@@ -180,8 +210,7 @@ public class WorkflowExecutor {
                                     }
                                 }
                             });
-                })
-                .thenCompose(v -> executeSteps(pending, executed, failed, deferCount));
+                });
     }
 
     private record StepResult(String taskDesc, Object output, boolean success, Map<String, Object> results) {}
@@ -328,7 +357,18 @@ public class WorkflowExecutor {
             }
             return CompletableFuture.completedFuture(indices);
         }
-        return controlPoint.onRoute(step.getName(), stepResult, step.getNext())
+        // Build context for onRoute: upstream context_from results + current step results
+        Map<String, Object> routeContext = new HashMap<>();
+        if (step.getContextFrom() != null) {
+            for (String ref : step.getContextFrom()) {
+                Map<String, Object> out = stepOutputs.get(ref);
+                if (out != null) {
+                    routeContext.put(ref, out);
+                }
+            }
+        }
+        routeContext.put(step.getName(), stepResult);
+        return controlPoint.onRoute(step.getName(), routeContext, step.getNext())
                 .thenApply(decision -> {
                     log.info("Route for '{}': {} ({})", step.getName(), decision.getNextStep(), decision.getReason());
                     emit(EventType.ROUTE_DECISION, Map.of("step", step.getName(), "next", decision.getNextStep(), "reason", decision.getReason()));
