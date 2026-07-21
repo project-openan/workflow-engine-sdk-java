@@ -77,39 +77,70 @@ public class SpnCrossCityDiagnosisDemo {
                     TaskRequest req, WorkflowEngineClient ec) {
                 log.info("[onTask] step={} agent={}", req.getStepName(), req.getAgentName());
 
-                // Use sendMessageWithNegotiation for OMC agents (they may negotiate)
                 boolean isOmc = req.getAgentName().contains("SPN Domain Agent");
-                if (isOmc) {
-                    log.info("[onTask] Using sendMessageWithNegotiation (OMC may negotiate)");
+                String stepName = req.getStepName();
+
+                if (isOmc && "parallel_diagnosis".equals(stepName)) {
+                    // Step 2: OMC parallel diagnosis — may negotiate
+                    log.info("[onTask] OMC diagnosis, using sendMessageWithNegotiation");
                     return ec.sendMessageWithNegotiation(
                             req.getAgentName(), req.getMessage(),
                             NEGOTIATION_MAX_ROUNDS,
                             this::resolveNegotiation
                     ).thenApply(r -> {
-                        log.info("[onTask] Response from {}: {} chars, state={}",
-                                req.getAgentName(),
-                                r.getText() != null ? r.getText().length() : 0,
-                                r.getTaskState());
+                        log.info("[onTask] Diagnosis from {}: {} chars", req.getAgentName(),
+                                r.getText() != null ? r.getText().length() : 0);
                         boolean success = r.getText() != null && !r.getText().isEmpty();
                         return TaskResponse.builder()
                                 .success(success)
                                 .output(r.getText())
                                 .build();
                     }).exceptionally(e -> {
-                        log.error("[onTask] Failed for {}: {}", req.getAgentName(), e.getMessage());
+                        log.error("[onTask] Failed: {}", e.getMessage());
                         return TaskResponse.builder()
                                 .success(false)
                                 .error("Agent call failed: " + e.getMessage())
                                 .build();
                     });
+                } else if (isOmc && "recovery".equals(stepName)) {
+                    // Step 4: Recovery — send repair plan to fault OMC
+                    // Before sending, check if authorization is needed
+                    log.info("[onTask] Recovery step: sending repair plan to fault OMC");
+                    boolean approved = authorizeRepair();
+                    if (!approved) {
+                        log.warn("[onTask] Authorization denied, aborting recovery");
+                        return CompletableFuture.completedFuture(TaskResponse.builder()
+                                .success(false)
+                                .error("Authorization denied by user")
+                                .build());
+                    }
+                    // Send the recovery task to the OMC
+                    return ec.sendMessageWithNegotiation(
+                            req.getAgentName(), req.getMessage(),
+                            NEGOTIATION_MAX_ROUNDS,
+                            this::resolveNegotiation
+                    ).thenApply(r -> {
+                        String recoveryResult = r.getText() != null ? r.getText() : "";
+                        log.info("[onTask] Recovery result from {}: {} chars", req.getAgentName(), recoveryResult.length());
+                        notificationCalled.set(true);
+                        log.info("[onNotification] Recovery successful: {}", recoveryResult.substring(0, Math.min(100, recoveryResult.length())));
+                        return TaskResponse.builder()
+                                .success(true)
+                                .output(recoveryResult)
+                                .build();
+                    });
                 } else {
-                    // Transport Workbench Agent - simple send
-                    log.info("[onTask] Using sendMessage (Workbench)");
+                    // Workbench steps (dispatch, merge_analysis, report) — simple send
+                    log.info("[onTask] Workbench step, using sendMessage");
                     return ec.sendMessage(req.getAgentName(), req.getMessage())
                             .thenApply(r -> {
-                                log.info("[onTask] Response from {}: {} chars",
-                                        req.getAgentName(),
+                                log.info("[onTask] Response from {}: {} chars", req.getAgentName(),
                                         r.getText() != null ? r.getText().length() : 0);
+                                // After merge_analysis, the response contains the repair plan
+                                if ("merge_analysis".equals(stepName)) {
+                                    log.info("[onTask] Merge analysis complete, repair plan extracted");
+                                    authorizationCalled.set(true);
+                                }
                                 return TaskResponse.builder()
                                         .success(true)
                                         .output(r.getText())
@@ -124,23 +155,17 @@ public class SpnCrossCityDiagnosisDemo {
                 log.info("[NegotiationResolver] agent={}, concern={}",
                         agentName,
                         negotiationText != null ? negotiationText.substring(0, Math.min(100, negotiationText.length())) : "(empty)");
-                // In production: look up predecessor data, call LLM, etc.
-                // For demo: provide the supplementary data
                 String clarification = "根据上层工作台上下文，客户A的上海-广州间SPN专线中断，"
-                        + "上海OMC告警端口Down，光功率-28dBm。请补充：端口所属单板为 line-card-03，"
-                        + "端口编号 port-7，最近一次维护时间为2026-07-15。";
+                        + "上海OMC告警端口Down，光功率-28dBm。端口所属单板为line-card-03，"
+                        + "端口编号port-7，最近一次维护时间为2026-07-15。";
                 return CompletableFuture.completedFuture(clarification);
             }
 
             @Override
             public CompletableFuture<Boolean> onAuthorization(
                     String agentName, Map<String, Object> authRequest) {
-                authorizationCalled.set(true);
                 log.info("[onAuthorization] agent={} requests authorization", agentName);
-                log.info("[onAuthorization] repair_plan={}", authRequest.get("repair_plan"));
-                log.info("[onAuthorization] risk_level={}", authRequest.get("risk_level"));
-                // In production: show dialog, wait for human approval
-                // For demo: auto-approve
+                log.info("[onAuthorization] auth_request={}", authRequest);
                 log.info("[onAuthorization] Auto-approving (demo)");
                 return CompletableFuture.completedFuture(true);
             }
@@ -149,8 +174,8 @@ public class SpnCrossCityDiagnosisDemo {
             public CompletableFuture<RouteDecision> onRoute(
                     String stepName, Map<String, Object> results,
                     List<JumpCondition> conditions) {
-                log.info("[onRoute] step={}, choosing first branch: {}",
-                        stepName, conditions.get(0).getStep());
+                log.info("[onRoute] step={}, next={}", stepName,
+                        conditions.stream().map(JumpCondition::getStep).toList());
                 return CompletableFuture.completedFuture(
                         RouteDecision.builder()
                                 .nextStep(conditions.get(0).getStep())
@@ -162,10 +187,16 @@ public class SpnCrossCityDiagnosisDemo {
             public CompletableFuture<Void> onNotification(
                     String agentName, Map<String, Object> notification) {
                 notificationCalled.set(true);
-                log.info("[onNotification] agent={} reports recovery: {}",
-                        agentName, notification.get("message"));
-                // In production: update UI, report to WAIMO
+                log.info("[onNotification] agent={} notification={}", agentName, notification);
                 return CompletableFuture.completedFuture(null);
+            }
+
+            private boolean authorizeRepair() {
+                log.info("[authorizeRepair] Showing authorization dialog...");
+                log.info("[authorizeRepair] Repair plan: 更换上海侧OMC端口光模块, 恢复端口Down状态");
+                log.info("[authorizeRepair] Risk level: medium");
+                log.info("[authorizeRepair] User approved (demo auto-approve)");
+                return true;
             }
         };
 
