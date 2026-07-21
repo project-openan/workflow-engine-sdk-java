@@ -501,10 +501,17 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             List<Map<String, Object>> interfaces =
                     (List<Map<String, Object>>) card.get("supportedInterfaces");
             if (interfaces != null && !interfaces.isEmpty()) {
-                Map<String, Object> iface = interfaces.get(0);
+                // Prefer HTTP+JSON over JSONRPC: sendViaRawHttp handles REST
+                // /message:send more reliably than JSON-RPC root POST.
+                Map<String, Object> chosen = null;
+                for (Map<String, Object> iface : interfaces) {
+                    String binding = (String) iface.get("protocolBinding");
+                    if ("HTTP+JSON".equalsIgnoreCase(binding)) { chosen = iface; break; }
+                    if (chosen == null) { chosen = iface; }
+                }
                 return new AgentInterface(
-                        (String) iface.get("url"),
-                        (String) iface.get("protocolBinding"));
+                        (String) chosen.get("url"),
+                        (String) chosen.get("protocolBinding"));
             }
         }
         try {
