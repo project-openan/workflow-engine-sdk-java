@@ -2,6 +2,7 @@ package com.openan.a2at.engine.examples;
 
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.control.ControlPoint;
+import com.openan.a2at.engine.control.DefaultControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.ExecutionResult;
@@ -71,7 +72,9 @@ public class ExecutePsopDemo {
 
         // 3. Implement ControlPoint
         log.info("--- Step 3: Implement ControlPoint ---");
-        ControlPoint controlPoint = new DemoControlPoint();
+        // Use DefaultControlPoint: auto-send, first-branch routing, auto-approve auth
+        // Override methods to customize: new DefaultControlPoint() { @Override ... }
+        ControlPoint controlPoint = new DefaultControlPoint();
 
         // 4. Create A2A client runtime
         // In production, use the a2a-java-sdk to create a real runtime:
