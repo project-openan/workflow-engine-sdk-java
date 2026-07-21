@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -42,6 +43,7 @@ public class NotificationTHandler implements ExtensionHandler {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public CompletableFuture<Map<String, Object>> beforeSend(
             Map<String, Object> agentCard,
             String messageText,
@@ -49,7 +51,21 @@ public class NotificationTHandler implements ExtensionHandler {
             Object a2atClient,
             Object controlPoint
     ) {
-        return CompletableFuture.completedFuture(metadata);
+        String notifUri = findNotificationTUri(agentCard);
+        if (notifUri == null) {
+            return CompletableFuture.completedFuture(metadata);
+        }
+        if (metadata != null && metadata.containsKey(notifUri)) {
+            log.info("[Notification-T] Metadata already preset, skipping subscription injection");
+            return CompletableFuture.completedFuture(metadata);
+        }
+        Map<String, Object> result = metadata != null ? new java.util.HashMap<>(metadata) : new java.util.HashMap<>();
+        Map<String, Object> subscription = new java.util.HashMap<>();
+        subscription.put("action", "subscribe");
+        subscription.put("topic", "recovery_result");
+        result.put(notifUri, subscription);
+        log.info("[Notification-T] Injected subscription for '{}'", getAgentName(agentCard));
+        return CompletableFuture.completedFuture(result);
     }
 
     @Override
@@ -61,7 +77,19 @@ public class NotificationTHandler implements ExtensionHandler {
             Object eventCallback
     ) {
         Map<String, Object> metadata = result.getMetadata();
-        Object notification = metadata != null ? metadata.get("Notification-T") : null;
+        Object notification = null;
+        if (metadata != null) {
+            notification = metadata.get("Notification-T");
+            if (notification == null) {
+                for (var entry : metadata.entrySet()) {
+                    String key = String.valueOf(entry.getKey());
+                    if (key.contains("Notification-T")) {
+                        notification = entry.getValue();
+                        break;
+                    }
+                }
+            }
+        }
         if (notification == null || controlPoint == null) {
             return CompletableFuture.completedFuture(result);
         }
@@ -103,6 +131,25 @@ public class NotificationTHandler implements ExtensionHandler {
         return CompletableFuture.completedFuture(null);
     }
 
+
+    @SuppressWarnings("unchecked")
+    private static String findNotificationTUri(Map<String, Object> agentCard) {
+        Map<String, Object> caps = (Map<String, Object>) agentCard.get("capabilities");
+        if (caps == null) {
+            return null;
+        }
+        List<Map<String, Object>> extensions = (List<Map<String, Object>>) caps.get("extensions");
+        if (extensions == null) {
+            return null;
+        }
+        for (Map<String, Object> ext : extensions) {
+            String uri = (String) ext.get("uri");
+            if (uri != null && uri.contains("Notification-T")) {
+                return uri;
+            }
+        }
+        return null;
+    }
     private static String getAgentName(Map<String, Object> agentCard) {
         Object name = agentCard.get("name");
         return name != null ? name.toString() : "";
