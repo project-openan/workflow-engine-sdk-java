@@ -34,6 +34,7 @@ public class WorkflowEngineClientConfig {
     private final String credentialsConfigPath;
     private final Map<String, Map<String, Map<String, Object>>> credentialsConfig;
     private final String a2atEnvPath;
+    private final int maxNegotiationRounds;
     private final List<ExtensionHandler> customHandlers;
 
     private WorkflowEngineClientConfig(Builder b) {
@@ -42,6 +43,7 @@ public class WorkflowEngineClientConfig {
         this.credentialsConfigPath = b.credentialsConfigPath;
         this.credentialsConfig = b.credentialsConfig;
         this.a2atEnvPath = b.a2atEnvPath;
+        this.maxNegotiationRounds = b.maxNegotiationRounds;
         this.customHandlers = b.customHandlers;
     }
 
@@ -65,6 +67,10 @@ public class WorkflowEngineClientConfig {
         return a2atEnvPath;
     }
 
+    public int getMaxNegotiationRounds() {
+        return maxNegotiationRounds;
+    }
+
     public List<ExtensionHandler> getCustomHandlers() {
         return customHandlers;
     }
@@ -79,6 +85,7 @@ public class WorkflowEngineClientConfig {
         private String credentialsConfigPath = null;
         private Map<String, Map<String, Map<String, Object>>> credentialsConfig = null;
         private String a2atEnvPath = null;
+        private int maxNegotiationRounds = 3;
         private List<ExtensionHandler> customHandlers = null;
 
         public Builder sslVerify(boolean v) {
@@ -103,6 +110,11 @@ public class WorkflowEngineClientConfig {
 
         public Builder a2atEnvPath(String v) {
             this.a2atEnvPath = v;
+            return this;
+        }
+
+        public Builder maxNegotiationRounds(int v) {
+            this.maxNegotiationRounds = v;
             return this;
         }
 

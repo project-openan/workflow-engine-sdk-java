@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.SendMessageResult;
+import com.openan.a2at.engine.control.ControlPoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +65,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private final String contextId;
     private EventCallback eventCallback = new EventCallback();
     private Object controlPoint;
+    private final int maxNegotiationRounds;
 
     /**
      * Full constructor with configuration.
@@ -97,8 +99,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 cardMap.put(name, card);
             }
         }
-        log.info("[EngineClient] Initialized with {} agent(s), ssl_verify={}, a2at={}",
-                cardMap.size(), config.isSslVerify(), a2atClient != null);
+        this.maxNegotiationRounds = config.getMaxNegotiationRounds();
+        log.info("[EngineClient] Initialized with {} agent(s), ssl_verify={}, a2at={}, maxNeg={}",
+                cardMap.size(), config.isSslVerify(), a2atClient != null, maxNegotiationRounds);
     }
 
     /**
@@ -186,11 +189,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                     String ctx = contextId != null ? contextId : this.contextId;
                     return doSendViaA2ARuntime(agentCard, agentName, message, ctx, processedMetadata)
                             .thenCompose(result -> runAfterReceiveHandlers(agentCard, result))
-                            .thenApply(result -> {
-                                emit(EventType.AGENT_RESPONSE,
-                                        Map.of("agent", agentName, "response", result.getText()));
-                                return result;
-                            });
+                            .thenCompose(result -> autoNegotiate(agentCard, agentName, message, ctx, result, 1));
                 });
     }
 
@@ -687,7 +686,52 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     }
 
     // ------------------------------------------------------------------
-    // Negotiation
+    // Internal negotiation loop (auto-driven by sendMessage)
+    // ------------------------------------------------------------------
+
+    private CompletableFuture<SendMessageResult> autoNegotiate(
+            Object agentCard, String agentName, String originalMessage,
+            String contextId, SendMessageResult result, int round) {
+        if (!isNegotiationNeeded(result) || round > maxNegotiationRounds) {
+            emit(EventType.AGENT_RESPONSE,
+                    Map.of("agent", agentName, "response", result.getText()));
+            return CompletableFuture.completedFuture(result);
+        }
+        Map<String, Object> negMeta = result.getMetadata() != null ? result.getMetadata() : new HashMap<>();
+        String negText = negMeta.getOrDefault("negotiation_message", "").toString();
+        log.info("[Negotiation] Round {} for '{}': {}", round, agentName, negText);
+        emit(EventType.NEGOTIATION_REQUEST, Map.of("agent", agentName, "round", round, "concern", negText));
+        CompletableFuture<String> clarFuture;
+        if (controlPoint instanceof ControlPoint cp) {
+            clarFuture = cp.onNegotiation(agentName, negText, negMeta);
+        } else {
+            clarFuture = CompletableFuture.completedFuture(
+                    "Please proceed with the original task using available information.");
+        }
+        return clarFuture.thenCompose(clarification -> {
+            if (clarification == null || clarification.isEmpty()) {
+                emit(EventType.NEGOTIATION_FAILED, Map.of("agent", agentName, "round", round, "reason", "no clarification"));
+                emit(EventType.AGENT_RESPONSE, Map.of("agent", agentName, "response", result.getText()));
+                return CompletableFuture.completedFuture(result);
+            }
+            emit(EventType.NEGOTIATION_RESOLVED, Map.of("agent", agentName, "round", round, "clarification", clarification));
+            String followUp = "[NEGOTIATION_RESOLUTION]\n"
+                    + "The engine has reviewed your negotiation request and provides "
+                    + "the following clarification:\n\n" + clarification
+                    + "\n\n---\nOriginal Task:\n" + originalMessage
+                    + "\n\nPlease re-execute the task based on the clarification above.";
+            return runBeforeSendHandlers(agentCard, followUp, null)
+                    .thenCompose(meta -> {
+                        String ctx = contextId != null ? contextId : this.contextId;
+                        return doSendViaA2ARuntime(agentCard, agentName, followUp, ctx, meta)
+                                .thenCompose(r -> runAfterReceiveHandlers(agentCard, r))
+                                .thenCompose(r -> autoNegotiate(agentCard, agentName, originalMessage, contextId, r, round + 1));
+                    });
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Negotiation (legacy sendMessageWithNegotiation, kept for backward compat)
     // ------------------------------------------------------------------
 
     @Override

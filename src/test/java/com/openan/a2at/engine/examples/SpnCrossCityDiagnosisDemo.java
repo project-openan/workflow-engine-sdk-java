@@ -1,6 +1,5 @@
 package com.openan.a2at.engine.examples;
 
-import com.openan.a2at.engine.client.WorkflowEngineClient.NegotiationResolver;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.DefaultControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
@@ -38,7 +37,6 @@ public class SpnCrossCityDiagnosisDemo {
     static final String ORCH_URL = "https://127.0.0.1:5001";
     static final String PSOP_ID = "psop_spn_cross_city_diagnosis";
     static final String CRED_FILE = "spn_agent_credentials.json";
-    static final int NEGOTIATION_MAX_ROUNDS = 3;
 
     public static void main(String[] args) throws Exception {
         boolean sslVerify = false;
@@ -75,10 +73,10 @@ public class SpnCrossCityDiagnosisDemo {
         // onRoute (first non-terminal branch). Only override what we customize.
         ControlPoint controlPoint = new DefaultControlPoint() {
             @Override
-            public CompletableFuture<String> resolveNegotiation(
+            public CompletableFuture<String> onNegotiation(
                     String agentName, String negotiationText,
                     Map<String, Object> receiveResult) {
-                log.info("[resolveNegotiation] agent={}: {}",
+                log.info("[onNegotiation] agent={}: {}",
                         agentName,
                         negotiationText != null ? negotiationText : "(empty)");
                 return CompletableFuture.completedFuture(

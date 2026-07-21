@@ -10,35 +10,51 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * User-facing decision interface.
- * on_task and on_route are required; on_authorization and on_notification
- * have default implementations (approve / no-op).
+ * Each method has a single responsibility.
+ * SDK internally handles all A2A-T protocol mechanics (Task-T prompt generation,
+ * Negotiation-T loop, Authorization-T injection, Notification-T subscription).
+ * ControlPoint methods only make business decisions.
  */
 public interface ControlPoint {
 
     /**
-     * Called when a step needs to send a task to an agent.
-     * request.message holds the full assembled message (context + task + lang hint).
-     * Call engineClient.sendMessage(request.getAgentName(), request.getMessage()).
+     * Send a Task-T message to an agent. Just call sendMessage.
+     * SDK internally handles: Task-T prompt generation (beforeSend),
+     * negotiation auto-loop (calls onNegotiation if INPUT_REQUIRED),
+     * Authorization-T confirmation injection, Notification-T subscription.
+     * Do NOT call sendMessageWithNegotiation or inject A2A-T metadata.
      */
     CompletableFuture<TaskResponse> onTask(TaskRequest request, com.openan.a2at.engine.client.WorkflowEngineClient engineClient);
 
     /**
-     * Called at a conditional branch. User decides which branch to take.
-     * conditions is List<JumpCondition>, each with getStep() and getCondition().
+     * Conditional branch decision. Only decide which step to go to.
+     * Do NOT send messages here.
      */
     CompletableFuture<RouteDecision> onRoute(String stepName, Map<String, Object> results, List<JumpCondition> conditions);
 
     /**
-     * Called when an agent requests authorization. Default: approve.
+     * Authorization approval decision. Return true/false.
+     * Do NOT send Authorization-T confirmation - SDK injects it automatically
+     * into the next sendMessage via beforeSend. Default: auto-approve.
      */
     default CompletableFuture<Boolean> onAuthorization(String agentName, Map<String, Object> authRequest) {
         return CompletableFuture.completedFuture(true);
     }
 
     /**
-     * Called when a notification is received. Default: no-op.
+     * Handle a received Notification-T. Do NOT send messages here. Default: no-op.
      */
     default CompletableFuture<Void> onNotification(String agentName, Map<String, Object> notification) {
         return CompletableFuture.completedFuture(null);
+    }
+
+    /**
+     * Provide supplementary data when an agent returns INPUT_REQUIRED
+     * (Negotiation-T). Return the clarification text - the SDK internally
+     * resends the follow-up message. Do NOT send messages here.
+     * Default: returns a generic clarification.
+     */
+    default CompletableFuture<String> onNegotiation(String agentName, String negotiationText, Map<String, Object> receiveResult) {
+        return CompletableFuture.completedFuture("Please proceed with the original task using available information.");
     }
 }
