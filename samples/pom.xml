@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.openan.a2at</groupId>
+        <artifactId>a2at-engine-java-parent</artifactId>
+        <version>0.3.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>a2at-engine-java-samples</artifactId>
+    <packaging>jar</packaging>
+
+    <name>a2at-engine-java-samples</name>
+    <description>Sample applications demonstrating the A2A-T workflow execution SDK</description>
+
+    <dependencies>
+        <!-- The workflow execution SDK -->
+        <dependency>
+            <groupId>com.openan.a2at</groupId>
+            <artifactId>a2at-engine-java</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Logging implementation for demo console output -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
