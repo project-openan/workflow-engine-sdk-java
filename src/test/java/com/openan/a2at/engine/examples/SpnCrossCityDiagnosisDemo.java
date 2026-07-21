@@ -80,7 +80,7 @@ public class SpnCrossCityDiagnosisDemo {
                     Map<String, Object> receiveResult) {
                 log.info("[resolveNegotiation] agent={}: {}",
                         agentName,
-                        negotiationText != null ? negotiationText.substring(0, Math.min(100, negotiationText.length())) : "(empty)");
+                        negotiationText != null ? negotiationText : "(empty)");
                 return CompletableFuture.completedFuture(
                         "根据工作台上下文，客户A上海-广州间SPN专线中断，上海OMC告警端口Down，"
                         + "光功率-28dBm。端口所属单板line-card-03，端口编号port-7，最近维护2026-07-15。");

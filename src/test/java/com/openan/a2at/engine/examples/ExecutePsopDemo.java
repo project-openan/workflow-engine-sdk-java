@@ -93,7 +93,7 @@ public class ExecutePsopDemo {
                     case EventType.TASK_REQUEST -> log.info("     Agent: {}", data.get("agent"));
                     case EventType.TASK_RESPONSE -> {
                         String output = String.valueOf(data.getOrDefault("output", ""));
-                        log.info("     Response: {}", output.substring(0, Math.min(80, output.length())));
+                        log.info("     Response: {}", output);
                     }
                     case EventType.ROUTE_DECISION -> log.info("     Route: {} -> {}", data.get("step"), data.get("next"));
                     case EventType.STEP_COMPLETE -> log.info("  <- Step done: {}", data.get("step"));
@@ -151,8 +151,7 @@ public class ExecutePsopDemo {
         public CompletableFuture<TaskResponse> onTask(
                 TaskRequest request, WorkflowEngineClient engineClient) {
             log.info("  [on_task] agent={}, task={}", request.getAgentName(),
-                    request.getDescription().substring(0,
-                            Math.min(60, request.getDescription().length())));
+                    request.getDescription());
 
             return engineClient.sendMessage(request.getAgentName(), request.getMessage())
                     .thenApply(result -> {

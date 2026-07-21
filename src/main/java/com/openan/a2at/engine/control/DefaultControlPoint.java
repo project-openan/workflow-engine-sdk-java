@@ -88,7 +88,7 @@ public class DefaultControlPoint implements ControlPoint {
             Map<String, Object> receiveResult) {
         log.info("[DefaultCP] Negotiation from {}: {}",
                 agentName,
-                negotiationText != null ? negotiationText.substring(0, Math.min(100, negotiationText.length())) : "(empty)");
+                negotiationText != null ? negotiationText : "(empty)");
         return CompletableFuture.completedFuture(
                 "Please proceed with the original task using available information.");
     }

@@ -60,7 +60,7 @@ public class AuthenticatedAgentDemo {
             // Check Authorization header
             String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
             log.info("[MockAgent] Received message:send, Authorization={}",
-                    authHeader != null ? authHeader.substring(0, Math.min(40, authHeader.length())) + "..." : "(none)");
+                    authHeader != null ? authHeader : "(none)");
             if (authHeader != null && authHeader.startsWith("Bearer mock-bearer-token-xyz")) {
                 tokenReceived.set(true);
                 // Return a mock diagnosis result
@@ -221,7 +221,7 @@ public class AuthenticatedAgentDemo {
             Map<String, Object> first = result.getHistory().get(0);
             log.info("First task: agent={}, status={}, output={}",
                     first.get("agent"), first.get("status"),
-                    String.valueOf(first.get("output")).substring(0, Math.min(120, String.valueOf(first.get("output")).length())));
+                    String.valueOf(first.get("output")));
         }
         if (result.getError() != null) {
             log.error("Error: {}", result.getError());
