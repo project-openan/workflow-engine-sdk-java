@@ -19,12 +19,12 @@ public interface ControlPoint {
 
     /**
      * Send a Task-T message to an agent. Just call sendMessage.
-     * SDK internally handles: Task-T prompt generation (beforeSend),
-     * negotiation auto-loop (calls onNegotiation if INPUT_REQUIRED),
-     * Authorization-T confirmation injection, Notification-T subscription.
-     * Do NOT call sendMessageWithNegotiation or inject A2A-T metadata.
-     */
-    CompletableFuture<TaskResponse> onTask(TaskRequest request, com.openan.a2at.engine.client.WorkflowEngineClient engineClient);
+    * SDK internally handles: Task-T prompt generation (beforeSend),
+    * negotiation auto-loop (calls onNegotiation if INPUT_REQUIRED),
+    * Authorization-T confirmation injection, Notification-T subscription.
+     * Just call sendMessage - the SDK handles the rest.
+    */
+   CompletableFuture<TaskResponse> onTask(TaskRequest request, com.openan.a2at.engine.client.WorkflowEngineClient engineClient);
 
     /**
      * Conditional branch decision. Only decide which step to go to.

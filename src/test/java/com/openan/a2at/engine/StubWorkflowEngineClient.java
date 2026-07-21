@@ -78,13 +78,6 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
     }
 
     @Override
-    public CompletableFuture<SendMessageResult> sendMessageWithNegotiation(
-            String agentName, String message, String contextId, int maxRounds,
-            NegotiationResolver negotiationResolver) {
-        return sendMessage(agentName, message, contextId, null);
-    }
-
-    @Override
     public void setControlPoint(Object controlPoint) {
         this.controlPoint = controlPoint;
     }
@@ -111,3 +104,4 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
         return sent.size();
     }
 }
+

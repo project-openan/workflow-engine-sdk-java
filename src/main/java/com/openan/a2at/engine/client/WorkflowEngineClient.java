@@ -29,31 +29,6 @@ public interface WorkflowEngineClient {
         return sendMessage(agentName, message, null, null);
     }
 
-    /**
-     * Send a message with auto-negotiation support.
-     * When agent returns INPUT_REQUIRED, uses A2A-T receive/continue state
-     * machine, retries with the resolved clarification up to maxRounds.
-     *
-     * @param contextId           optional context ID (null = auto-generated)
-     * @param negotiationResolver optional callback(agentName, negotiationText, receiveResult) -> clarification
-     */
-    CompletableFuture<SendMessageResult> sendMessageWithNegotiation(
-            String agentName, String message, String contextId, int maxRounds,
-            NegotiationResolver negotiationResolver);
-
-    /** Convenience: no context ID. */
-    default CompletableFuture<SendMessageResult> sendMessageWithNegotiation(
-            String agentName, String message, int maxRounds,
-            NegotiationResolver negotiationResolver) {
-        return sendMessageWithNegotiation(agentName, message, null, maxRounds, negotiationResolver);
-    }
-
-    /** Functional interface for negotiation clarification. */
-    @FunctionalInterface
-    interface NegotiationResolver {
-        CompletableFuture<String> resolve(String agentName, String negotiationText, Map<String, Object> receiveResult);
-    }
-
     void setControlPoint(Object controlPoint);
     void setEventCallback(EventCallback callback);
     void close();
