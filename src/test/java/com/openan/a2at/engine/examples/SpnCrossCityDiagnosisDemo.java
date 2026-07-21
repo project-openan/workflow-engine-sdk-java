@@ -76,77 +76,40 @@ public class SpnCrossCityDiagnosisDemo {
             public CompletableFuture<TaskResponse> onTask(
                     TaskRequest req, WorkflowEngineClient ec) {
                 log.info("[onTask] step={} agent={}", req.getStepName(), req.getAgentName());
-
-                boolean isOmc = req.getAgentName().contains("SPN Domain Agent");
                 String stepName = req.getStepName();
 
-                if (isOmc && "parallel_diagnosis".equals(stepName)) {
-                    // Step 2: OMC parallel diagnosis — may negotiate
-                    log.info("[onTask] OMC diagnosis, using sendMessageWithNegotiation");
-                    return ec.sendMessageWithNegotiation(
-                            req.getAgentName(), req.getMessage(),
-                            NEGOTIATION_MAX_ROUNDS,
-                            this::resolveNegotiation
-                    ).thenApply(r -> {
-                        log.info("[onTask] Diagnosis from {}: {} chars", req.getAgentName(),
-                                r.getText() != null ? r.getText().length() : 0);
-                        boolean success = r.getText() != null && !r.getText().isEmpty();
-                        return TaskResponse.builder()
-                                .success(success)
-                                .output(r.getText())
-                                .build();
-                    }).exceptionally(e -> {
-                        log.error("[onTask] Failed: {}", e.getMessage());
-                        return TaskResponse.builder()
-                                .success(false)
-                                .error("Agent call failed: " + e.getMessage())
-                                .build();
-                    });
-                } else if (isOmc && "recovery".equals(stepName)) {
-                    // Step 4: Recovery — send repair plan to fault OMC
-                    // Before sending, check if authorization is needed
-                    log.info("[onTask] Recovery step: sending repair plan to fault OMC");
-                    boolean approved = authorizeRepair();
-                    if (!approved) {
-                        log.warn("[onTask] Authorization denied, aborting recovery");
-                        return CompletableFuture.completedFuture(TaskResponse.builder()
-                                .success(false)
-                                .error("Authorization denied by user")
-                                .build());
+                // Both parallel_diagnosis and recovery send to OMC agents.
+                // SDK automatically handles:
+                //   - Authorization-T in OMC diagnosis response -> onAuthorization
+                //   - Notification-T in OMC recovery response -> onNotification
+                // ControlPoint only decides how to send (with negotiation support).
+                return ec.sendMessageWithNegotiation(
+                        req.getAgentName(), req.getMessage(),
+                        NEGOTIATION_MAX_ROUNDS,
+                        this::resolveNegotiation
+                ).thenApply(r -> {
+                    log.info("[onTask] Response from {}: {} chars, state={}",
+                            req.getAgentName(),
+                            r.getText() != null ? r.getText().length() : 0,
+                            r.getTaskState());
+                    boolean success = r.getText() != null && !r.getText().isEmpty()
+                            && !"INPUT_REQUIRED".equals(r.getTaskState());
+                    if (stepName.equals("parallel_diagnosis")) {
+                        log.info("[onTask] Diagnosis complete for {}", req.getAgentName());
+                    } else if (stepName.equals("recovery")) {
+                        log.info("[onTask] Recovery complete for {}", req.getAgentName());
                     }
-                    // Send the recovery task to the OMC
-                    return ec.sendMessageWithNegotiation(
-                            req.getAgentName(), req.getMessage(),
-                            NEGOTIATION_MAX_ROUNDS,
-                            this::resolveNegotiation
-                    ).thenApply(r -> {
-                        String recoveryResult = r.getText() != null ? r.getText() : "";
-                        log.info("[onTask] Recovery result from {}: {} chars", req.getAgentName(), recoveryResult.length());
-                        notificationCalled.set(true);
-                        log.info("[onNotification] Recovery successful: {}", recoveryResult.substring(0, Math.min(100, recoveryResult.length())));
-                        return TaskResponse.builder()
-                                .success(true)
-                                .output(recoveryResult)
-                                .build();
-                    });
-                } else {
-                    // Workbench steps (dispatch, merge_analysis, report) — simple send
-                    log.info("[onTask] Workbench step, using sendMessage");
-                    return ec.sendMessage(req.getAgentName(), req.getMessage())
-                            .thenApply(r -> {
-                                log.info("[onTask] Response from {}: {} chars", req.getAgentName(),
-                                        r.getText() != null ? r.getText().length() : 0);
-                                // After merge_analysis, the response contains the repair plan
-                                if ("merge_analysis".equals(stepName)) {
-                                    log.info("[onTask] Merge analysis complete, repair plan extracted");
-                                    authorizationCalled.set(true);
-                                }
-                                return TaskResponse.builder()
-                                        .success(true)
-                                        .output(r.getText())
-                                        .build();
-                            });
-                }
+                    return TaskResponse.builder()
+                            .success(success)
+                            .output(r.getText())
+                            .build();
+                }).exceptionally(e -> {
+                    log.error("[onTask] Failed for {}: {}", req.getAgentName(), e.getMessage());
+                    return TaskResponse.builder()
+                            .success(false)
+                            .error("Agent call failed: " + e.getMessage())
+                            .build();
+                });
             }
 
             CompletableFuture<String> resolveNegotiation(
@@ -164,9 +127,14 @@ public class SpnCrossCityDiagnosisDemo {
             @Override
             public CompletableFuture<Boolean> onAuthorization(
                     String agentName, Map<String, Object> authRequest) {
+                authorizationCalled.set(true);
                 log.info("[onAuthorization] agent={} requests authorization", agentName);
-                log.info("[onAuthorization] auth_request={}", authRequest);
-                log.info("[onAuthorization] Auto-approving (demo)");
+                log.info("[onAuthorization] repair_plan={}", authRequest.get("repair_plan"));
+                log.info("[onAuthorization] risk_level={}", authRequest.get("risk_level"));
+                log.info("[onAuthorization] Waiting for user confirmation...");
+                // In production: show dialog, wait for human approval
+                // For demo: auto-approve after a brief pause to simulate human interaction
+                log.info("[onAuthorization] User approved (demo auto-approve)");
                 return CompletableFuture.completedFuture(true);
             }
 
@@ -174,12 +142,13 @@ public class SpnCrossCityDiagnosisDemo {
             public CompletableFuture<RouteDecision> onRoute(
                     String stepName, Map<String, Object> results,
                     List<JumpCondition> conditions) {
-                log.info("[onRoute] step={}, next={}", stepName,
+                log.info("[onRoute] step={}, conditions={}", stepName,
                         conditions.stream().map(JumpCondition::getStep).toList());
+                // After parallel_diagnosis, route to recovery (the only branch)
                 return CompletableFuture.completedFuture(
                         RouteDecision.builder()
                                 .nextStep(conditions.get(0).getStep())
-                                .reason("sequential flow")
+                                .reason("diagnosis complete, proceeding to recovery")
                                 .build());
             }
 
@@ -187,16 +156,10 @@ public class SpnCrossCityDiagnosisDemo {
             public CompletableFuture<Void> onNotification(
                     String agentName, Map<String, Object> notification) {
                 notificationCalled.set(true);
-                log.info("[onNotification] agent={} notification={}", agentName, notification);
+                log.info("[onNotification] agent={} reports: {}", agentName, notification.get("message"));
+                log.info("[onNotification] Recovery status: {}", notification.get("status"));
+                // Workbench received recovery success — original Task-T SSE stream can now end
                 return CompletableFuture.completedFuture(null);
-            }
-
-            private boolean authorizeRepair() {
-                log.info("[authorizeRepair] Showing authorization dialog...");
-                log.info("[authorizeRepair] Repair plan: 更换上海侧OMC端口光模块, 恢复端口Down状态");
-                log.info("[authorizeRepair] Risk level: medium");
-                log.info("[authorizeRepair] User approved (demo auto-approve)");
-                return true;
             }
         };
 
