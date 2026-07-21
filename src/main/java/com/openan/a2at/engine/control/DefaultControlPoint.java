@@ -8,6 +8,9 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
 
 /**
  * Default ControlPoint implementation with common auto-send behavior.
@@ -35,6 +38,7 @@ public class DefaultControlPoint implements ControlPoint {
     private static final Logger log = LoggerFactory.getLogger(DefaultControlPoint.class);
 
     private final int maxNegotiationRounds;
+    private final Set<String> authorizedAgents = ConcurrentHashMap.newKeySet();
 
     /** Create with default negotiation max rounds (3). */
     public DefaultControlPoint() {
@@ -57,6 +61,38 @@ public class DefaultControlPoint implements ControlPoint {
     public CompletableFuture<TaskResponse> onTask(
             TaskRequest request, WorkflowEngineClient engineClient) {
         log.info("[DefaultCP] onTask: agent={}, step={}", request.getAgentName(), request.getStepName());
+        // If this agent was previously authorized, include Authorization-T
+        // confirmation in the outgoing message metadata so the OMC knows
+        // the repair plan has been approved and can proceed with execution.
+        Map<String, Object> metadata = null;
+        boolean isAuthorized = authorizedAgents.contains(request.getAgentName());
+        if (isAuthorized) {
+            metadata = new HashMap<>();
+            metadata.put("Authorization-T", Map.of("approved", true, "message", "Authorization confirmed, proceed with repair"));
+            log.info("[DefaultCP] Sending with Authorization-T confirmation to {}", request.getAgentName());
+            // Use sendMessage (with metadata) instead of sendMessageWithNegotiation
+            // because the recovery step sends an authorization confirmation, not a
+            // new diagnosis task that might negotiate.
+            return engineClient.sendMessage(
+                    request.getAgentName(), request.getMessage(), null, metadata
+            ).thenApply(r -> {
+                boolean success = r.getText() != null && !r.getText().isEmpty()
+                        && (r.getTaskState() == null || !r.getTaskState().contains("INPUT_REQUIRED"));
+                log.info("[DefaultCP] Response from {}: {} chars, success={}",
+                        request.getAgentName(),
+                        r.getText() != null ? r.getText().length() : 0, success);
+                return TaskResponse.builder()
+                        .success(success)
+                        .output(r.getText())
+                        .build();
+            }).exceptionally(e -> {
+                log.error("[DefaultCP] Task failed for {}: {}", request.getAgentName(), e.getMessage());
+                return TaskResponse.builder()
+                        .success(false)
+                        .error("Agent call failed: " + e.getMessage())
+                        .build();
+            });
+        }
         return engineClient.sendMessageWithNegotiation(
                 request.getAgentName(), request.getMessage(),
                 maxNegotiationRounds, this::resolveNegotiation
@@ -122,6 +158,7 @@ public class DefaultControlPoint implements ControlPoint {
     public CompletableFuture<Boolean> onAuthorization(
             String agentName, Map<String, Object> authRequest) {
         log.info("[DefaultCP] onAuthorization: agent={}, auto-approving", agentName);
+        authorizedAgents.add(agentName);
         return CompletableFuture.completedFuture(true);
     }
 
