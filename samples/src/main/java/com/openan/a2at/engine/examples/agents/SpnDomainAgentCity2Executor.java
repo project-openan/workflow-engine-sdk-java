@@ -78,8 +78,9 @@ public class SpnDomainAgentCity2Executor extends BaseAgentExecutor {
         }
 
         List<Part<?>> parts = List.of(new TextPart(responseText));
-        emitter.addArtifact(parts, "diagnosis-result", "SPN diagnosis result", metadata, true, false);
+        emitter.addArtifact(parts, "diagnosis-result", "SPN diagnosis result", metadata, false, true);
         log.info("[SPN-Domain-Agent-City2] Task completed: taskId={}", taskId);
+        emitter.complete();
     }
 
     private static void sleepBriefly() {

@@ -77,8 +77,9 @@ public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
                     : handleTopLevelTask(input);
 
             List<Part<?>> parts = List.of(new TextPart(responseText));
-            emitter.addArtifact(parts, "workflow-result", "Result", Map.of(), true, false);
+            emitter.addArtifact(parts, "workflow-result", "Result", Map.of(), false, true);
             log.info("[Workbench-Agent] Task completed: taskId={}", taskId);
+            emitter.complete();
         } catch (Exception e) {
             log.error("[Workbench-Agent] Task failed: {}", e.getMessage(), e);
             emitter.fail(buildStatusMessage(contextId, taskId, "Failed: " + e.getMessage()));
