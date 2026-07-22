@@ -1,0 +1,74 @@
+package com.openan.a2at.engine.examples.agents;
+
+import org.a2aproject.sdk.server.agentexecution.RequestContext;
+import org.a2aproject.sdk.server.tasks.AgentEmitter;
+import org.a2aproject.sdk.spec.A2AError;
+import org.a2aproject.sdk.spec.Part;
+import org.a2aproject.sdk.spec.TextPart;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * SPN Domain Agent for City1 (Shanghai OMC).
+ *
+ * <p>Simulates fault diagnosis: Shanghai side has a FAULT (port Down,
+ * optical power -28dBm). For recovery tasks, reports recovery success
+ * via Notification-T metadata.
+ */
+public class SpnDomainAgentExecutor extends BaseAgentExecutor {
+    private static final Logger log = LoggerFactory.getLogger(SpnDomainAgentExecutor.class);
+
+    private static final String FAULT_DIAGNOSIS_RESULT =
+            "诊断结果：上海城市OMC诊断结果 - 端口Down，光功率-28dBm(低于阈值)，存在故障。\n"
+            + "修复方案：更换上海OMC端口光模块，恢复端口Down状态。此修复方案需要人工授权后执行。\n"
+            + "故障根因：上海OMC端口光模块故障。";
+
+    private static final String RECOVERY_RESULT =
+            "上海OMC端口光模块已更换，端口恢复Up，专线业务恢复正常。";
+
+    @Override
+    public void execute(RequestContext ctx, AgentEmitter emitter) throws A2AError {
+        String taskId = ctx.getTaskId();
+        String contextId = ctx.getContextId();
+        String input = extractText(ctx.getMessage());
+        log.info("[SPN-Domain-Agent] Received task: taskId={}, text={} chars", taskId, input.length());
+
+        emitter.submit(buildStatusMessage(contextId, taskId, "Diagnosis task received"));
+        emitter.startWork(buildStatusMessage(contextId, taskId, "Running SPN fault diagnosis"));
+
+        boolean isRecovery = input.contains("## 抢通指令") || input.toLowerCase().contains("recovery");
+
+        String responseText;
+        Map<String, Object> metadata = new HashMap<>();
+
+        if (isRecovery) {
+            responseText = RECOVERY_RESULT;
+            metadata.put("Notification-T", Map.of(
+                    "topic", "recovery_result",
+                    "status", "recovery_successful",
+                    "message", RECOVERY_RESULT));
+            log.info("[SPN-Domain-Agent] Recovery completed, injecting Notification-T");
+        } else {
+            responseText = FAULT_DIAGNOSIS_RESULT;
+            metadata.put("Authorization-T", Map.of(
+                    "needs_authorization", true,
+                    "repair_plan", "更换上海OMC端口光模块，恢复端口Down状态",
+                    "risk_level", "medium",
+                    "affected_service", "客户A上海-广州间SPN专线"));
+            log.info("[SPN-Domain-Agent] Diagnosis completed, injecting Authorization-T");
+        }
+
+        List<Part<?>> parts = List.of(new TextPart(responseText));
+        emitter.addArtifact(parts, "diagnosis-result", "SPN diagnosis result", metadata, true, false);
+        log.info("[SPN-Domain-Agent] Task completed: taskId={}", taskId);
+    }
+
+    @Override
+    public void cancel(RequestContext ctx, AgentEmitter emitter) throws A2AError {
+        emitter.cancel();
+    }
+}

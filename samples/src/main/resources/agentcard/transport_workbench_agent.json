@@ -1,0 +1,82 @@
+{
+  "name": "Transport Workbench Agent",
+  "description": "负责向不同地市的SPN故障处理Agent下发专线故障诊断指令，并汇总分析诊断结果，生成报告。",
+  "provider": {
+    "organization": "Huawei",
+    "url": ""
+  },
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "extendedAgentCard": false,
+    "extensions": [
+      {
+        "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Task-T/v1",
+        "description": "Extension of structured prompt Task-T requests.",
+        "required": false
+      },
+      {
+        "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",
+        "description": "Extension for A2A-T negotiation text exchange.",
+        "required": false
+      },
+       {
+         "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/DATA-NEGOTIATION-T/v1",
+         "description": "Extension for A2A-T negotiation context data.",
+         "required": false
+       },
+       {
+         "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1",
+         "description": "Extension for A2A-T notification push.",
+         "required": false
+       }
+      ]
+  },
+  "defaultInputModes": [
+    "application/json",
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "application/json",
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "cross-city-fault-diagnosis",
+      "name": "cross-city-fault-diagnosis",
+      "description": "receive fault diagnosis task, orchestrate OMC agents, merge and recover",
+      "tags": [
+        "SPN",
+        "fault-diagnosis",
+        "cross-city"
+      ]
+    },
+    {
+      "id": "dispatch-diagnosis",
+      "name": "Dispatch Diagnosis",
+      "description": "向多个地市SPN故障处理Agent同时下发专线故障诊断指令",
+      "tags": [
+        "dispatch",
+        "diagnosis"
+      ]
+    },
+    {
+      "id": "aggregate-analysis",
+      "name": "Aggregate Analysis",
+      "description": "收集并汇总各地市SPN Agent的诊断结果，进行综合分析并生成报告",
+      "tags": [
+        "aggregate",
+        "analysis"
+      ]
+    }
+  ],
+  "supportedInterfaces": [
+    {
+      "protocolBinding": "HTTP+JSON",
+      "protocolVersion": "1.0",
+      "url": "http://127.0.0.1:26337/a2a/json",
+      "tenant": ""
+    }
+  ]
+}

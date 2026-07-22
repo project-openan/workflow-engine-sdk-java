@@ -1,0 +1,78 @@
+{
+  "name": "SPN Domain Agent City2",
+  "description": "SPN Domain Agent for City2 OMC - Guangzhou, private-line fault diagnosis with Bearer auth",
+  "provider": {
+    "organization": "Huawei",
+    "url": "https://www.huawei.com"
+  },
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "extendedAgentCard": false,
+    "extensions": [
+      {
+        "description": "Extension of structured prompt Task-T requests.",
+        "required": false,
+        "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Task-T/v1"
+      },
+      {
+        "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",
+        "description": "Extension for A2A-T negotiation text exchange.",
+        "required": false
+      },
+      {
+        "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1",
+        "description": "Extension for A2A-T authorization.",
+        "required": false
+      },
+      {
+        "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1",
+        "description": "Extension for A2A-T notification push.",
+        "required": false
+      }
+    ]
+  },
+  "defaultInputModes": [
+    "application/json",
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "application/json",
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "SPN-private-line-service-complain-diagnosis-city2",
+      "name": "SPN专线业务投诉诊断-City2",
+      "description": "City2地市SPN网络专线故障根因诊断能力",
+      "tags": [
+        "SPN专线业务投诉诊断",
+        "City2"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "bearerAuth": {
+      "httpAuthSecurityScheme": {
+        "scheme": "Bearer",
+        "description": "使用用户名和密码通过登录接口查询accessSession后，使用该accessSession进行bearer认证。"
+      }
+    }
+  },
+  "securityRequirements": [
+    {
+      "schemes": {
+        "bearerAuth": {}
+      }
+    }
+  ],
+  "supportedInterfaces": [
+    {
+      "protocolBinding": "HTTP+JSON",
+      "protocolVersion": "1.0",
+      "url": "http://127.0.0.1:26336/a2a/json",
+      "tenant": ""
+    }
+  ]
+}

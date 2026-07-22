@@ -425,9 +425,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         if (resp.statusCode() != 200) {
             throw new RuntimeException("Agent returned " + resp.statusCode() + ": " + resp.body());
         }
-        String respBody = resp.body();
+       String respBody = resp.body();
 
-        // SSE streaming response: multiple "data: {json}" lines
+       // SSE streaming response: multiple "data: {json}" lines
         // Single JSON response: one JSON object (message:send or JSONRPC)
         String responseText = "";
         Map<String, Object> respMetadata = new HashMap<>();
@@ -444,22 +444,50 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 try {
                     Map<String, Object> eventData = mapper.readValue(json, Map.class);
                     eventData = SseNormalization.normalize(eventData);
-                    Object task = eventData.get("task");
-                    if (task instanceof Map) {
-                        Map<String, Object> taskMap = (Map<String, Object>) task;
-                        Object status = taskMap.get("status");
-                        if (status instanceof Map) {
-                            Object state = ((Map<String, Object>) status).get("state");
-                            if (state instanceof String) taskState = (String) state;
-                        }
-                        Object meta = taskMap.get("metadata");
+
+                    // a2a-java SDK SSE events: task, message, statusUpdate, artifactUpdate
+                   Object taskObj = eventData.get("task");
+                   if (taskObj instanceof Map) {
+                       Map<String, Object> taskMap = (Map<String, Object>) taskObj;
+                       Object status = taskMap.get("status");
+                       if (status instanceof Map) {
+                           Object state = ((Map<String, Object>) status).get("state");
+                           if (state instanceof String) taskState = (String) state;
+                       }
+                       Object meta = taskMap.get("metadata");
                         if (meta instanceof Map) respMetadata = (Map<String, Object>) meta;
                         String t = extractTextFromResultMap(taskMap);
                         if (t != null && !t.isEmpty()) textBuilder.append(t);
                     }
-                    Object msgEvent = eventData.get("message");
-                    if (msgEvent instanceof Map) {
-                        String t = extractTextFromResultMap((Map<String, Object>) msgEvent);
+
+                    Object suObj = eventData.get("statusUpdate");
+                    if (suObj instanceof Map) {
+                        Map<String, Object> suMap = (Map<String, Object>) suObj;
+                        Object suStatus = suMap.get("status");
+                        if (suStatus instanceof Map) {
+                            Object suState = ((Map<String, Object>) suStatus).get("state");
+                            if (suState instanceof String) taskState = (String) suState;
+                        }
+                        String t = extractTextFromResultMap(suMap);
+                        if (t != null && !t.isEmpty()) textBuilder.append(t);
+                    }
+
+                    Object auObj = eventData.get("artifactUpdate");
+                    if (auObj instanceof Map) {
+                        Map<String, Object> auMap = (Map<String, Object>) auObj;
+                        Object artifact = auMap.get("artifact");
+                        if (artifact instanceof Map) {
+                            Map<String, Object> artMap = (Map<String, Object>) artifact;
+                            Object auMeta = artMap.get("metadata");
+                            if (auMeta instanceof Map) respMetadata = (Map<String, Object>) auMeta;
+                            String t = extractTextFromResultMap(artMap);
+                            if (t != null && !t.isEmpty()) textBuilder.append(t);
+                        }
+                    }
+
+                    Object msgObj = eventData.get("message");
+                    if (msgObj instanceof Map) {
+                        String t = extractTextFromResultMap((Map<String, Object>) msgObj);
                         if (t != null && !t.isEmpty()) textBuilder.append(t);
                     }
                 } catch (Exception ignored) {
@@ -504,26 +532,33 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     @SuppressWarnings("unchecked")
     private static String extractTextFromResultMap(Map<String, Object> resultMap) {
         StringBuilder text = new StringBuilder();
-        // Extract from artifacts
+        // Extract from artifacts (plural - list form, used in task responses)
         Object artifacts = resultMap.get("artifacts");
         if (artifacts instanceof List) {
             for (Object art : (List<?>) artifacts) {
-                if (art instanceof Map) {
-                    Object artParts = ((Map<String, Object>) art).get("parts");
-                    if (artParts instanceof List) {
-                        for (Object p : (List<?>) artParts) {
-                            if (p instanceof Map) {
-                                Object t = ((Map<String, Object>) p).get("text");
-                                if (t instanceof String) {
-                                    text.append(t);
-                                }
-                            }
-                        }
-                    }
+                extractPartsText(art, text);
+            }
+        }
+        // Extract from artifact (singular - used in a2a-java SSE artifactUpdate events)
+        extractPartsText(resultMap.get("artifact"), text);
+        // Extract from parts directly (used in a2a-java SSE statusUpdate events)
+        extractPartsText(resultMap, text);
+        return text.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void extractPartsText(Object container, StringBuilder text) {
+        if (!(container instanceof Map)) return;
+        Object parts = ((Map<String, Object>) container).get("parts");
+        if (!(parts instanceof List)) return;
+        for (Object p : (List<?>) parts) {
+            if (p instanceof Map) {
+                Object t = ((Map<String, Object>) p).get("text");
+                if (t instanceof String) {
+                    text.append(t);
                 }
             }
         }
-        return text.toString();
     }
 
     // ------------------------------------------------------------------
