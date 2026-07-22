@@ -3,6 +3,7 @@ package com.openan.a2at.engine.runner;
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
+import com.openan.a2at.engine.client.A2AJavaClientRuntime;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
@@ -42,12 +43,12 @@ public class ExecutePsop {
      * @param engineClient     optional pre-created client (null = auto-create)
      * @param runtimeIntent    original user intent
      * @param lang             language hint (zh/en)
-     * @param a2aClientRuntime the A2A client runtime from a2a-java-sdk
-     * @param eventCallback    optional event callback (null = no-op)
-     * @param onFinish         optional persistence hook: (result, collectedEvents) -> CompletableFuture<Void> (async)
-     * @param onEvent          optional event transformer: event -> event | null | List<event>
-     * @return CompletableFuture<ExecutionResult>
-     */
+    * @param a2aClientRuntime the A2A client runtime from a2a-java-sdk
+    * @param eventCallback    optional event callback (null = no-op)
+    * @param onFinish         optional persistence hook: (result, collectedEvents) -> CompletableFuture<Void> (async)
+    * @param onEvent          optional event transformer: event -> event | null | List<event>
+    * @return CompletableFuture<ExecutionResult>
+    */
     public static CompletableFuture<ExecutionResult> execute(
             Object psop,
             List<?> agentCards,
@@ -59,7 +60,7 @@ public class ExecutePsop {
             String credentialsConfigPath,
             boolean sslVerify,
             String caCertsPath,
-            Object a2aClientRuntime,
+            A2AJavaClientRuntime a2aClientRuntime,
             EventCallback eventCallback,
             BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish,
             Function<Map<String, Object>, Object> onEvent) {
@@ -189,7 +190,7 @@ public class ExecutePsop {
             WorkflowEngineClient engineClient,
             String runtimeIntent,
             String lang,
-            Object a2aClientRuntime,
+            A2AJavaClientRuntime a2aClientRuntime,
             EventCallback eventCallback,
             BiConsumer<ExecutionResult, List<Map<String, Object>>> onFinish,
             Function<Map<String, Object>, Object> onEvent) {
@@ -219,7 +220,7 @@ public class ExecutePsop {
         private String credentialsConfigPath;
         private boolean sslVerify = true;
         private String caCertsPath;
-        private Object a2aClientRuntime;
+        private A2AJavaClientRuntime a2aClientRuntime;
         private EventCallback eventCallback;
         private BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish;
         private Function<Map<String, Object>, Object> onEvent;
@@ -274,7 +275,7 @@ public class ExecutePsop {
             return this;
         }
 
-        public Builder a2aClientRuntime(Object a2aClientRuntime) {
+        public Builder a2aClientRuntime(A2AJavaClientRuntime a2aClientRuntime) {
             this.a2aClientRuntime = a2aClientRuntime;
             return this;
         }

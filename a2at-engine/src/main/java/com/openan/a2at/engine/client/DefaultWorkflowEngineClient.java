@@ -1,36 +1,27 @@
-/*
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License. You may obtain
- * a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations
- * under the License.
- */
-
 package com.openan.a2at.engine.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
-import com.openan.a2at.engine.model.SendMessageResult;
 import com.openan.a2at.engine.control.ControlPoint;
+import com.openan.a2at.engine.model.SendMessageResult;
+import org.a2aproject.sdk.client.ClientEvent;
+import org.a2aproject.sdk.client.MessageEvent;
+import org.a2aproject.sdk.client.TaskEvent;
+import org.a2aproject.sdk.client.TaskUpdateEvent;
+import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext;
+import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallInterceptor;
+import org.a2aproject.sdk.client.transport.spi.interceptors.PayloadAndHeaders;
+import org.a2aproject.sdk.spec.Artifact;
+import org.a2aproject.sdk.spec.Message;
+import org.a2aproject.sdk.spec.MessageSendParams;
+import org.a2aproject.sdk.spec.Part;
+import org.a2aproject.sdk.spec.Task;
+import org.a2aproject.sdk.spec.TaskArtifactUpdateEvent;
+import org.a2aproject.sdk.spec.TaskStatusUpdateEvent;
+import org.a2aproject.sdk.spec.TextPart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,25 +30,11 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Default implementation of WorkflowEngineClient.
- *
- * <p>Mirrors the Python SDK's {@code WorkflowEngineClient}. Handles:
- * AgentCard lookup, A2A message sending, auth interceptors,
- * A2A-T extensions (Task-T, Negotiation-T, Authorization-T, Notification-T),
- * SSE response normalization, streaming response handling, text extraction,
- * and event emission.
- *
- * <p>When an {@code a2aClientRuntime} is provided, delegates to it via
- * reflection. Otherwise, falls back to raw HTTP JSON-RPC POST.
- */
 public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCloseable {
-
     private static final Logger log = LoggerFactory.getLogger(DefaultWorkflowEngineClient.class);
     private static final ObjectMapper mapper = new ObjectMapper();
-
     private final Map<String, Object> cardMap = new ConcurrentHashMap<>();
-    private final Object a2aClientRuntime;
+    private final A2AJavaClientRuntime a2aClientRuntime;
     private final AgentAuthManager authManager;
     private final ExtensionRegistry extensionRegistry;
     private final Object a2atClient;
@@ -67,16 +44,10 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private Object controlPoint;
     private final int maxNegotiationRounds;
 
-    /**
-     * Full constructor with configuration.
-     *
-     * @param agentCards        list of AgentCard objects (Map or typed)
-     * @param a2aClientRuntime  the A2A client runtime (optional, may be null)
-     * @param config            configuration for SSL, auth, A2A-T
-     */
-    public DefaultWorkflowEngineClient(List<?> agentCards, Object a2aClientRuntime,
+    public DefaultWorkflowEngineClient(List<?> agentCards, A2AJavaClientRuntime a2aClientRuntime,
                                        WorkflowEngineClientConfig config) {
-        this.a2aClientRuntime = a2aClientRuntime;
+        this.a2aClientRuntime = a2aClientRuntime != null ? a2aClientRuntime
+                : new DefaultA2AJavaClientRuntime(config.isSslVerify(), config.getCaCertsPath());
         this.contextId = UUID.randomUUID().toString();
         this.sslVerify = config.isSslVerify();
         if (config.getCredentialsConfigPath() != null) {
@@ -104,13 +75,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 cardMap.size(), config.isSslVerify(), a2atClient != null, maxNegotiationRounds);
     }
 
-    /**
-     * Legacy constructor without config (SSL verify defaults to false, no auth/A2AT).
-     *
-     * @param agentCards        list of AgentCard objects
-     * @param a2aClientRuntime  the A2A client runtime (optional)
-     */
-    public DefaultWorkflowEngineClient(List<?> agentCards, Object a2aClientRuntime) {
+    public DefaultWorkflowEngineClient(List<?> agentCards, A2AJavaClientRuntime a2aClientRuntime) {
         this(agentCards, a2aClientRuntime,
                 WorkflowEngineClientConfig.builder().sslVerify(false).build());
     }
@@ -161,14 +126,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         try {
             eventCallback.onEvent(type, data);
         } catch (Exception ignored) {
-            // Event callback failures are non-fatal
         }
     }
-
-    // ------------------------------------------------------------------
-    // send_message
-    // ------------------------------------------------------------------
-
+    // --- send_message ---
     @Override
     public CompletableFuture<SendMessageResult> sendMessage(
             String agentName, String message, String contextId, Map<String, Object> metadata) {
@@ -178,8 +138,6 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             return CompletableFuture.failedFuture(new RuntimeException("Agent not found: " + agentName));
         }
         log.info("[EngineClient] send_message to {}: {} chars", agentName, message.length());
-
-        // Run before_send extension handlers (e.g. Task-T prompt generation)
         return runBeforeSendHandlers(agentCard, message, metadata)
                 .thenCompose(processedMetadata -> {
                     emit(EventType.AGENT_REQUEST, Map.of(
@@ -192,7 +150,6 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                             .thenCompose(result -> autoNegotiate(agentCard, agentName, message, ctx, result, 1));
                 });
     }
-
     @SuppressWarnings("unchecked")
     private CompletableFuture<Map<String, Object>> runBeforeSendHandlers(
             Object agentCard, String message, Map<String, Object> presetMetadata) {
@@ -207,12 +164,10 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         return future;
     }
-
     @SuppressWarnings("unchecked")
     private CompletableFuture<SendMessageResult> runAfterReceiveHandlers(Object agentCard, SendMessageResult result) {
         Map<String, Object> cardAsMap = toMap(agentCard);
         List<String> extUris = extractExtensionUris(cardAsMap);
-
         List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
         CompletableFuture<SendMessageResult> future = CompletableFuture.completedFuture(result);
         for (ExtensionHandler handler : handlers) {
@@ -220,516 +175,129 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         return future;
     }
-
     @SuppressWarnings("unchecked")
     private List<String> extractExtensionUris(Map<String, Object> agentCard) {
         List<String> uris = new ArrayList<>();
         Map<String, Object> caps = (Map<String, Object>) agentCard.get("capabilities");
-        if (caps == null) {
-            return uris;
-        }
+        if (caps == null) return uris;
         List<Map<String, Object>> extensions = (List<Map<String, Object>>) caps.get("extensions");
-        if (extensions == null) {
-            return uris;
-        }
+        if (extensions == null) return uris;
         for (Map<String, Object> ext : extensions) {
             Object uri = ext.get("uri");
-            if (uri != null && !uri.toString().isEmpty()) {
-                uris.add(uri.toString());
-            }
+            if (uri != null && !uri.toString().isEmpty()) uris.add(uri.toString());
         }
         return uris;
     }
-
-    // ------------------------------------------------------------------
-    // Core A2A send
-    // ------------------------------------------------------------------
-
-    @SuppressWarnings("unchecked")
+    // --- Core A2A send via SDK runtime ---
     protected CompletableFuture<SendMessageResult> doSendViaA2ARuntime(
             Object agentCard, String agentName, String message,
             String contextId, Map<String, Object> metadata) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                if (a2aClientRuntime == null) {
-                    return sendViaRawHttp(agentCard, agentName, message, contextId, metadata);
-                }
-                // Delegate to the a2a-java-sdk runtime via reflection
-                var createClientMethod = a2aClientRuntime.getClass().getMethod(
-                        "createStreamingClient", String.class);
-                var sendMethod = a2aClientRuntime.getClass().getMethod(
-                        "sendMessage",
-                        Map.class, Object.class, Object.class,
-                        java.util.function.Consumer.class);
-                String baseUrl = resolveAgentUrl(agentCard);
-                createClientMethod.invoke(a2aClientRuntime, baseUrl);
-                Object sendParams = buildMessageSendParams(message, contextId, metadata);
-                Object callContext = buildCallContext(agentCard, metadata);
-                Iterable<Object> events = (Iterable<Object>) sendMethod.invoke(
-                        a2aClientRuntime, toMap(agentCard), sendParams, callContext,
-                        (java.util.function.Consumer<String>) s -> log.info("[A2A] {}", s));
-                String responseText = null;
-                Object lastTask = null;
-                Map<String, Object> lastMetadata = new HashMap<>();
-                String taskState = "";
-                for (Object event : events) {
-                    String text = extractEventText(event);
-                    if (text != null && !text.isEmpty()) {
-                        responseText = (responseText != null ? responseText : "") + text;
-                    }
-                    Map<String, Object> eventMeta = extractEventMetadata(event);
-                    if (eventMeta != null && !eventMeta.isEmpty()) {
-                        lastMetadata = eventMeta;
-                    }
-                    Object eventTask = extractEventTask(event);
-                    if (eventTask != null) {
-                        lastTask = eventTask;
-                    }
-                }
-                if (responseText == null && lastTask != null) {
-                    responseText = String.valueOf(lastTask);
-                }
-                return SendMessageResult.builder()
-                        .text(responseText != null ? responseText : "")
-                        .task(lastTask)
-                        .metadata(lastMetadata)
-                        .taskState(taskState)
-                        .build();
+                Map<String, Object> cardAsMap = toMap(agentCard);
+                MessageSendParams params = buildMessageSendParams(message, contextId, metadata);
+                ClientCallContext callContext = buildClientCallContext(cardAsMap, agentName, metadata);
+                log.info("[EngineClient] Sending via A2A SDK to {}", agentName);
+                Iterable<ClientEvent> events = a2aClientRuntime.sendMessage(
+                        cardAsMap, params, callContext, s -> log.info("[A2A] {}", s));
+                String responseText = extractResponseText(events);
+                String taskState = extractResponseTaskState(events);
+                Map<String, Object> respMetadata = extractResponseMetadata(events);
+                Object task = extractResponseTask(events);
+                log.info("[EngineClient] Response from {}: {} chars, state={}", agentName, responseText.length(), taskState);
+                return SendMessageResult.builder().text(responseText).task(task).metadata(respMetadata).taskState(taskState).build();
             } catch (Exception e) {
                 log.error("[EngineClient] Failed to send message to {}: {}", agentName, e.getMessage(), e);
                 throw new RuntimeException("Agent call failed: " + e.getMessage(), e);
             }
         });
     }
-
-    /**
-     * Fallback: send a raw HTTP JSON-RPC POST when no a2a-java-sdk runtime is provided.
-     * Applies auth interceptors to build headers, normalizes SSE responses.
-     */
+    private MessageSendParams buildMessageSendParams(String message, String contextId, Map<String, Object> metadata) {
+        Message msg = Message.builder()
+                .messageId(UUID.randomUUID().toString())
+                .contextId(contextId)
+                .role(Message.Role.ROLE_AGENT)
+                .parts(new TextPart(message))
+                .metadata(metadata != null ? metadata : Map.of())
+                .build();
+        return MessageSendParams.builder().message(msg).build();
+    }
     @SuppressWarnings("unchecked")
-    private SendMessageResult sendViaRawHttp(
-            Object agentCard, String agentName, String message,
-            String contextId, Map<String, Object> metadata) throws Exception {
-        String url = resolveAgentUrl(agentCard);
-        if (url == null) {
-            throw new RuntimeException("Cannot resolve agent URL for: " + agentName);
-        }
-        log.info("[EngineClient] Raw HTTP POST to {}", url);
-        HttpClient.Builder clientBuilder = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)  // avoid HTTP/2 upgrade header (causes uvicorn warning)
-                .connectTimeout(Duration.ofSeconds(60))
-                .followRedirects(HttpClient.Redirect.ALWAYS);
-        if (!sslVerify) {
-            try {
-                javax.net.ssl.SSLContext trustAllCtx = javax.net.ssl.SSLContext.getInstance("TLS");
-                trustAllCtx.init(null, new javax.net.ssl.TrustManager[]{new javax.net.ssl.X509TrustManager() {
-                    public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-                    public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                        return new java.security.cert.X509Certificate[0];
-                    }
-                }}, null);
-                // Disable hostname verification: self-signed certs
-                // have no SAN, so endpoint identification fails.
-                System.setProperty("jdk.internal.httpclient.disableHostnameVerification", "true");
-                clientBuilder.sslContext(trustAllCtx);
-            } catch (Exception e) {
-                log.warn("[EngineClient] Failed to disable TLS: {}", e.getMessage());
-            }
-        }
-        HttpClient client = clientBuilder.build();
-
-        // Determine protocol binding and build request accordingly
-        AgentInterface agentIface = resolveAgentInterface(agentCard);
-        String protocolBinding = agentIface != null ? agentIface.protocolBinding : "HTTP+JSON";
-        boolean isJsonRpc = "JSONRPC".equalsIgnoreCase(protocolBinding);
-        // Check if the agent supports streaming
-        boolean streaming = isStreamingEnabled(agentCard);
-        // REST: {url}/message:stream (SSE) when streaming, else {url}/message:send
-        // JSONRPC: {url} (root path, JSON-RPC envelope)
-        String requestUrl;
-        if (isJsonRpc) {
-            requestUrl = url;
-        } else if (streaming) {
-            requestUrl = url + "/message:stream";
-        } else {
-            requestUrl = url + "/message:send";
-        }
-
-        // Build message payload (shared by both protocols)
-        // Matches protobuf SendMessageRequest JSON format:
-        //   messageId (required), role="ROLE_AGENT", parts:[{text:...}],
-        //   contextId, optional metadata
-        Map<String, Object> msg = new HashMap<>();
-        msg.put("messageId", UUID.randomUUID().toString());
-        msg.put("role", "ROLE_AGENT");
-        List<Map<String, Object>> parts = new ArrayList<>();
-        Map<String, Object> textPart = new HashMap<>();
-        textPart.put("text", message);
-        parts.add(textPart);
-        msg.put("parts", parts);
-        msg.put("contextId", contextId);
-        if (metadata != null && !metadata.isEmpty()) {
-            msg.put("metadata", metadata);
-        }
-
-        String jsonBody;
-        if (isJsonRpc) {
-            // JSON-RPC envelope: {jsonrpc, method, params:{message}, id}
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("jsonrpc", "2.0");
-            requestBody.put("method", "message/send");
-            requestBody.put("params", Map.of("message", msg));
-            requestBody.put("id", UUID.randomUUID().toString());
-            jsonBody = mapper.writeValueAsString(requestBody);
-        } else {
-            // REST: raw SendMessageRequest (message object at top level)
-            jsonBody = mapper.writeValueAsString(Map.of("message", msg));
-        }
-
-        log.info("[EngineClient] Raw HTTP POST to {} ({})", requestUrl, protocolBinding);
-        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(requestUrl))
-                .header("Content-Type", "application/json")
-                .header("A2A-Version", "1.0")
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                .timeout(Duration.ofSeconds(60));
-
-        // Auth: directly get credentials from AgentAuthManager (bypasses
-        // ClientCallInterceptor.intercept which needs typed AgentCard)
-        Map<String, Object> cardAsMap = toMap(agentCard);
-        Map<String, String> headerMap = new HashMap<>();
-        applyAuthHeaders(cardAsMap, agentName, headerMap);
-        // Extension: ExtensionInterceptor does not depend on AgentCard, safe to use
-        List<org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallInterceptor> interceptors =
-                authManager.buildInterceptors(cardAsMap, agentName);
-        for (org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallInterceptor interceptor : interceptors) {
-            if (interceptor instanceof ExtensionInterceptor) {
+    private ClientCallContext buildClientCallContext(Map<String, Object> cardAsMap, String agentName, Map<String, Object> messageMetadata) {
+        Map<String, String> headers = new HashMap<>();
+        applyAuthHeaders(cardAsMap, agentName, headers);
+        List<ClientCallInterceptor> interceptors = authManager.buildInterceptors(cardAsMap, agentName);
+        for (ClientCallInterceptor interceptor : interceptors) {
+            if (interceptor instanceof ExtensionInterceptor extInterceptor) {
                 try {
-                    org.a2aproject.sdk.client.transport.spi.interceptors.PayloadAndHeaders ph =
-                            interceptor.intercept("message/send", msg, headerMap, null,
-                                    new org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext(
-                                            new HashMap<>(), new HashMap<>()));
-                    headerMap.putAll(ph.getHeaders());
+                    ClientCallContext interceptCtx = new ClientCallContext(new HashMap<>(), headers);
+                    PayloadAndHeaders ph = extInterceptor.intercept("message/send", messageMetadata, headers, null, interceptCtx);
+                    headers.putAll(ph.getHeaders());
                 } catch (Exception e) {
                     log.warn("[EngineClient] Extension interceptor failed: {}", e.getMessage());
                 }
             }
         }
-        for (Map.Entry<String, String> h : headerMap.entrySet()) {
-            reqBuilder.header(h.getKey(), h.getValue());
-        }
-
-        HttpResponse<String> resp = client.send(reqBuilder.build(),
-                HttpResponse.BodyHandlers.ofString());
-        if (resp.statusCode() != 200) {
-            throw new RuntimeException("Agent returned " + resp.statusCode() + ": " + resp.body());
-        }
-       String respBody = resp.body();
-
-       // SSE streaming response: multiple "data: {json}" lines
-        // Single JSON response: one JSON object (message:send or JSONRPC)
-        String responseText = "";
-        Map<String, Object> respMetadata = new HashMap<>();
-        String taskState = "";
-
-        if (streaming && !isJsonRpc && respBody.contains("data:")) {
-            // Parse SSE events
-            StringBuilder textBuilder = new StringBuilder();
-            for (String line : respBody.split("\n")) {
-                line = line.trim();
-                if (!line.startsWith("data:")) continue;
-                String json = line.substring(5).trim();
-                if (json.isEmpty()) continue;
-                try {
-                    Map<String, Object> eventData = mapper.readValue(json, Map.class);
-                    eventData = SseNormalization.normalize(eventData);
-
-                    // a2a-java SDK SSE events: task, message, statusUpdate, artifactUpdate
-                   Object taskObj = eventData.get("task");
-                   if (taskObj instanceof Map) {
-                       Map<String, Object> taskMap = (Map<String, Object>) taskObj;
-                       Object status = taskMap.get("status");
-                       if (status instanceof Map) {
-                           Object state = ((Map<String, Object>) status).get("state");
-                           if (state instanceof String) taskState = (String) state;
-                       }
-                       Object meta = taskMap.get("metadata");
-                        if (meta instanceof Map) respMetadata = (Map<String, Object>) meta;
-                        String t = extractTextFromResultMap(taskMap);
-                        if (t != null && !t.isEmpty()) textBuilder.append(t);
-                    }
-
-                    Object suObj = eventData.get("statusUpdate");
-                    if (suObj instanceof Map) {
-                        Map<String, Object> suMap = (Map<String, Object>) suObj;
-                        Object suStatus = suMap.get("status");
-                        if (suStatus instanceof Map) {
-                            Object suState = ((Map<String, Object>) suStatus).get("state");
-                            if (suState instanceof String) taskState = (String) suState;
-                        }
-                        String t = extractTextFromResultMap(suMap);
-                        if (t != null && !t.isEmpty()) textBuilder.append(t);
-                    }
-
-                    Object auObj = eventData.get("artifactUpdate");
-                    if (auObj instanceof Map) {
-                        Map<String, Object> auMap = (Map<String, Object>) auObj;
-                        Object artifact = auMap.get("artifact");
-                        if (artifact instanceof Map) {
-                            Map<String, Object> artMap = (Map<String, Object>) artifact;
-                            Object auMeta = artMap.get("metadata");
-                            if (auMeta instanceof Map) respMetadata = (Map<String, Object>) auMeta;
-                            String t = extractTextFromResultMap(artMap);
-                            if (t != null && !t.isEmpty()) textBuilder.append(t);
-                        }
-                    }
-
-                    Object msgObj = eventData.get("message");
-                    if (msgObj instanceof Map) {
-                        String t = extractTextFromResultMap((Map<String, Object>) msgObj);
-                        if (t != null && !t.isEmpty()) textBuilder.append(t);
-                    }
-                } catch (Exception ignored) {
-                }
-            }
-            responseText = textBuilder.toString();
-        } else {
-            // Single JSON response (message:send or JSONRPC)
-            Map<String, Object> respData = mapper.readValue(respBody, Map.class);
-            respData = SseNormalization.normalize(respData);
-            Object result = respData.get("result");
-            if (result == null) {
-                result = respData.get("task");
-            }
-            if (result instanceof Map) {
-                Map<String, Object> resultMap = (Map<String, Object>) result;
-                Object status = resultMap.get("status");
-                if (status instanceof Map) {
-                    Object state = ((Map<String, Object>) status).get("state");
-                    if (state instanceof String) taskState = (String) state;
-                }
-                Object meta = resultMap.get("metadata");
-                if (meta instanceof Map) respMetadata = (Map<String, Object>) meta;
-                responseText = extractTextFromResultMap(resultMap);
-            }
-            if (responseText.isEmpty() && respMetadata != null) {
-                for (Object val : respMetadata.values()) {
-                    if (val instanceof String s && s.length() > 20) {
-                        responseText = s;
-                        break;
-                    }
-                }
-            }
-        }
-        return SendMessageResult.builder()
-                .text(responseText)
-                .metadata(respMetadata)
-                .taskState(taskState)
-                .build();
+        return new ClientCallContext(new HashMap<>(), headers);
     }
-
-    @SuppressWarnings("unchecked")
-    private static String extractTextFromResultMap(Map<String, Object> resultMap) {
+    // --- ClientEvent extraction ---
+    private static String extractResponseText(Iterable<ClientEvent> events) {
         StringBuilder text = new StringBuilder();
-        // Extract from artifacts (plural - list form, used in task responses)
-        Object artifacts = resultMap.get("artifacts");
-        if (artifacts instanceof List) {
-            for (Object art : (List<?>) artifacts) {
-                extractPartsText(art, text);
-            }
+        for (ClientEvent event : events) {
+            if (event instanceof TaskEvent te) extractTextFromTask(te.getTask(), text);
+            else if (event instanceof TaskUpdateEvent tue) {
+                extractTextFromTask(tue.getTask(), text);
+                if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae) extractTextFromArtifact(ae.artifact(), text);
+            } else if (event instanceof MessageEvent me) extractTextFromMessage(me.getMessage(), text);
         }
-        // Extract from artifact (singular - used in a2a-java SSE artifactUpdate events)
-        extractPartsText(resultMap.get("artifact"), text);
-        // Extract from parts directly (used in a2a-java SSE statusUpdate events)
-        extractPartsText(resultMap, text);
         return text.toString();
     }
-
-    @SuppressWarnings("unchecked")
-    private static void extractPartsText(Object container, StringBuilder text) {
-        if (!(container instanceof Map)) return;
-        Object parts = ((Map<String, Object>) container).get("parts");
-        if (!(parts instanceof List)) return;
-        for (Object p : (List<?>) parts) {
-            if (p instanceof Map) {
-                Object t = ((Map<String, Object>) p).get("text");
-                if (t instanceof String) {
-                    text.append(t);
-                }
+    private static void extractTextFromTask(Task task, StringBuilder sb) {
+        if (task.artifacts() != null) for (Artifact a : task.artifacts()) extractTextFromArtifact(a, sb);
+    }
+    private static void extractTextFromArtifact(Artifact artifact, StringBuilder sb) {
+        if (artifact.parts() != null) for (Part<?> part : artifact.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
+    }
+    private static void extractTextFromMessage(Message message, StringBuilder sb) {
+        if (message.parts() != null) for (Part<?> part : message.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
+    }
+    private static String extractResponseTaskState(Iterable<ClientEvent> events) {
+        String state = "";
+        for (ClientEvent event : events) {
+            if (event instanceof TaskEvent te) state = te.getTask().status().state().name();
+            else if (event instanceof TaskUpdateEvent tue) {
+                if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) state = sue.status().state().name();
             }
         }
+        return state;
     }
-
-    // ------------------------------------------------------------------
-    // Utility
-    // ------------------------------------------------------------------
-
-    @SuppressWarnings("unchecked")
-    private boolean isStreamingEnabled(Object agentCard) {
-        Map<String, Object> card = toMap(agentCard);
-        Object caps = card.get("capabilities");
-        if (caps instanceof Map) {
-            Object streaming = ((Map<String, Object>) caps).get("streaming");
-            return Boolean.TRUE.equals(streaming);
-        }
-        return false;
-    }
-
-    private static final class AgentInterface {
-        final String url;
-        final String protocolBinding;
-        AgentInterface(String url, String protocolBinding) {
-            this.url = url;
-            this.protocolBinding = protocolBinding != null ? protocolBinding : "HTTP+JSON";
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private AgentInterface resolveAgentInterface(Object agentCard) {
-        if (agentCard instanceof Map) {
-            Map<String, Object> card = (Map<String, Object>) agentCard;
-            List<Map<String, Object>> interfaces =
-                    (List<Map<String, Object>>) card.get("supportedInterfaces");
-            if (interfaces != null && !interfaces.isEmpty()) {
-                // Prefer HTTP+JSON over JSONRPC: sendViaRawHttp handles REST
-                // /message:send more reliably than JSON-RPC root POST.
-                Map<String, Object> chosen = null;
-                for (Map<String, Object> iface : interfaces) {
-                    String binding = (String) iface.get("protocolBinding");
-                    if ("HTTP+JSON".equalsIgnoreCase(binding)) { chosen = iface; break; }
-                    if (chosen == null) { chosen = iface; }
-                }
-                return new AgentInterface(
-                        (String) chosen.get("url"),
-                        (String) chosen.get("protocolBinding"));
+    private static Map<String, Object> extractResponseMetadata(Iterable<ClientEvent> events) {
+        Map<String, Object> metadata = new HashMap<>();
+        for (ClientEvent event : events) {
+            if (event instanceof TaskEvent te) {
+                Map<String, Object> m = te.getTask().metadata();
+                if (m != null && !m.isEmpty()) metadata = m;
+            } else if (event instanceof TaskUpdateEvent tue) {
+                Map<String, Object> m = tue.getTask().metadata();
+                if (m != null && !m.isEmpty()) metadata = m;
             }
         }
-        try {
-            Object interfaces = agentCard.getClass().getMethod("getSupportedInterfaces").invoke(agentCard);
-            if (interfaces instanceof List && !((List<?>) interfaces).isEmpty()) {
-                Object first = ((List<?>) interfaces).get(0);
-                String url = (String) first.getClass().getMethod("getUrl").invoke(first);
-                String binding = null;
-                try { binding = (String) first.getClass().getMethod("getProtocolBinding").invoke(first); }
-                    catch (Exception ignored) {}
-                return new AgentInterface(url, binding);
-            }
-        } catch (Exception ignored) {
-        }
-        return null;
+        return metadata;
     }
-
-    private String resolveAgentUrl(Object agentCard) {
-        AgentInterface iface = resolveAgentInterface(agentCard);
-        return iface != null ? iface.url : null;
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> toMap(Object card) {
-        if (card instanceof Map) {
-            return (Map<String, Object>) card;
+    private static Object extractResponseTask(Iterable<ClientEvent> events) {
+        Object lastTask = null;
+        for (ClientEvent event : events) {
+            if (event instanceof TaskEvent te) lastTask = te.getTask();
+            else if (event instanceof TaskUpdateEvent tue) lastTask = tue.getTask();
         }
-        try {
-            return mapper.convertValue(card, Map.class);
-        } catch (Exception e) {
-            return Map.of();
-        }
+        return lastTask;
     }
-
-    private Object buildMessageSendParams(String message, String contextId, Map<String, Object> metadata) {
-        Map<String, Object> params = new HashMap<>();
-        params.put("message", message);
-        params.put("contextId", contextId);
-        if (metadata != null) {
-            params.put("metadata", metadata);
-        }
-        return params;
-    }
-
-    private Object buildCallContext(Object agentCard, Map<String, Object> metadata) {
-        return null;
-    }
-
-    private String extractEventText(Object event) {
-        try {
-            Object task = event.getClass().getMethod("getTask").invoke(event);
-            if (task != null) {
-                Object artifacts = task.getClass().getMethod("getArtifacts").invoke(task);
-                if (artifacts instanceof List) {
-                    for (Object artifact : (List<?>) artifacts) {
-                        Object parts = artifact.getClass().getMethod("getParts").invoke(artifact);
-                        if (parts instanceof List) {
-                            for (Object part : (List<?>) parts) {
-                                try {
-                                    String text = (String) part.getClass().getMethod("getText").invoke(part);
-                                    if (text != null && !text.isEmpty()) {
-                                        return text;
-                                    }
-                                } catch (Exception ignored) {
-                                    // Part shape mismatch, skip
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-            // Task path extraction failed, try message path
-        }
-        try {
-            Object msg = event.getClass().getMethod("getMessage").invoke(event);
-            if (msg != null) {
-                Object parts = msg.getClass().getMethod("getParts").invoke(msg);
-                if (parts instanceof List) {
-                    for (Object part : (List<?>) parts) {
-                        String text = (String) part.getClass().getMethod("getText").invoke(part);
-                        if (text != null && !text.isEmpty()) {
-                            return text;
-                        }
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-            // Message path extraction failed
-        }
-        return null;
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> extractEventMetadata(Object event) {
-        try {
-            Object task = event.getClass().getMethod("getTask").invoke(event);
-            if (task != null) {
-                Object metadata = task.getClass().getMethod("getMetadata").invoke(task);
-                if (metadata instanceof Map) {
-                    return (Map<String, Object>) metadata;
-                }
-            }
-        } catch (Exception ignored) {
-            // Metadata not reflectable
-        }
-        return null;
-    }
-
-    private Object extractEventTask(Object event) {
-        try {
-            return event.getClass().getMethod("getTask").invoke(event);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Internal negotiation loop (auto-driven by sendMessage)
-    // ------------------------------------------------------------------
-
+    // --- autoNegotiate ---
     private CompletableFuture<SendMessageResult> autoNegotiate(
             Object agentCard, String agentName, String originalMessage,
             String contextId, SendMessageResult result, int round) {
         if (!isNegotiationNeeded(result) || round > maxNegotiationRounds) {
-            emit(EventType.AGENT_RESPONSE,
-                    Map.of("agent", agentName, "response", result.getText()));
+            emit(EventType.AGENT_RESPONSE, Map.of("agent", agentName, "response", result.getText()));
             return CompletableFuture.completedFuture(result);
         }
         Map<String, Object> negMeta = result.getMetadata() != null ? result.getMetadata() : new HashMap<>();
@@ -740,8 +308,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         if (controlPoint instanceof ControlPoint cp) {
             clarFuture = cp.onNegotiation(agentName, negText, negMeta);
         } else {
-            clarFuture = CompletableFuture.completedFuture(
-                    "Please proceed with the original task using available information.");
+            clarFuture = CompletableFuture.completedFuture("Please proceed with the original task using available information.");
         }
         return clarFuture.thenCompose(clarification -> {
             if (clarification == null || clarification.isEmpty()) {
@@ -750,11 +317,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 return CompletableFuture.completedFuture(result);
             }
             emit(EventType.NEGOTIATION_RESOLVED, Map.of("agent", agentName, "round", round, "clarification", clarification));
-            String followUp = "[NEGOTIATION_RESOLUTION]\n"
-                    + "The engine has reviewed your negotiation request and provides "
-                    + "the following clarification:\n\n" + clarification
-                    + "\n\n---\nOriginal Task:\n" + originalMessage
-                    + "\n\nPlease re-execute the task based on the clarification above.";
+            String followUp = "[NEGOTIATION_RESOLUTION]\nThe engine has reviewed your negotiation request and provides the following clarification:\n\n" + clarification + "\n\n---\nOriginal Task:\n" + originalMessage + "\n\nPlease re-execute the task based on the clarification above.";
             return runBeforeSendHandlers(agentCard, followUp, null)
                     .thenCompose(meta -> {
                         String ctx = contextId != null ? contextId : this.contextId;
@@ -764,40 +327,27 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                     });
         });
     }
-
     private static boolean isNegotiationNeeded(SendMessageResult result) {
         return result.getTaskState() != null && result.getTaskState().contains("INPUT_REQUIRED");
     }
-
-    /**
-     * Directly set auth headers from AgentAuthManager credential service.
-     * Bypasses ClientCallInterceptor.intercept (which needs typed AgentCard).
-     */
+    // --- auth headers ---
     @SuppressWarnings("unchecked")
     private void applyAuthHeaders(Map<String, Object> cardAsMap, String agentName, Map<String, String> headerMap) {
         AgentCredentialService credSvc = authManager.getService(agentName);
-        if (credSvc == null) {
-            return;
-        }
+        if (credSvc == null) return;
         Map<String, Map<String, Object>> schemeConfigs = authManager.getConfig(agentName);
-        if (schemeConfigs == null) {
-            schemeConfigs = Map.of();
-        }
+        if (schemeConfigs == null) schemeConfigs = Map.of();
         Map<String, Object> secSchemes = (Map<String, Object>) cardAsMap.get("securitySchemes");
         Object secReqsObj = cardAsMap.get("securityRequirements");
         List<Map<String, Object>> secReqs = secReqsObj instanceof List ? (List<Map<String, Object>>) secReqsObj : List.of();
-        if (secSchemes == null || secSchemes.isEmpty() || secReqs.isEmpty()) {
-            return;
-        }
+        if (secSchemes == null || secSchemes.isEmpty() || secReqs.isEmpty()) return;
         for (Map<String, Object> req : secReqs) {
             Object schemes = req.get("schemes");
             if (schemes instanceof Map) {
                 for (String schemeName : ((Map<String, Object>) schemes).keySet()) {
                     Map<String, Object> schemeCfg = schemeConfigs.getOrDefault(schemeName, Map.of());
                     String credential = credSvc.getCredential(schemeName, null);
-                    if (credential == null) {
-                        continue;
-                    }
+                    if (credential == null) continue;
                     String authHeader = (String) schemeCfg.get("auth_header");
                     if (authHeader != null && !authHeader.isEmpty()) {
                         String prefix = (String) schemeCfg.getOrDefault("auth_header_prefix", "");
@@ -808,49 +358,41 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                         log.info("[Auth] Set Bearer header for agent {}", agentName);
                     }
                     String acceptHeader = (String) schemeCfg.get("accept_header");
-                    if (acceptHeader != null && !acceptHeader.isEmpty()) {
-                        headerMap.put("Accept", acceptHeader);
-                    }
+                    if (acceptHeader != null && !acceptHeader.isEmpty()) headerMap.put("Accept", acceptHeader);
                     break;
                 }
             }
         }
     }
-
+    // --- utility ---
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> toMap(Object card) {
+        if (card instanceof Map) return (Map<String, Object>) card;
+        try {
+            return mapper.convertValue(card, Map.class);
+        } catch (Exception e) {
+            return Map.of();
+        }
+    }
     @Override
     public void close() {
         log.info("[EngineClient] Closing");
+        try { a2aClientRuntime.close(); } catch (Exception ignored) {}
     }
-
     @Override
     public void updateAgentCards(List<?> agentCards) {
         cardMap.clear();
         for (Object card : agentCards) {
             String name = extractName(card);
-            if (name != null) {
-                cardMap.put(name, card);
-            }
+            if (name != null) cardMap.put(name, card);
         }
         log.info("[EngineClient] Updated agent cards: {} agent(s)", cardMap.size());
     }
-
     @Override
     public void registerHandler(ExtensionHandler handler) {
         extensionRegistry.register(handler);
     }
-
-    /**
-     * Get the A2ATClient instance (for advanced Task-T / Negotiation-T usage).
-     * Mirrors Python SDK's {@code get_a2at_client()}.
-     */
-    public Object getA2atClient() {
-        return a2atClient;
-    }
-
-    /**
-     * Static utility to normalize an AgentCard dict to a compatible format.
-     * Mirrors Python SDK's {@code WorkflowEngineClient.normalize_agent_dict()}.
-     */
+    public Object getA2atClient() { return a2atClient; }
     public static Map<String, Object> normalizeAgentDict(Map<String, Object> agentDict) {
         return AgentCardNormalizer.normalize(agentDict);
     }
