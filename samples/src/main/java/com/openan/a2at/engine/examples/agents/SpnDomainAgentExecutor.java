@@ -2,6 +2,7 @@ package com.openan.a2at.engine.examples.agents;
 
 import org.a2aproject.sdk.server.agentexecution.RequestContext;
 import org.a2aproject.sdk.server.tasks.AgentEmitter;
+import org.a2aproject.sdk.spec.TaskState;
 import org.a2aproject.sdk.spec.A2AError;
 import org.a2aproject.sdk.spec.Part;
 import org.a2aproject.sdk.spec.TextPart;
@@ -42,6 +43,33 @@ public class SpnDomainAgentExecutor extends BaseAgentExecutor {
 
         boolean isRecovery = input.contains("## 抢通指令") || input.toLowerCase().contains("recovery");
 
+        if (isRecovery) {
+            // Intermediate progress: executing recovery plan
+            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
+                    buildStatusMessage(contextId, taskId, "正在执行抢通操作：更换光模块..."));
+            sleepBriefly();
+            emitter.sendMessage(List.of(new TextPart("光模块更换进度：已拔出故障模块，正在插入新模块")));
+            sleepBriefly();
+            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
+                    buildStatusMessage(contextId, taskId, "光模块已更换，正在验证端口状态..."));
+            sleepBriefly();
+        } else {
+            // Intermediate progress: step-by-step diagnosis
+            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
+                    buildStatusMessage(contextId, taskId, "正在查询上海OMC端口状态..."));
+            sleepBriefly();
+            // Send intermediate artifact (partial diagnosis data)
+            emitter.addArtifact(
+                    List.of(new TextPart("端口状态：port-7 = DOWN\n光功率：-28dBm（阈值-20dBm）")),
+                    "port-status", "端口状态查询", Map.of(), false, false);
+            sleepBriefly();
+            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
+                    buildStatusMessage(contextId, taskId, "检测到端口Down，正在分析光功率数据..."));
+            sleepBriefly();
+            emitter.sendMessage(List.of(new TextPart("诊断中间结果：光功率-28dBm严重低于阈值，疑似光模块故障")));
+            sleepBriefly();
+        }
+
         String responseText;
         Map<String, Object> metadata = new HashMap<>();
 
@@ -65,6 +93,14 @@ public class SpnDomainAgentExecutor extends BaseAgentExecutor {
         List<Part<?>> parts = List.of(new TextPart(responseText));
         emitter.addArtifact(parts, "diagnosis-result", "SPN diagnosis result", metadata, true, false);
         log.info("[SPN-Domain-Agent] Task completed: taskId={}", taskId);
+    }
+
+    private static void sleepBriefly() {
+        try {
+            Thread.sleep(300);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Override

@@ -2,6 +2,8 @@ package com.openan.a2at.engine.examples;
 
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
+import com.openan.a2at.engine.control.EventCallback;
+import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.SendMessageResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -91,10 +93,44 @@ public class SpnCrossCityDiagnosisDemo {
                         .sslVerify(false)
                         .build());
 
+        // Set up EventCallback to receive intermediate state data in real time
+        engineClient.setEventCallback(new EventCallback() {
+            @Override
+            public void onEvent(String type, Map<String, Object> data) {
+                switch (type) {
+                    case EventType.AGENT_STATUS_UPDATE ->
+                        log.info("  >> [STATUS] agent={}, state={}, final={}",
+                                data.get("agent"), data.get("state"), data.get("is_final"));
+                    case EventType.AGENT_ARTIFACT_UPDATE ->
+                        log.info("  >> [ARTIFACT] agent={}, name={}, text={}",
+                                data.get("agent"), data.get("artifact_name"),
+                                truncate(data.get("text")));
+                    case EventType.AGENT_MESSAGE_EVENT ->
+                        log.info("  >> [MESSAGE] agent={}, text={}",
+                                data.get("agent"), truncate(data.get("text")));
+                    case EventType.AGENT_REQUEST ->
+                        log.info("  >> [REQUEST] agent={}, {} chars",
+                                data.get("agent"),
+                                data.get("request") != null ? String.valueOf(data.get("request")).length() : 0);
+                    case EventType.AGENT_RESPONSE ->
+                        log.info("  >> [RESPONSE] agent={}, {} chars",
+                                data.get("agent"),
+                                data.get("response") != null ? String.valueOf(data.get("response")).length() : 0);
+                    default -> { /* other event types not shown in this demo */ }
+                }
+            }
+        });
+
         // sendMessage handles A2A-T protocol internally
         SendMessageResult result = engineClient.sendMessage(WB_AGENT_NAME, taskText).join();
         log.info("[SelfTrigger] Task state: {}", result.getTaskState());
         engineClient.close();
         return result.getText();
+    }
+
+    private static String truncate(Object text) {
+        if (text == null) return "(empty)";
+        String s = String.valueOf(text);
+        return s.length() > 80 ? s.substring(0, 80) + "..." : s;
     }
 }

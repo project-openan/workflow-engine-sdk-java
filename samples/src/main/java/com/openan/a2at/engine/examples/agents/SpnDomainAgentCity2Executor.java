@@ -2,6 +2,7 @@ package com.openan.a2at.engine.examples.agents;
 
 import org.a2aproject.sdk.server.agentexecution.RequestContext;
 import org.a2aproject.sdk.server.tasks.AgentEmitter;
+import org.a2aproject.sdk.spec.TaskState;
 import org.a2aproject.sdk.spec.A2AError;
 import org.a2aproject.sdk.spec.Part;
 import org.a2aproject.sdk.spec.TextPart;
@@ -41,6 +42,26 @@ public class SpnDomainAgentCity2Executor extends BaseAgentExecutor {
 
         boolean isRecovery = input.contains("## 抢通指令") || input.toLowerCase().contains("recovery");
 
+        if (isRecovery) {
+            // Intermediate progress: executing recovery
+            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
+                    buildStatusMessage(contextId, taskId, "广州侧正在执行抢通操作..."));
+            sleepBriefly();
+            emitter.sendMessage(List.of(new TextPart("广州侧抢通进度：正在排查端口状态")));
+            sleepBriefly();
+        } else {
+            // Intermediate progress: step-by-step diagnosis
+            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
+                    buildStatusMessage(contextId, taskId, "正在查询广州OMC端口状态..."));
+            sleepBriefly();
+            emitter.addArtifact(
+                    List.of(new TextPart("端口状态：port-3 = UP\n光功率：-17dBm（正常范围）")),
+                    "port-status", "端口状态查询", Map.of(), false, false);
+            sleepBriefly();
+            emitter.sendMessage(List.of(new TextPart("广州侧诊断中间结果：端口正常，光功率正常，无异常告警")));
+            sleepBriefly();
+        }
+
         String responseText;
         Map<String, Object> metadata = new HashMap<>();
 
@@ -59,6 +80,14 @@ public class SpnDomainAgentCity2Executor extends BaseAgentExecutor {
         List<Part<?>> parts = List.of(new TextPart(responseText));
         emitter.addArtifact(parts, "diagnosis-result", "SPN diagnosis result", metadata, true, false);
         log.info("[SPN-Domain-Agent-City2] Task completed: taskId={}", taskId);
+    }
+
+    private static void sleepBriefly() {
+        try {
+            Thread.sleep(300);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Override
