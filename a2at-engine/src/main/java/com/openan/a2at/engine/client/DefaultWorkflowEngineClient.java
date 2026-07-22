@@ -199,7 +199,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 ClientCallContext callContext = buildClientCallContext(cardAsMap, agentName, metadata);
                 log.info("[EngineClient] Sending via A2A SDK to {}", agentName);
                 Iterable<ClientEvent> events = a2aClientRuntime.sendMessage(
-                        cardAsMap, params, callContext, s -> log.info("[A2A] {}", s));
+                        cardAsMap, params, callContext,
+                        event -> forwardIntermediateEvent(event, agentName),
+                        s -> log.info("[A2A] {}", s));
                 String responseText = extractResponseText(events);
                 String taskState = extractResponseTaskState(events);
                 Map<String, Object> respMetadata = extractResponseMetadata(events);
@@ -241,6 +243,50 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         return new ClientCallContext(new HashMap<>(), headers);
     }
     // --- ClientEvent extraction ---
+    // --- intermediate event forwarding ---
+    private void forwardIntermediateEvent(ClientEvent event, String agentName) {
+        if (event instanceof TaskUpdateEvent tue) {
+           if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
+               String state = sue.status().state().name();
+                StringBuilder statusText = new StringBuilder();
+                extractTextFromMessage(sue.status().message(), statusText);
+               Map<String, Object> data = new HashMap<>();
+               data.put("agent", agentName);
+               data.put("state", state);
+               data.put("is_final", sue.isFinal());
+                if (!statusText.isEmpty()) data.put("text", statusText.toString());
+               if (sue.metadata() != null && !sue.metadata().isEmpty()) data.put("metadata", sue.metadata());
+                log.info("[EngineClient] Agent {} status update: {}", agentName, state);
+                emit(EventType.AGENT_STATUS_UPDATE, data);
+            } else if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae) {
+                StringBuilder text = new StringBuilder();
+                extractTextFromArtifact(ae.artifact(), text);
+                Map<String, Object> data = new HashMap<>();
+                data.put("agent", agentName);
+                data.put("artifact_id", ae.artifact().artifactId());
+                data.put("artifact_name", ae.artifact().name());
+                data.put("append", ae.append());
+                data.put("last_chunk", ae.lastChunk());
+                if (!text.isEmpty()) data.put("text", text.toString());
+                if (ae.metadata() != null && !ae.metadata().isEmpty()) data.put("metadata", ae.metadata());
+                log.info("[EngineClient] Agent {} artifact update: {} ({})", agentName, ae.artifact().name(), ae.artifact().artifactId());
+                emit(EventType.AGENT_ARTIFACT_UPDATE, data);
+            }
+        } else if (event instanceof MessageEvent me) {
+            StringBuilder text = new StringBuilder();
+            extractTextFromMessage(me.getMessage(), text);
+            Map<String, Object> data = new HashMap<>();
+            data.put("agent", agentName);
+            data.put("role", me.getMessage().role().name());
+            if (!text.isEmpty()) data.put("text", text.toString());
+            if (me.getMessage().metadata() != null && !me.getMessage().metadata().isEmpty()) {
+                data.put("metadata", me.getMessage().metadata());
+            }
+            log.info("[EngineClient] Agent {} message event: {} chars", agentName, text.length());
+            emit(EventType.AGENT_MESSAGE_EVENT, data);
+        }
+    }
+
     private static String extractResponseText(Iterable<ClientEvent> events) {
         StringBuilder text = new StringBuilder();
         for (ClientEvent event : events) {

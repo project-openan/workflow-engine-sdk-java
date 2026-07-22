@@ -100,6 +100,7 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
             Map<String, Object> agentCardMap,
             org.a2aproject.sdk.spec.MessageSendParams params,
             ClientCallContext callContext,
+            Consumer<ClientEvent> eventSink,
             Consumer<String> logSink) {
         AgentCard agentCard = AgentCardMapper.toSdkAgentCard(agentCardMap);
         RestTransportConfig transportConfig = createTransportConfig();
@@ -125,6 +126,13 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
                     params,
                     List.of((event, card) -> {
                         events.add(event);
+                        if (eventSink != null) {
+                            try {
+                                eventSink.accept(event);
+                            } catch (Exception e) {
+                                log.warn("[A2ARuntime] eventSink callback failed: {}", e.getMessage());
+                            }
+                        }
                         if (isTerminal(event)) {
                             done.countDown();
                         }

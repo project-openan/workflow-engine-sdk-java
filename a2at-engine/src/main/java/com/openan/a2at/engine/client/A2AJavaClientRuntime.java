@@ -46,6 +46,8 @@ public interface A2AJavaClientRuntime {
      * @param agentCard   the target agent's card as a map (from config or registry)
      * @param params      the message send parameters (message, context, metadata)
      * @param callContext client call context with auth/extension headers
+     * @param eventSink   optional callback invoked for each intermediate event (status updates,
+     *                    artifact updates, messages). Null = no real-time forwarding.
      * @param logSink     optional log consumer for SDK diagnostics
      * @return an iterable of {@link ClientEvent} produced by the agent
      */
@@ -53,6 +55,7 @@ public interface A2AJavaClientRuntime {
             Map<String, Object> agentCard,
             MessageSendParams params,
             ClientCallContext callContext,
+            Consumer<ClientEvent> eventSink,
             Consumer<String> logSink);
 
     /**

@@ -10,8 +10,11 @@ public final class EventType {
     public static final String ROUTE_DECISION = "route_decision";
     public static final String ERROR = "error";
     public static final String WORKFLOW_COMPLETE = "workflow_complete";
-    public static final String AGENT_REQUEST = "agent_request";
-    public static final String AGENT_RESPONSE = "agent_response";
+   public static final String AGENT_REQUEST = "agent_request";
+   public static final String AGENT_RESPONSE = "agent_response";
+    public static final String AGENT_STATUS_UPDATE = "agent_status_update";
+    public static final String AGENT_ARTIFACT_UPDATE = "agent_artifact_update";
+    public static final String AGENT_MESSAGE_EVENT = "agent_message_event";
     public static final String NEGOTIATION_REQUEST = "negotiation_request";
     public static final String NEGOTIATION_RESOLVED = "negotiation_resolved";
     public static final String NEGOTIATION_FAILED = "negotiation_failed";

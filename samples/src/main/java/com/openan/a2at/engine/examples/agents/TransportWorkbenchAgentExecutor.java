@@ -219,9 +219,16 @@ public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
                 switch (type) {
                     case EventType.START -> log.info("  [START] {}", data.get("workflow"));
                     case EventType.STEP_START -> log.info("  [STEP_START] {}", data.get("step"));
-                    case EventType.TASK_REQUEST -> log.info("  [TASK_REQUEST] agent={}", data.get("agent"));
-                    case EventType.TASK_RESPONSE -> log.info("  [TASK_RESPONSE] agent={}", data.get("agent"));
-                    case EventType.STEP_COMPLETE -> log.info("  [STEP_COMPLETE] {}", data.get("step"));
+                   case EventType.TASK_REQUEST -> log.info("  [TASK_REQUEST] agent={}", data.get("agent"));
+                   case EventType.TASK_RESPONSE -> log.info("  [TASK_RESPONSE] agent={}", data.get("agent"));
+                    case EventType.AGENT_STATUS_UPDATE -> log.info("  [STATUS_UPDATE] agent={}, state={}, final={}",
+                            data.get("agent"), data.get("state"), data.get("is_final"));
+                    case EventType.AGENT_ARTIFACT_UPDATE -> log.info("  [ARTIFACT_UPDATE] agent={}, artifact={}, chunks={}",
+                            data.get("agent"), data.get("artifact_name"), data.get("last_chunk"));
+                    case EventType.AGENT_MESSAGE_EVENT -> log.info("  [MESSAGE] agent={}, {} chars",
+                            data.get("agent"),
+                            data.get("text") != null ? ((String) data.get("text")).length() : 0);
+                   case EventType.STEP_COMPLETE -> log.info("  [STEP_COMPLETE] {}", data.get("step"));
                     case EventType.ROUTE_DECISION -> log.info("  [ROUTE] {} -> {}", data.get("step"), data.get("next"));
                     case EventType.COMPLETE -> log.info("  [COMPLETE]");
                     case EventType.ERROR -> log.error("  [ERROR] {}", data.get("error"));

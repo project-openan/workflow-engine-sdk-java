@@ -36,6 +36,13 @@ class EventTypeTest {
     }
 
     @Test
+    void intermediateAgentEventsExist() {
+        assertEquals("agent_status_update", EventType.AGENT_STATUS_UPDATE);
+        assertEquals("agent_artifact_update", EventType.AGENT_ARTIFACT_UPDATE);
+        assertEquals("agent_message_event", EventType.AGENT_MESSAGE_EVENT);
+    }
+
+    @Test
     void extensionEventsMatchPython() {
         assertEquals("negotiation_request", EventType.NEGOTIATION_REQUEST);
         assertEquals("negotiation_resolved", EventType.NEGOTIATION_RESOLVED);
