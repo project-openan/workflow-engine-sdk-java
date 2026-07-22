@@ -35,6 +35,7 @@
         <jackson.version>2.20.1</jackson.version>
         <slf4j.version>2.0.17</slf4j.version>
         <junit.version>5.10.2</junit.version>
+        <log4j2.version>2.24.3</log4j2.version>
     </properties>
 
     <build>

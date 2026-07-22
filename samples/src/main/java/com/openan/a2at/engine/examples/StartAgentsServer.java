@@ -42,6 +42,7 @@ public class StartAgentsServer implements Runnable {
     static final String REGISTRY_URL = "https://127.0.0.1:5000";
     static final String ORCH_URL = "https://127.0.0.1:5001";
     static final String CRED_FILE = "spn_agent_credentials.json";
+    static final String A2AT_ENV_FILE = ".env";
 
     private final List<EmbeddedA2AServer> servers = new ArrayList<>();
     private volatile boolean running = true;
@@ -59,12 +60,14 @@ public class StartAgentsServer implements Runnable {
     public void start() throws Exception {
         boolean sslVerify = false;
         String credPath = getClass().getClassLoader().getResource(CRED_FILE).getPath();
+        String envPath = resolveEnvPath();
+        log.info("A2AT env file: {}", envPath != null ? envPath : "(not found, A2A-T extensions disabled)");
 
         List<AgentEntry> agents = List.of(
                 loadAgent("agentcard/spn_domain_agent.json", new SpnDomainAgentExecutor()),
                 loadAgent("agentcard/spn_domain_agent_city2.json", new SpnDomainAgentCity2Executor()),
                 loadAgent("agentcard/transport_workbench_agent.json",
-                        new TransportWorkbenchAgentExecutor(REGISTRY_URL, ORCH_URL, credPath, sslVerify))
+                        new TransportWorkbenchAgentExecutor(REGISTRY_URL, ORCH_URL, credPath, sslVerify, envPath))
         );
 
         for (AgentEntry entry : agents) {
@@ -117,6 +120,26 @@ public class StartAgentsServer implements Runnable {
     }
 
     private record AgentEntry(String host, int port, Map<String, Object> card, AgentExecutor executor) {}
+
+    /**
+     * Resolve the A2AT {@code .env} file path. Searches classpath, then the
+     * project root (two levels up from the samples target/classes dir), then
+     * the current working directory. Returns null if not found.
+     */
+    public static String resolveEnvPath() {
+        var url = StartAgentsServer.class.getClassLoader().getResource(A2AT_ENV_FILE);
+        if (url != null && "file".equals(url.getProtocol())) {
+            return new java.io.File(url.getPath()).getAbsolutePath();
+        }
+        java.nio.file.Path cwd = java.nio.file.Paths.get(System.getProperty("user.dir"));
+        for (java.nio.file.Path dir = cwd; dir != null; dir = dir.getParent()) {
+            java.io.File candidate = dir.resolve(A2AT_ENV_FILE).toFile();
+            if (candidate.exists()) {
+                return candidate.getAbsolutePath();
+            }
+        }
+        return null;
+    }
 
     public static void main(String[] args) throws Exception {
         StartAgentsServer server = new StartAgentsServer();

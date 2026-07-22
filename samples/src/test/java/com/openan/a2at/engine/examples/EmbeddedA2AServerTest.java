@@ -34,6 +34,9 @@ class EmbeddedA2AServerTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // Unit tests must stay deterministic and offline: disable LLM calls so
+        // agents fall back to their hardcoded diagnostic text (asserted below).
+        System.setProperty("a2at.llm.disabled", "true");
         port = 28000 + (int) (Math.random() * 1000);
         Map<String, Object> card = Map.of(
                 "name", AGENT_NAME,

@@ -273,14 +273,15 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 emit(EventType.AGENT_ARTIFACT_UPDATE, data);
             }
         } else if (event instanceof MessageEvent me) {
+            Message msg = me.getMessage();
             StringBuilder text = new StringBuilder();
-            extractTextFromMessage(me.getMessage(), text);
+            extractTextFromMessage(msg, text);
             Map<String, Object> data = new HashMap<>();
             data.put("agent", agentName);
-            data.put("role", me.getMessage().role().name());
+            if (msg != null) data.put("role", msg.role().name());
             if (!text.isEmpty()) data.put("text", text.toString());
-            if (me.getMessage().metadata() != null && !me.getMessage().metadata().isEmpty()) {
-                data.put("metadata", me.getMessage().metadata());
+            if (msg != null && msg.metadata() != null && !msg.metadata().isEmpty()) {
+                data.put("metadata", msg.metadata());
             }
             log.info("[EngineClient] Agent {} message event: {} chars", agentName, text.length());
             emit(EventType.AGENT_MESSAGE_EVENT, data);
@@ -305,7 +306,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         if (artifact.parts() != null) for (Part<?> part : artifact.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
     }
     private static void extractTextFromMessage(Message message, StringBuilder sb) {
-        if (message.parts() != null) for (Part<?> part : message.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
+        // status().message() is legitimately null for terminal events emitted via complete()/fail()
+        if (message == null || message.parts() == null) return;
+        for (Part<?> part : message.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
     }
     private static String extractResponseTaskState(Iterable<ClientEvent> events) {
         String state = "";
@@ -321,14 +324,30 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         Map<String, Object> metadata = new HashMap<>();
         for (ClientEvent event : events) {
             if (event instanceof TaskEvent te) {
-                Map<String, Object> m = te.getTask().metadata();
-                if (m != null && !m.isEmpty()) metadata = m;
+                mergeTaskMetadata(te.getTask(), metadata);
             } else if (event instanceof TaskUpdateEvent tue) {
-                Map<String, Object> m = tue.getTask().metadata();
-                if (m != null && !m.isEmpty()) metadata = m;
+                mergeTaskMetadata(tue.getTask(), metadata);
             }
         }
         return metadata;
+    }
+
+    /**
+     * Merge task-level metadata AND each artifact's metadata into the result map.
+     * Agents attach Authorization-T / Notification-T to artifact metadata, so
+     * without this merge those extension payloads never reach the extension handlers.
+     */
+    @SuppressWarnings("unchecked")
+    private static void mergeTaskMetadata(Task task, Map<String, Object> metadata) {
+        if (task == null) return;
+        Map<String, Object> m = task.metadata();
+        if (m != null && !m.isEmpty()) metadata.putAll(m);
+        if (task.artifacts() != null) {
+            for (Artifact a : task.artifacts()) {
+                Map<String, Object> am = a.metadata();
+                if (am != null && !am.isEmpty()) metadata.putAll(am);
+            }
+        }
     }
     private static Object extractResponseTask(Iterable<ClientEvent> events) {
         Object lastTask = null;

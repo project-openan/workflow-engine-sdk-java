@@ -7,6 +7,7 @@ import com.openan.a2at.engine.model.JumpCondition;
 import com.openan.a2at.engine.model.RouteDecision;
 import com.openan.a2at.engine.model.TaskRequest;
 import com.openan.a2at.engine.model.TaskResponse;
+import com.openan.a2at.engine.examples.StartAgentsServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +31,16 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
 
     private final AtomicBoolean authorizationCalled = new AtomicBoolean(false);
     private final AtomicBoolean notificationCalled = new AtomicBoolean(false);
+
+    private final String a2atEnvPath;
+
+    public WorkbenchControlPoint() {
+        this(null);
+    }
+
+    public WorkbenchControlPoint(String a2atEnvPath) {
+        this.a2atEnvPath = a2atEnvPath != null ? a2atEnvPath : StartAgentsServer.resolveEnvPath();
+    }
 
     public boolean wasAuthorizationCalled() { return authorizationCalled.get(); }
     public boolean wasNotificationCalled() { return notificationCalled.get(); }
@@ -80,9 +91,13 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
         String city1 = String.valueOf(results.getOrDefault("diagnosis_city1", ""));
         String city2 = String.valueOf(results.getOrDefault("diagnosis_city2", ""));
         String nextStep = determineFaultRoute(city1, city2);
-        log.info("[onRoute] {} -> {}", stepName, nextStep);
+        String reason = LlmHelper.text(a2atEnvPath,
+                "你是SPN跨城故障定位分析专家。用一句话说明故障所在城市和下一步动作。中文。",
+                "上海诊断：" + city1 + "\n广州诊断：" + city2 + "\n已选定下一步：" + nextStep + "。请给一句话理由。",
+                "fault analysis");
+        log.info("[onRoute] {} -> {} ({})", stepName, nextStep, reason);
         return CompletableFuture.completedFuture(
-                RouteDecision.builder().nextStep(nextStep).reason("fault analysis").build());
+                RouteDecision.builder().nextStep(nextStep).reason(reason).build());
     }
 
     private static String determineFaultRoute(String city1Result, String city2Result) {
@@ -96,9 +111,11 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
     public CompletableFuture<String> onNegotiation(
             String agentName, String negotiationText, Map<String, Object> receiveResult) {
         log.info("[onNegotiation] agent={}: {}", agentName, negotiationText);
-        return CompletableFuture.completedFuture(
-                "根据工作台上下文，客户A上海-广州间SPN专线中断，"
-                + "上海OMC告警端口Down，光功率-28dBm。");
+        String fallback = "根据工作台上下文，客户A上海-广州间SPN专线中断，"
+                + "上海OMC告警端口Down，光功率-28dBm。";
+        String sys = "你是SPN跨城专线抢通工作台的协商澄清专家。根据协商请求，补充客户A上海-广州间SPN专线中断的上下文（上海OMC告警端口Down、光功率-28dBm）。中文。";
+        String clarification = LlmHelper.text(a2atEnvPath, sys, negotiationText, fallback);
+        return CompletableFuture.completedFuture(clarification);
     }
 
     @Override

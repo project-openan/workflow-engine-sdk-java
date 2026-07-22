@@ -38,11 +38,16 @@
             <version>${a2a.java.sdk.version}</version>
         </dependency>
 
-        <!-- Logging implementation for demo console output -->
+        <!-- Logging: Log4j2 (SLF4J 2.x binding) with console + rolling file appender -->
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>${slf4j.version}</version>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j2-impl</artifactId>
+            <version>${log4j2.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j2.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

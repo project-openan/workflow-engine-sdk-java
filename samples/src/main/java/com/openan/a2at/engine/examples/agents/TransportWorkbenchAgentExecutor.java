@@ -1,6 +1,5 @@
 package com.openan.a2at.engine.examples.agents;
 
-import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.ExecutionResult;
@@ -11,7 +10,6 @@ import com.openan.a2at.engine.runner.ExecutePsop;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.a2aproject.sdk.server.agentexecution.RequestContext;
 import org.a2aproject.sdk.server.tasks.AgentEmitter;
-import org.a2aproject.sdk.spec.A2AError;
 import org.a2aproject.sdk.spec.Part;
 import org.a2aproject.sdk.spec.TextPart;
 import org.slf4j.Logger;
@@ -26,19 +24,16 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Transport Workbench Agent - the orchestrator.
  *
- * <p>This agent is both server (receives tasks) and client (dispatches
- * sub-tasks to OMC agents via the workflow engine). When it receives a
- * top-level task (e.g. "diagnose SPN fault"), it searches the orchestration
- * center for a matching PSOP workflow, loads it, and executes it.
+ * <p>Server-side negotiation-capable (extends {@link NegotiationBaseAgentExecutor}):
+ * a top-level task first triggers a Negotiation-T round (INPUT_REQUIRED); on the
+ * follow-up it searches the orchestration center for a matching PSOP, loads and
+ * executes the workflow (dispatching sub-tasks to OMC agents), and returns the
+ * merged result. Sub-tasks (merge_analysis) are handled inline.
  *
- * <p>Agent cards are loaded from classpath JSON config files, not from the
- * registry center — the registry may contain stale entries from the Python
- * version with different ports or URL prefixes.
- *
- * <p>SRP: orchestration logic lives here. Workflow decision logic is
- * delegated to {@link WorkbenchControlPoint}.
+ * <p>Agent cards are loaded from classpath JSON (correct Java URLs), avoiding
+ * stale registry entries from the Python version.
  */
-public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
+public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecutor {
     private static final Logger log = LoggerFactory.getLogger(TransportWorkbenchAgentExecutor.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
@@ -53,42 +48,50 @@ public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
     private final String orchUrl;
     private final String credentialsPath;
     private final boolean sslVerify;
+    private final String a2atEnvPath;
 
     public TransportWorkbenchAgentExecutor(String registryUrl, String orchUrl,
                                            String credentialsPath, boolean sslVerify) {
+        this(registryUrl, orchUrl, credentialsPath, sslVerify, null);
+    }
+
+    public TransportWorkbenchAgentExecutor(String registryUrl, String orchUrl,
+                                           String credentialsPath, boolean sslVerify,
+                                           String a2atEnvPath) {
         this.orchUrl = orchUrl;
         this.credentialsPath = credentialsPath;
         this.sslVerify = sslVerify;
+        this.a2atEnvPath = a2atEnvPath;
     }
 
     @Override
-    public void execute(RequestContext ctx, AgentEmitter emitter) throws A2AError {
+    protected String resolveEnvPath() {
+        return a2atEnvPath;
+    }
+
+    @Override
+    protected String executeBusiness(RequestContext ctx, AgentEmitter emitter, String input) {
         String taskId = ctx.getTaskId();
         String contextId = ctx.getContextId();
-        String input = extractText(ctx.getMessage());
-        log.info("[Workbench-Agent] Received task: taskId={}, text={} chars", taskId, input.length());
-
-        emitter.submit(buildStatusMessage(contextId, taskId, "Task received"));
-        emitter.startWork(buildStatusMessage(contextId, taskId, "Processing"));
-
         try {
             String responseText = input.contains(SUBTASK_MARKER)
                     ? handleSubTask(input)
                     : handleTopLevelTask(input);
-
-            List<Part<?>> parts = List.of(new TextPart(responseText));
-            emitter.addArtifact(parts, "workflow-result", "Result", Map.of(), false, true);
-            log.info("[Workbench-Agent] Task completed: taskId={}", taskId);
-            emitter.complete();
+            return responseText;
         } catch (Exception e) {
-            log.error("[Workbench-Agent] Task failed: {}", e.getMessage(), e);
-            emitter.fail(buildStatusMessage(contextId, taskId, "Failed: " + e.getMessage()));
+            log.error("[Workbench-Agent] Business failed: {}", e.getMessage(), e);
+            return "Workbench execution failed: " + e.getMessage();
         }
     }
 
     @Override
-    public void cancel(RequestContext ctx, AgentEmitter emitter) throws A2AError {
-        emitter.cancel();
+    protected String defaultNegotiationText() {
+        return "工作台需确认跨城故障处置范围与授权后再执行协同诊断，请补充。";
+    }
+
+    @Override
+    protected String defaultNegotiationConcern() {
+        return "workbench needs scope confirmation before orchestration";
     }
 
     // ------------------------------------------------------------------
@@ -105,7 +108,7 @@ public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
         Workflow workflow = LoadPsop.load(orchUrl, psopId, null, sslVerify);
         log.info("[Workbench-Agent] Workflow: {} ({} steps)", workflow.getName(), workflow.getSteps().size());
 
-        WorkbenchControlPoint controlPoint = new WorkbenchControlPoint();
+        WorkbenchControlPoint controlPoint = new WorkbenchControlPoint(a2atEnvPath);
         ExecutionResult result = ExecutePsop.builder()
                 .psop(workflow)
                 .agentCards(agentCards)
@@ -114,6 +117,7 @@ public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
                 .lang("zh")
                 .sslVerify(sslVerify)
                 .credentialsConfigPath(credentialsPath)
+                .a2atEnvPath(a2atEnvPath)
                 .eventCallback(createEventCallback())
                 .onFinish((r, events) -> {
                     log.info("[onFinish] Success={}, Events={}", r.isSuccess(), events.size());
@@ -125,11 +129,6 @@ public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
         return buildResultText(result, controlPoint);
     }
 
-    /**
-     * Load our own agent cards from classpath JSON config files.
-     * These cards have the correct Java agent URLs, avoiding stale
-     * entries from the registry center.
-     */
     private static List<Map<String, Object>> loadAgentCardsFromConfig() {
         Map<String, Map<String, Object>> byName = new LinkedHashMap<>();
         for (String res : AGENT_CARD_RESOURCES) {
@@ -220,8 +219,8 @@ public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
                 switch (type) {
                     case EventType.START -> log.info("  [START] {}", data.get("workflow"));
                     case EventType.STEP_START -> log.info("  [STEP_START] {}", data.get("step"));
-                   case EventType.TASK_REQUEST -> log.info("  [TASK_REQUEST] agent={}", data.get("agent"));
-                   case EventType.TASK_RESPONSE -> log.info("  [TASK_RESPONSE] agent={}", data.get("agent"));
+                    case EventType.TASK_REQUEST -> log.info("  [TASK_REQUEST] agent={}", data.get("agent"));
+                    case EventType.TASK_RESPONSE -> log.info("  [TASK_RESPONSE] agent={}", data.get("agent"));
                     case EventType.AGENT_STATUS_UPDATE -> log.info("  [STATUS_UPDATE] agent={}, state={}, final={}",
                             data.get("agent"), data.get("state"), data.get("is_final"));
                     case EventType.AGENT_ARTIFACT_UPDATE -> log.info("  [ARTIFACT_UPDATE] agent={}, artifact={}, chunks={}",
@@ -229,7 +228,7 @@ public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
                     case EventType.AGENT_MESSAGE_EVENT -> log.info("  [MESSAGE] agent={}, {} chars",
                             data.get("agent"),
                             data.get("text") != null ? ((String) data.get("text")).length() : 0);
-                   case EventType.STEP_COMPLETE -> log.info("  [STEP_COMPLETE] {}", data.get("step"));
+                    case EventType.STEP_COMPLETE -> log.info("  [STEP_COMPLETE] {}", data.get("step"));
                     case EventType.ROUTE_DECISION -> log.info("  [ROUTE] {} -> {}", data.get("step"), data.get("next"));
                     case EventType.COMPLETE -> log.info("  [COMPLETE]");
                     case EventType.ERROR -> log.error("  [ERROR] {}", data.get("error"));

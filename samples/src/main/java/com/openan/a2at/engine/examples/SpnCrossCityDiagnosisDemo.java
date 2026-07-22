@@ -91,6 +91,7 @@ public class SpnCrossCityDiagnosisDemo {
                 List.of(agentCard), null,
                 WorkflowEngineClientConfig.builder()
                         .sslVerify(false)
+                        .a2atEnvPath(StartAgentsServer.resolveEnvPath())
                         .build());
 
         // Set up EventCallback to receive intermediate state data in real time
