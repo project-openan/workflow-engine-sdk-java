@@ -138,6 +138,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             return CompletableFuture.failedFuture(new RuntimeException("Agent not found: " + agentName));
         }
         log.info("[EngineClient] send_message to {}: {} chars", agentName, message.length());
+        log.debug("[EngineClient] message content to {}: [{}]", agentName, message);
         return runBeforeSendHandlers(agentCard, message, metadata)
                 .thenCompose(processedMetadata -> {
                     emit(EventType.AGENT_REQUEST, Map.of(
@@ -158,6 +159,8 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         Map<String, Object> cardAsMap = toMap(agentCard);
         List<String> extUris = extractExtensionUris(cardAsMap);
         List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
+        log.debug("[EngineClient] beforeSend handlers for '{}': {}", cardAsMap.get("name"),
+                handlers.stream().map(ExtensionHandler::extensionKeyword).toList());
         CompletableFuture<Map<String, Object>> future = CompletableFuture.completedFuture(metadata);
         for (ExtensionHandler handler : handlers) {
             future = future.thenCompose(m -> handler.beforeSend(cardAsMap, message, m, a2atClient, controlPoint));
@@ -169,6 +172,8 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         Map<String, Object> cardAsMap = toMap(agentCard);
         List<String> extUris = extractExtensionUris(cardAsMap);
         List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
+        log.debug("[EngineClient] afterReceive handlers for '{}': {}", cardAsMap.get("name"),
+                handlers.stream().map(ExtensionHandler::extensionKeyword).toList());
         CompletableFuture<SendMessageResult> future = CompletableFuture.completedFuture(result);
         for (ExtensionHandler handler : handlers) {
             future = future.thenCompose(r -> handler.afterReceive(cardAsMap, r, a2atClient, controlPoint, eventCallback));
@@ -207,6 +212,10 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 Map<String, Object> respMetadata = extractResponseMetadata(events);
                 Object task = extractResponseTask(events);
                 log.info("[EngineClient] Response from {}: {} chars, state={}", agentName, responseText.length(), taskState);
+                log.debug("[EngineClient] Response text from {}: [{}]", agentName, responseText);
+                if (respMetadata != null && !respMetadata.isEmpty()) {
+                    log.info("[EngineClient] Response metadata keys for {}: {}", agentName, respMetadata.keySet());
+                }
                 return SendMessageResult.builder().text(responseText).task(task).metadata(respMetadata).taskState(taskState).build();
             } catch (Exception e) {
                 log.error("[EngineClient] Failed to send message to {}: {}", agentName, e.getMessage(), e);
@@ -256,7 +265,10 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                data.put("is_final", sue.isFinal());
                 if (!statusText.isEmpty()) data.put("text", statusText.toString());
                if (sue.metadata() != null && !sue.metadata().isEmpty()) data.put("metadata", sue.metadata());
-                log.info("[EngineClient] Agent {} status update: {}", agentName, state);
+                log.info("[EngineClient] Agent {} status update: {} (final={})", agentName, state, sue.isFinal());
+                if (!statusText.isEmpty()) {
+                    log.debug("[EngineClient] Agent {} status text: {}", agentName, statusText);
+                }
                 emit(EventType.AGENT_STATUS_UPDATE, data);
             } else if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae) {
                 StringBuilder text = new StringBuilder();
@@ -284,6 +296,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 data.put("metadata", msg.metadata());
             }
             log.info("[EngineClient] Agent {} message event: {} chars", agentName, text.length());
+            if (!text.isEmpty()) {
+                log.debug("[EngineClient] Agent {} message text: {}", agentName, text);
+            }
             emit(EventType.AGENT_MESSAGE_EVENT, data);
         }
     }
@@ -368,6 +383,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         Map<String, Object> negMeta = result.getMetadata() != null ? result.getMetadata() : new HashMap<>();
         String negText = negMeta.getOrDefault("negotiation_message", "").toString();
         log.info("[Negotiation] Round {} for '{}': {}", round, agentName, negText);
+        log.debug("[Negotiation] Full metadata for '{}': {}", agentName, negMeta);
         emit(EventType.NEGOTIATION_REQUEST, Map.of("agent", agentName, "round", round, "concern", negText));
         CompletableFuture<String> clarFuture;
         if (controlPoint instanceof ControlPoint cp) {
@@ -381,6 +397,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 emit(EventType.AGENT_RESPONSE, Map.of("agent", agentName, "response", result.getText()));
                 return CompletableFuture.completedFuture(result);
             }
+            log.info("[Negotiation] Clarification for '{}' round {}: {}", agentName, round, clarification);
             emit(EventType.NEGOTIATION_RESOLVED, Map.of("agent", agentName, "round", round, "clarification", clarification));
             String followUp = "[NEGOTIATION_RESOLUTION]\nThe engine has reviewed your negotiation request and provides the following clarification:\n\n" + clarification + "\n\n---\nOriginal Task:\n" + originalMessage + "\n\nPlease re-execute the task based on the clarification above.";
             return runBeforeSendHandlers(agentCard, followUp, null)

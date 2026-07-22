@@ -19,6 +19,12 @@
         </RollingFile>
     </Appenders>
     <Loggers>
+        <!-- SDK diagnostic trace: full message content, SSE events, negotiation, extension handlers -->
+        <Logger name="com.openan.a2at" level="DEBUG"/>
+        <!-- Demo agents: INFO shows negotiation rounds + business progress -->
+        <Logger name="com.openan.a2at.engine.examples" level="DEBUG"/>
+        <!-- Underlying a2a-java SDK: reduce noise, keep warnings/errors -->
+        <Logger name="org.a2aproject" level="WARN"/>
         <Root level="INFO">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="File"/>

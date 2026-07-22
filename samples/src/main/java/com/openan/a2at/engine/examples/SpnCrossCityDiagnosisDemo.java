@@ -61,10 +61,10 @@ public class SpnCrossCityDiagnosisDemo {
 
         String response = sendTaskToWorkbench(taskText);
         log.info("=== Workbench Agent Response ===");
-        log.info("Response: {} chars", response != null ? response.length() : 0);
-        if (response != null) {
-            log.info("Response preview: {}",
-                    response.length() > 200 ? response.substring(0, 200) + "..." : response);
+       if (response != null) {
+            log.info("Response ({} chars):\n{}", response.length(), response);
+        } else {
+            log.warn("Response was null");
         }
 
         // Step 3: Shutdown
@@ -105,18 +105,18 @@ public class SpnCrossCityDiagnosisDemo {
                     case EventType.AGENT_ARTIFACT_UPDATE ->
                         log.info("  >> [ARTIFACT] agent={}, name={}, text={}",
                                 data.get("agent"), data.get("artifact_name"),
-                                truncate(data.get("text")));
+                                data.get("text"));
                     case EventType.AGENT_MESSAGE_EVENT ->
                         log.info("  >> [MESSAGE] agent={}, text={}",
-                                data.get("agent"), truncate(data.get("text")));
+                                data.get("agent"), data.get("text"));
                     case EventType.AGENT_REQUEST ->
                         log.info("  >> [REQUEST] agent={}, {} chars",
                                 data.get("agent"),
                                 data.get("request") != null ? String.valueOf(data.get("request")).length() : 0);
                     case EventType.AGENT_RESPONSE ->
-                        log.info("  >> [RESPONSE] agent={}, {} chars",
+                        log.info("  >> [RESPONSE] agent={}, response={}",
                                 data.get("agent"),
-                                data.get("response") != null ? String.valueOf(data.get("response")).length() : 0);
+                                data.get("response") != null ? data.get("response") : "(empty)");
                     default -> { /* other event types not shown in this demo */ }
                 }
             }
@@ -129,9 +129,4 @@ public class SpnCrossCityDiagnosisDemo {
         return result.getText();
     }
 
-    private static String truncate(Object text) {
-        if (text == null) return "(empty)";
-        String s = String.valueOf(text);
-        return s.length() > 80 ? s.substring(0, 80) + "..." : s;
-    }
 }

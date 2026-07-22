@@ -130,6 +130,7 @@ public class ExecutePsop {
                 runtimeIntent != null ? runtimeIntent : "", lang != null ? lang : "zh");
 
         // Emit start
+        log.info("[execute_psop] Starting: workflow=" + workflow.getName() + ", " + workflow.getSteps().size() + " steps, intent=" + runtimeIntent + ", lang=" + lang);
         collectingCallback.onEvent(EventType.START, Map.of("workflow", workflow.getName(), "steps", workflow.getSteps().size()));
 
         // Run + finalize
@@ -168,6 +169,7 @@ public class ExecutePsop {
                     }
                     return finishFuture.thenApply(v -> {
                         // Emit close
+                        log.info("[execute_psop] Finished: workflow=" + workflow.getName() + ", success=" + result.isSuccess() + ", history=" + (result.getHistory() != null ? result.getHistory().size() : 0));
                         collectingCallback.onEvent(EventType.CLOSE, Map.of());
                         // Close engine client
                         try {

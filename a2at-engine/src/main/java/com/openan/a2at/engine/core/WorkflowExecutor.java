@@ -233,13 +233,18 @@ public class WorkflowExecutor {
                     .subtaskIndex(subtaskIndex)
                     .build();
             emit(EventType.TASK_REQUEST, Map.of("step", step.getName(), "agent", task.getAgent(), "task", task.getDescription()));
-            log.info("[Executor] Dispatching task to agent {}: {}", task.getAgent(), task.getDescription());
+            log.info("[Executor] Dispatching task: step={}, agent={}, subtask_index={}, desc={}",
+                    step.getName(), task.getAgent(), subtaskIndex, task.getDescription());
+            log.debug("[Executor] Task message to {}: [{}]", task.getAgent(), taskMessage);
 
             futures.add(controlPoint.onTask(request, engineClient).thenApply(response -> {
                 task.setStatus(response.isSuccess() ? TaskStatus.SUCCESS : TaskStatus.FAILED);
                 emit(EventType.TASK_STATUS_CHANGED, Map.of("step", step.getName(), "subtask_index", subtaskIndex, "agent", task.getAgent(), "status", task.getStatus().getValue()));
                 String status = response.isSuccess() ? "success" : "failed";
                 log.info("[Executor] Task {} -> {}: {}", task.getDescription(), task.getAgent(), status);
+                if (response.isSuccess() && response.getOutput() != null) {
+                    log.debug("[Executor] Task output from {}: [{}]", task.getAgent(), response.getOutput());
+                }
                 executionHistory.add(Map.of("step", step.getName(), "task", task.getDescription(), "agent", task.getAgent(), "status", status, "output", response.isSuccess() ? response.getOutput() : (response.getError() != null ? response.getError() : "")));
                 emit(EventType.TASK_RESPONSE, Map.of("step", step.getName(), "agent", task.getAgent(), "task", task.getDescription(), "output", response.isSuccess() ? response.getOutput() : (response.getError() != null ? response.getError() : "")));
                 return new StepResult(task.getDescription(), response.isSuccess() ? response.getOutput() : response.getError(), response.isSuccess(), null);

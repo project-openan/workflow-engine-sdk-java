@@ -69,10 +69,10 @@ public class AuthorizationTHandler implements ExtensionHandler {
             return CompletableFuture.completedFuture(result);
         }
         String agentName = getAgentName(agentCard);
-        log.info("[Authorization-T] Agent '{}' requests authorization", agentName);
 
         Object finalAuthRequest = authRequest instanceof String || authRequest instanceof Map
                 ? authRequest : authRequest.toString();
+        log.info("[Authorization-T] Agent '{}' requests authorization: {}", agentName, finalAuthRequest);
 
         // Emit authorization_request event
         if (eventCallback != null) {

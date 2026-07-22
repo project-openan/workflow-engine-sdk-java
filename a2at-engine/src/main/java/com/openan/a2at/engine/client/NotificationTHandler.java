@@ -94,7 +94,7 @@ public class NotificationTHandler implements ExtensionHandler {
             return CompletableFuture.completedFuture(result);
         }
         String agentName = getAgentName(agentCard);
-        log.info("[Notification-T] Received notification from '{}'", agentName);
+        log.info("[Notification-T] Received notification from '{}': {}", agentName, notification);
 
         // Emit notification event
         if (eventCallback != null) {

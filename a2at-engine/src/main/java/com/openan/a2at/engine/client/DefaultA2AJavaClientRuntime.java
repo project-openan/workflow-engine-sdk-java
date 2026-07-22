@@ -22,6 +22,7 @@ import org.a2aproject.sdk.client.Client;
 import org.a2aproject.sdk.client.ClientEvent;
 import org.a2aproject.sdk.client.TaskEvent;
 import org.a2aproject.sdk.client.TaskUpdateEvent;
+import org.a2aproject.sdk.client.MessageEvent;
 import org.a2aproject.sdk.client.http.JdkA2AHttpClient;
 import org.a2aproject.sdk.client.transport.rest.RestTransport;
 import org.a2aproject.sdk.client.transport.rest.RestTransportConfig;
@@ -29,6 +30,7 @@ import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext;
 import org.a2aproject.sdk.spec.A2AClientException;
 import org.a2aproject.sdk.spec.AgentCard;
 import org.a2aproject.sdk.spec.TaskArtifactUpdateEvent;
+import org.a2aproject.sdk.spec.TaskStatus;
 import org.a2aproject.sdk.spec.TaskState;
 import org.a2aproject.sdk.spec.TaskStatusUpdateEvent;
 import org.slf4j.Logger;
@@ -103,6 +105,7 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
             Consumer<ClientEvent> eventSink,
             Consumer<String> logSink) {
         AgentCard agentCard = AgentCardMapper.toSdkAgentCard(agentCardMap);
+        String agentUrl = agentCardMap.get("url") != null ? agentCardMap.get("url").toString() : "?";
         RestTransportConfig transportConfig = createTransportConfig();
         Client client;
         try {
@@ -110,13 +113,18 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
                     .withTransport(RestTransport.class, transportConfig)
                     .build();
         } catch (A2AClientException e) {
+            log.error("[A2ARuntime] Failed to create client for '{}' ({}): {}", agentCard.name(), agentUrl, e.getMessage(), e);
             throw new RuntimeException("Failed to create a2a-java client for "
                     + agentCard.name() + ": " + e.getMessage(), e);
         }
+        log.info("[A2ARuntime] sendMessage: agent='{}', url={}, messageId={}",
+                agentCard.name(), agentUrl,
+                params.message() != null ? params.message().messageId() : "?");
 
         List<ClientEvent> events = Collections.synchronizedList(new ArrayList<>());
         CountDownLatch done = new CountDownLatch(1);
         AtomicReference<Throwable> errorRef = new AtomicReference<>();
+        AtomicReference<ClientEvent> lastEventRef = new AtomicReference<>();
 
         try {
             if (logSink != null) {
@@ -126,36 +134,48 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
                     params,
                     List.of((event, card) -> {
                         events.add(event);
+                        lastEventRef.set(event);
+                        logEvent(agentCard.name(), event);
                         if (eventSink != null) {
                             try {
                                 eventSink.accept(event);
                             } catch (Exception e) {
-                                log.warn("[A2ARuntime] eventSink callback failed: {}", e.getMessage());
+                                log.warn("[A2ARuntime] eventSink callback failed for {} (event_class={}): {}",
+                                        agentCard.name(), event.getClass().getSimpleName(), e.getMessage(), e);
                             }
                         }
                         if (isTerminal(event)) {
+                            log.info("[A2ARuntime] Terminal event for '{}': {}",
+                                    agentCard.name(), describeTerminalEvent(event));
                             done.countDown();
                         }
                     }),
                     error -> {
                         errorRef.set(error);
+                        log.error("[A2ARuntime] Error callback for '{}': {}", agentCard.name(), error.getMessage(), error);
                         done.countDown();
                     },
                     callContext);
         } catch (A2AClientException e) {
             client.close();
+            log.error("[A2ARuntime] message:send exception for '{}': {}", agentCard.name(), e.getMessage(), e);
             throw new RuntimeException("A2A message:send failed for "
                     + agentCard.name() + ": " + e.getMessage(), e);
         }
 
         try {
             if (!done.await(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                ClientEvent last = lastEventRef.get();
+                log.error("[A2ARuntime] TIMEOUT for '{}' after {}s: received {} event(s), last event_class={}",
+                        agentCard.name(), SEND_TIMEOUT_SECONDS, events.size(),
+                        last != null ? last.getClass().getSimpleName() : "none");
                 client.close();
                 throw new RuntimeException("A2A message:send timed out for " + agentCard.name());
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             client.close();
+            log.warn("[A2ARuntime] Interrupted while waiting for '{}'", agentCard.name());
             throw new RuntimeException("A2A message:send interrupted for " + agentCard.name(), e);
         }
 
@@ -165,9 +185,7 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
             throw new RuntimeException("A2A message:send failed for "
                     + agentCard.name() + ": " + errorRef.get().getMessage(), errorRef.get());
         }
-        if (logSink != null) {
-            logSink.accept("[A2A] Received " + events.size() + " event(s) from " + agentCard.name());
-        }
+        log.info("[A2ARuntime] Completed for '{}': {} event(s)", agentCard.name(), events.size());
         return events;
     }
 
@@ -229,5 +247,52 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
                 || state == TaskState.TASK_STATE_REJECTED
                 || state == TaskState.TASK_STATE_INPUT_REQUIRED
                 || state == TaskState.TASK_STATE_AUTH_REQUIRED;
+    }
+
+    // ------------------------------------------------------------------
+    // Diagnostic logging helpers
+    // ------------------------------------------------------------------
+
+    private static void logEvent(String agentName, ClientEvent event) {
+        if (event instanceof TaskEvent te) {
+            TaskStatus st = te.getTask() != null ? te.getTask().status() : null;
+            log.info("[A2ARuntime] Event[Task] agent='{}', state={}, final={}",
+                    agentName,
+                    st != null ? st.state() : "?",
+                    st != null && st.state() != null && isTerminal(st.state()));
+        } else if (event instanceof TaskUpdateEvent tue) {
+            if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
+                TaskStatus st = sue.status();
+                log.info("[A2ARuntime] Event[StatusUpdate] agent='{}', state={}, final={}",
+                        agentName,
+                        st != null ? st.state() : "?",
+                        sue.isFinal());
+            } else if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae) {
+                log.info("[A2ARuntime] Event[ArtifactUpdate] agent='{}', name={}, append={}, lastChunk={}",
+                        agentName,
+                        ae.artifact() != null ? ae.artifact().name() : "?",
+                        ae.append(), ae.lastChunk());
+            }
+        } else if (event instanceof MessageEvent me) {
+            log.info("[A2ARuntime] Event[Message] agent='{}', role={}, parts={}",
+                    agentName,
+                    me.getMessage() != null && me.getMessage().role() != null ? me.getMessage().role() : "?",
+                    me.getMessage() != null && me.getMessage().parts() != null ? me.getMessage().parts().size() : 0);
+        } else {
+            log.debug("[A2ARuntime] Event[{}] agent='{}'", event.getClass().getSimpleName(), agentName);
+        }
+    }
+
+    private static String describeTerminalEvent(ClientEvent event) {
+        if (event instanceof TaskEvent te) {
+            return te.getTask() != null && te.getTask().status() != null
+                    ? te.getTask().status().state().name() : "?";
+        }
+        if (event instanceof TaskUpdateEvent tue
+                && tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
+            return sue.status() != null && sue.status().state() != null
+                    ? sue.status().state().name() : "?";
+        }
+        return event.getClass().getSimpleName();
     }
 }

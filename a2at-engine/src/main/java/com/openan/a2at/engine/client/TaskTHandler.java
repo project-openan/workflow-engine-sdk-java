@@ -82,7 +82,8 @@ public class TaskTHandler implements ExtensionHandler {
                         .getMethod("promptText").invoke(promptResult);
                 if (promptText != null && !promptText.isEmpty()) {
                     result.put(taskTUri, promptText);
-                    log.info("[Task-T] Generated prompt for '{}'", getAgentName(agentCard));
+                    log.info("[Task-T] Generated prompt for '{}': {} chars", getAgentName(agentCard), promptText.length());
+                    log.debug("[Task-T] Prompt content: [{}]", promptText);
                 }
             }
         } catch (Exception e) {

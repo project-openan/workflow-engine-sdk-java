@@ -184,7 +184,7 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
     private String handleSubTask(String messageText) {
         log.info("[Workbench-Agent] Sub-task received (from workflow executor)");
         if (!messageText.contains(MERGE_KEYWORD)) {
-            return "Sub-task processed: " + messageText.substring(0, Math.min(100, messageText.length()));
+            return "Sub-task processed: " + messageText;
         }
         return analyzeFaultLocation(messageText);
     }

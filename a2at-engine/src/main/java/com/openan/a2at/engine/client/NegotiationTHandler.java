@@ -88,11 +88,11 @@ public class NegotiationTHandler implements ExtensionHandler {
                     String negMsg = (String) rr.getOrDefault("message", "");
                     metadata.put("negotiation_message", negMsg);
                     metadata.put("negotiation_context", rr);
-                    log.info("[Negotiation-T] Agent '{}' requested negotiation", getAgentName(agentCard));
+                    log.info("[Negotiation-T] Agent '{}' requested negotiation: {}", getAgentName(agentCard), negMsg);
                 }
             }
         } catch (Exception e) {
-            log.warn("[Negotiation-T] Failed: {}", e.getMessage());
+            log.warn("[Negotiation-T] Failed for '{}': {}", getAgentName(agentCard), e.getMessage(), e);
         }
         result.setMetadata(metadata);
         return CompletableFuture.completedFuture(result);
