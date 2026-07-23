@@ -154,24 +154,12 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
                                                List<Map<String, Object>> agentCards) {
         String authUri = "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1";
         String notifUri = "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1";
-        String authPayload =
-                "## 任务类型 新增授权\n" +
-                "## 操作授权规则列表\n" +
-                "- 操作名称：业务抢通\n" +
-                "- 操作类型：光模块更换/隧道调优\n" +
-                "- 操作对象：SPN专线业务\n" +
-                "- 授权策略：OMC自动执行\n" +
-                "- 触发执行条件：业务投诉诊断确认故障\n" +
-                "## 预期输出\n返回是否设置成功";
-        String notifPayload =
-                "## 通知主题\nservice-recovery-execution-result\n" +
-                "## 上报通知数据格式\n" +
-                "1. 专线业务投诉诊断任务标识\n" +
-                "2. 业务抢通方案是否执行成功\n" +
-                "3. 业务抢通方案执行结束时间\n" +
-                "4. 业务抢通方案名称\n" +
-                "5. 业务抢通方案详情\n" +
-                "## 预期输出\n订阅结果";
+        // Natural-language input for the A2A-T SDK prompt generation (LLM + template).
+        // For Notification-T the SDK has a "subscribe_incident" scenario that renders
+        // the subscription template. For Authorization-T the SDK has no scenario yet,
+        // so generation will fall back to using the input text as-is.
+        String authInput = "任务类型新增授权，操作名称业务抢通，操作类型光模块更换，操作对象SPN专线业务，授权策略OMC自动执行，触发执行条件业务投诉诊断确认故障，预期输出返回是否设置成功";
+        String notifInput = "通知主题为service-recovery-execution-result，订阅条件为业务抢通方案执行结果，上报通知数据格式为TextPart";
         for (Map<String, Object> card : agentCards) {
             String name = String.valueOf(card.get("name"));
             if (name == null || name.contains("Workbench")) {
@@ -179,10 +167,10 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
             }
             log.info("[Workbench-Agent] Pre-positioning Authorization-T to {}", name);
             engineClient.sendExtensionMessage(name, "下发授权放行策略",
-                    Map.of(authUri, authPayload)).join();
+                    authInput, authUri).join();
             log.info("[Workbench-Agent] Pre-positioning Notification-T to {}", name);
             engineClient.sendExtensionMessage(name, "订阅业务抢通结果通知",
-                    Map.of(notifUri, notifPayload)).join();
+                    notifInput, notifUri).join();
         }
         log.info("[Workbench-Agent] Extension pre-positioning complete");
     }

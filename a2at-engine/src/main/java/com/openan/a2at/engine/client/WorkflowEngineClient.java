@@ -31,17 +31,21 @@ public interface WorkflowEngineClient {
 
     /**
      * Send a one-shot extension message (e.g. Authorization-T pre-positioning,
-     * Notification-T subscription) to an agent. This bypasses the Task-T
-     * prompt generation and Negotiation-T auto-loop — the metadata is sent
-     * as-is. Used for pre-positioning operations done before the workflow starts.
+     * Notification-T subscription) to an agent. The metadata value is generated
+     * by the A2A-T SDK (LLM + prompt template) from the natural-language input.
+     * If the SDK cannot generate (no matching scenario or unavailable), the
+     * natural-language input is used as-is. Bypasses Task-T prompt generation
+     * and Negotiation-T auto-loop.
      *
-     * @param agentName  target agent name
-     * @param message    short instruction text
-     * @param metadata   extension metadata (keyed by full extension URI)
+     * @param agentName           target agent name
+     * @param instruction         short instruction text (becomes message parts)
+     * @param naturalLanguageInput natural-language input for SDK prompt generation
+     * @param extensionUri        full extension URI (becomes metadata key + A2A-Extensions header)
      */
     default CompletableFuture<SendMessageResult> sendExtensionMessage(
-            String agentName, String message, Map<String, Object> metadata) {
-        return sendMessage(agentName, message, null, metadata);
+            String agentName, String instruction, String naturalLanguageInput, String extensionUri) {
+        // Default: use the natural-language input directly as metadata value
+        return sendMessage(agentName, instruction, null, Map.of(extensionUri, naturalLanguageInput));
     }
 
     void setControlPoint(Object controlPoint);
