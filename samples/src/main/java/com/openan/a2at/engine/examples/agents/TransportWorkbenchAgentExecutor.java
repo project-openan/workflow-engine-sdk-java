@@ -218,7 +218,8 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
         if (result.getError() != null) {
             sb.append("Error: ").append(result.getError());
         }
-        sb.append("\nPre-positioned Authorization-T + Notification-T before workflow");
+        sb.append("\nPre-positioned Authorization-T whitelist + Notification-T subscription");
+        sb.append("Recovery self-triggered by SPN agents via whitelist policy");
         return sb.toString();
     }
 

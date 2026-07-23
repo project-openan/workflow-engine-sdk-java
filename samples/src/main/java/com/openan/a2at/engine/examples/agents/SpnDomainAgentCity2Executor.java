@@ -40,17 +40,7 @@ public class SpnDomainAgentCity2Executor extends NegotiationBaseAgentExecutor {
     protected String executeBusiness(RequestContext ctx, AgentEmitter emitter, String input) {
         String taskId = ctx.getTaskId();
         String contextId = ctx.getContextId();
-        boolean isRecovery = input.contains("## 抢通指令") || input.toLowerCase().contains("recovery");
-
-        if (isRecovery) {
-            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
-                    BaseAgentExecutor.buildStatusMessage(contextId, taskId, "广州侧正在执行抢通操作..."));
-            sleepBriefly();
-            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
-                    BaseAgentExecutor.buildStatusMessage(contextId, taskId, "广州侧抢通进度：正在排查端口状态"));
-            sleepBriefly();
-            return llmRecoveryResult(input, RECOVERY_RESULT);
-        }
+        // Diagnosis branch (Guangzhou side is normal, no fault)
         emitter.updateStatus(TaskState.TASK_STATE_WORKING,
                 BaseAgentExecutor.buildStatusMessage(contextId, taskId, "正在查询广州OMC端口状态..."));
         sleepBriefly();
@@ -61,7 +51,10 @@ public class SpnDomainAgentCity2Executor extends NegotiationBaseAgentExecutor {
         emitter.updateStatus(TaskState.TASK_STATE_WORKING,
                 BaseAgentExecutor.buildStatusMessage(contextId, taskId, "广州侧诊断中间结果：端口正常，光功率正常，无异常告警"));
         sleepBriefly();
-        return llmDiagnosisResult(input, NORMAL_DIAGNOSIS_RESULT);
+        // No fault on Guangzhou side, no recovery needed
+        String result = llmDiagnosisResult(input, NORMAL_DIAGNOSIS_RESULT);
+        log.info("[SPN-Domain-Agent-City2] Diagnosis complete, no fault, no recovery needed");
+        return result;
     }
 
     @Override

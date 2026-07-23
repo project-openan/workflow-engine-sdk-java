@@ -43,20 +43,6 @@ public class SpnDomainAgentExecutor extends NegotiationBaseAgentExecutor {
     protected String executeBusiness(RequestContext ctx, AgentEmitter emitter, String input) {
         String taskId = ctx.getTaskId();
         String contextId = ctx.getContextId();
-        boolean isRecovery = input.contains("## 抢通指令") || input.toLowerCase().contains("recovery");
-
-        if (isRecovery) {
-            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
-                    BaseAgentExecutor.buildStatusMessage(contextId, taskId, "正在执行抢通操作：更换光模块..."));
-            sleepBriefly();
-            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
-                    BaseAgentExecutor.buildStatusMessage(contextId, taskId, "光模块更换进度：已拔出故障模块，正在插入新模块"));
-            sleepBriefly();
-            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
-                    BaseAgentExecutor.buildStatusMessage(contextId, taskId, "光模块已更换，正在验证端口状态..."));
-            sleepBriefly();
-            return llmRecoveryResult(input, RECOVERY_RESULT);
-        }
         // Diagnosis branch
         emitter.updateStatus(TaskState.TASK_STATE_WORKING,
                 BaseAgentExecutor.buildStatusMessage(contextId, taskId, "正在查询上海OMC端口状态..."));
@@ -71,7 +57,52 @@ public class SpnDomainAgentExecutor extends NegotiationBaseAgentExecutor {
         emitter.updateStatus(TaskState.TASK_STATE_WORKING,
                 BaseAgentExecutor.buildStatusMessage(contextId, taskId, "诊断中间结果：光功率-28dBm严重低于阈值，疑似光模块故障"));
         sleepBriefly();
-        return llmDiagnosisResult(input, FAULT_DIAGNOSIS_RESULT);
+        String diagnosisResult = llmDiagnosisResult(input, FAULT_DIAGNOSIS_RESULT);
+        // After diagnosis, self-trigger recovery based on pre-positioned
+        // Authorization-T whitelist policy. If the repair action matches the
+        // whitelist, execute recovery and report result via Notification-T.
+        // If not in whitelist, report refusal via Notification-T.
+        selfTriggerRecovery(ctx, emitter, diagnosisResult);
+        return diagnosisResult;
+    }
+
+    /**
+     * After diagnosis, check the pre-positioned Authorization-T whitelist policy.
+     * If the repair action (“光模块更换” / optical module replacement) is in the
+     * whitelist, self-execute recovery and report the result via the
+     * Notification-T channel (artifact metadata). If not in whitelist, report
+     * refusal via the same channel.
+     */
+    private void selfTriggerRecovery(RequestContext ctx, AgentEmitter emitter, String diagnosisResult) {
+        String taskId = ctx.getTaskId();
+        String contextId = ctx.getContextId();
+        String notifUri = "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1";
+        String policy = getAuthorizationPolicy();
+        boolean inWhitelist = policy != null && !policy.isEmpty()
+                && (policy.contains("业务抦通") || policy.contains("光模块") || policy.contains("授权"));
+        if (inWhitelist) {
+            log.info("[SPN-Domain-Agent] Fault in whitelist, self-triggering recovery");
+            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
+                    BaseAgentExecutor.buildStatusMessage(contextId, taskId, "故障在白名单内，自主执行抦通：更换光模块..."));
+            sleepBriefly();
+            emitter.updateStatus(TaskState.TASK_STATE_WORKING,
+                    BaseAgentExecutor.buildStatusMessage(contextId, taskId, "光模块已更换，端口恢复Up"));
+            sleepBriefly();
+            String recoveryResult = llmRecoveryResult(diagnosisResult, RECOVERY_RESULT);
+            emitter.addArtifact(
+                    List.of(new TextPart(recoveryResult)),
+                    "recovery-result", "抦通结果",
+                    Map.of(notifUri, recoveryResult), false, true);
+            log.info("[SPN-Domain-Agent] Recovery result reported via Notification-T: {}", recoveryResult);
+        } else {
+            log.info("[SPN-Domain-Agent] Fault not in whitelist, refusing recovery");
+            String refusalResult = "操作不在白名单内，拒绝执行抦通。";
+            emitter.addArtifact(
+                    List.of(new TextPart(refusalResult)),
+                    "recovery-result", "抦通拒绝",
+                    Map.of(notifUri, refusalResult), false, true);
+            log.info("[SPN-Domain-Agent] Refusal reported via Notification-T: {}", refusalResult);
+        }
     }
 
     @Override

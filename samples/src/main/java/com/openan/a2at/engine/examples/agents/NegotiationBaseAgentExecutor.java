@@ -42,6 +42,17 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
 
     private volatile A2ATClient a2atClient;
 
+    // Pre-positioned extension payloads stored on first receipt, used later
+    // during diagnosis to self-trigger recovery and report results.
+    private volatile String authorizationPolicy;
+    private volatile String notificationSubscription;
+
+    /** The pre-positioned Authorization-T whitelist policy text, or null. */
+    protected final String getAuthorizationPolicy() { return authorizationPolicy; }
+
+    /** The pre-positioned Notification-T subscription text, or null. */
+    protected final String getNotificationSubscription() { return notificationSubscription; }
+
     /** Resolve the A2A-T .env path; null disables A2ATClient (negotiation still works with fallback context). */
     protected abstract String resolveEnvPath();
 
@@ -129,6 +140,13 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
                 .filter(e -> e.getKey().contains(extKeyword))
                 .map(Map.Entry::getValue)
                 .findFirst().orElse("");
+        // Store the policy/subscription text for later use during diagnosis
+        String payloadText = payload instanceof String s ? s : String.valueOf(payload);
+        if (extKeyword.contains("Authorization")) {
+            authorizationPolicy = payloadText;
+        } else if (extKeyword.contains("Notification")) {
+            notificationSubscription = payloadText;
+        }
         log.info("[{}] Pre-positioned {} received, payload length={}",
                 getClass().getSimpleName(), extKeyword,
                 payload instanceof String s ? s.length() : String.valueOf(payload).length());

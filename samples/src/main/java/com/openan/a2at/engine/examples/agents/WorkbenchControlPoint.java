@@ -72,9 +72,7 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
                     + "端口所属单板line-card-03，端口号port-7。";
             case "diagnosis_city2" -> message + "\n\n## 城市差异化参数\n"
                     + "客户A上海-广州间SPN专线中断，广州OMC侧需排查端口状态和光功率是否正常。";
-            case "recovery_city1", "recovery_city2" -> message + "\n\n## 抢通指令\n"
-                    + "执行抢通方案，完成后返回抢通结果。授权和通知订阅已预置。";
-            default -> message;
+default -> message;
         };
     }
 
@@ -84,23 +82,18 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
         if (!"merge_analysis".equals(stepName)) {
             return super.onRoute(stepName, results, conditions);
         }
+        // Recovery is not a workflow step. SPN agents self-trigger recovery
+        // based on pre-positioned Authorization-T whitelist policy, and report
+        // results via Notification-T channel. The workflow ends here.
         String city1 = String.valueOf(results.getOrDefault("diagnosis_city1", ""));
         String city2 = String.valueOf(results.getOrDefault("diagnosis_city2", ""));
-        String nextStep = determineFaultRoute(city1, city2);
         String reason = LlmHelper.text(a2atEnvPath,
-                "你是SPN跨城故障定位分析专家。用一句话说明故障所在城市和下一步动作。中文。",
-                "上海诊断：" + city1 + "\n广州诊断：" + city2 + "\n已选定下一步：" + nextStep + "。请给一句话理由。",
+                "你是SPN跨城故障定位分析专家。用一句话说明故障所在城市和抢通触发方式。中文。",
+                "上海诊断：" + city1 + "\n广州诊断：" + city2 + "\nSPN诊断完成后自查白名单授权策略，匹配则自主抢通，通过Notification-T上报结果。请给一句话总结。",
                 "fault analysis");
-        log.info("[onRoute] {} -> {} ({})", stepName, nextStep, reason);
+        log.info("[onRoute] {} -> endNode ({})", stepName, reason);
         return CompletableFuture.completedFuture(
-                RouteDecision.builder().nextStep(nextStep).reason(reason).build());
-    }
-
-    private static String determineFaultRoute(String city1Result, String city2Result) {
-        boolean city1Fault = city1Result.contains("故障") || city1Result.contains("Down");
-        boolean city2Fault = city2Result.contains("故障") || city2Result.contains("Down");
-        if (!city1Fault && !city2Fault) return "endNode";
-        return city2Fault && !city1Fault ? "recovery_city2" : "recovery_city1";
+                RouteDecision.builder().nextStep("endNode").reason(reason).build());
     }
 
     @Override
