@@ -254,7 +254,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         Message msg = Message.builder()
                 .messageId(UUID.randomUUID().toString())
                 .contextId(contextId)
-                .role(Message.Role.ROLE_AGENT)
+                .role(Message.Role.ROLE_USER)
                 .parts(new TextPart(message))
                 .metadata(metadata != null ? metadata : Map.of())
                 .build();
@@ -427,7 +427,12 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             log.info("[Negotiation] Clarification for '{}' round {}: {}", agentName, round, clarification);
             emit(EventType.NEGOTIATION_RESOLVED, Map.of("agent", agentName, "round", round, "clarification", clarification));
             String followUp = "[NEGOTIATION_RESOLUTION]\nThe engine has reviewed your negotiation request and provides the following clarification:\n\n" + clarification + "\n\n---\nOriginal Task:\n" + originalMessage + "\n\nPlease re-execute the task based on the clarification above.";
-            return runBeforeSendHandlers(agentCard, followUp, null)
+            // Carry the negotiation resolution as natural-language metadata
+            // under the Negotiation-T URI key, per A2A-T protocol.
+            Map<String, Object> followUpMeta = new HashMap<>();
+            followUpMeta.put("https://projects.tmforum.org/a2aproject/telecommunication/extensions/Negotiation-T/v1",
+                    "## \u6570\u636e\u8fd4\u56de\u786e\u8ba4\n" + clarification + "\n");
+            return runBeforeSendHandlers(agentCard, followUp, followUpMeta)
                     .thenCompose(meta -> {
                         String ctx = contextId != null ? contextId : this.contextId;
                         return doSendViaA2ARuntime(agentCard, agentName, followUp, ctx, meta)
