@@ -21,6 +21,8 @@ package com.openan.a2at.engine.client;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallInterceptor;
+import org.a2aproject.sdk.spec.AgentCard;
+import org.a2aproject.sdk.spec.SecurityScheme;
 import org.a2aproject.sdk.client.transport.spi.interceptors.auth.AuthInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,12 +136,10 @@ public class AgentAuthManager {
      * @param agentName the agent name
      * @return list of interceptors (auth + extension), or empty if none needed
      */
-    @SuppressWarnings("unchecked")
-    public List<ClientCallInterceptor> buildInterceptors(Map<String, Object> agentCard, String agentName) {
+    public List<ClientCallInterceptor> buildInterceptors(AgentCard agentCard, String agentName) {
         List<ClientCallInterceptor> interceptors = new ArrayList<>();
-        Map<String, Object> secSchemes = (Map<String, Object>) agentCard.get("securitySchemes");
-        Object secReqsObj = agentCard.get("securityRequirements");
-        List<Map<String, Object>> secReqs = secReqsObj instanceof List ? (List<Map<String, Object>>) secReqsObj : List.of();
+        Map<String, SecurityScheme> secSchemes = agentCard.securitySchemes();
+        var secReqs = agentCard.securityRequirements();
 
         boolean hasSecurity = secSchemes != null && !secSchemes.isEmpty()
                 && secReqs != null && !secReqs.isEmpty();
@@ -149,10 +149,9 @@ public class AgentAuthManager {
             credSvc = getService(agentName);
         } else {
             log.info("[AuthManager] Agent {}: no security schemes, skipping auth", agentName);
-            Map<String, Object> caps = (Map<String, Object>) agentCard.get("capabilities");
-            List<Map<String, Object>> extensions = caps != null
-                    ? (List<Map<String, Object>>) caps.get("extensions") : List.of();
-            if (extensions == null || extensions.isEmpty()) {
+            if (agentCard.capabilities() == null
+                    || agentCard.capabilities().extensions() == null
+                    || agentCard.capabilities().extensions().isEmpty()) {
                 return interceptors;
             }
         }
@@ -185,21 +184,15 @@ public class AgentAuthManager {
         return interceptors;
     }
 
-    @SuppressWarnings("unchecked")
-    private static List<String> extractExtensionUris(Map<String, Object> agentCard) {
+    private static List<String> extractExtensionUris(AgentCard agentCard) {
         List<String> uris = new ArrayList<>();
-        Map<String, Object> caps = (Map<String, Object>) agentCard.get("capabilities");
-        if (caps == null) {
+        if (agentCard.capabilities() == null) {
             return uris;
         }
-        List<Map<String, Object>> extensions = (List<Map<String, Object>>) caps.get("extensions");
-        if (extensions == null) {
-            return uris;
-        }
-        for (Map<String, Object> ext : extensions) {
-            Object uri = ext.get("uri");
-            if (uri != null && !uri.toString().isEmpty()) {
-                uris.add(uri.toString());
+        for (var ext : agentCard.capabilities().extensions()) {
+            String uri = ext.uri();
+            if (uri != null && !uri.isEmpty()) {
+                uris.add(uri);
             }
         }
         return uris;

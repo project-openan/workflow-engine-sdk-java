@@ -99,13 +99,15 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
 
     @Override
     public Iterable<ClientEvent> sendMessage(
-            Map<String, Object> agentCardMap,
+            AgentCard agentCard,
             org.a2aproject.sdk.spec.MessageSendParams params,
             ClientCallContext callContext,
             Consumer<ClientEvent> eventSink,
             Consumer<String> logSink) {
-        AgentCard agentCard = AgentCardMapper.toSdkAgentCard(agentCardMap);
-        String agentUrl = agentCardMap.get("url") != null ? agentCardMap.get("url").toString() : "?";
+        String agentUrl = "?";
+        if (agentCard.supportedInterfaces() != null && !agentCard.supportedInterfaces().isEmpty()) {
+            agentUrl = agentCard.supportedInterfaces().get(0).url();
+        }
         RestTransportConfig transportConfig = createTransportConfig();
         Client client;
         try {

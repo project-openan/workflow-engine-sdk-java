@@ -20,6 +20,7 @@ package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.model.SendMessageResult;
 import net.openan.a2at.sdk.client.A2ATClient;
+import org.a2aproject.sdk.spec.AgentCard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +47,7 @@ public class AuthorizationTHandler implements ExtensionHandler {
 
     @Override
     public CompletableFuture<Map<String, Object>> beforeSend(
-            Map<String, Object> agentCard,
+            AgentCard agentCard,
             String messageText,
             Map<String, Object> metadata,
             A2ATClient a2atClient,
@@ -58,7 +59,7 @@ public class AuthorizationTHandler implements ExtensionHandler {
     @Override
     @SuppressWarnings("unchecked")
     public CompletableFuture<SendMessageResult> afterReceive(
-            Map<String, Object> agentCard,
+            AgentCard agentCard,
             SendMessageResult result,
             A2ATClient a2atClient,
             Object controlPoint,
@@ -145,8 +146,7 @@ public class AuthorizationTHandler implements ExtensionHandler {
         }
     }
 
-    private static String getAgentName(Map<String, Object> agentCard) {
-        Object name = agentCard.get("name");
-        return name != null ? name.toString() : "";
+    private static String getAgentName(AgentCard agentCard) {
+        return agentCard.name();
     }
 }

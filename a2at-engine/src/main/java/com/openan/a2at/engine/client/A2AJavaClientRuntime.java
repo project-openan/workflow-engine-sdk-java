@@ -19,6 +19,7 @@
 package com.openan.a2at.engine.client;
 
 import org.a2aproject.sdk.client.ClientEvent;
+import org.a2aproject.sdk.spec.AgentCard;
 import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext;
 import org.a2aproject.sdk.spec.MessageSendParams;
 
@@ -52,7 +53,7 @@ public interface A2AJavaClientRuntime {
      * @return an iterable of {@link ClientEvent} produced by the agent
      */
     Iterable<ClientEvent> sendMessage(
-            Map<String, Object> agentCard,
+            AgentCard agentCard,
             MessageSendParams params,
             ClientCallContext callContext,
             Consumer<ClientEvent> eventSink,

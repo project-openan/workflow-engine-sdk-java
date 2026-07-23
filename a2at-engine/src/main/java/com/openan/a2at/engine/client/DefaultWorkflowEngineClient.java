@@ -8,6 +8,9 @@ import com.openan.a2at.engine.model.SendMessageResult;
 import net.openan.a2at.sdk.client.A2ATClient;
 import net.openan.a2at.sdk.client.model.PromptGenerationResult;
 import org.a2aproject.sdk.client.ClientEvent;
+import org.a2aproject.sdk.spec.AgentCard;
+import org.a2aproject.sdk.spec.SecurityScheme;
+import org.a2aproject.sdk.spec.SecurityRequirement;
 import org.a2aproject.sdk.client.MessageEvent;
 import org.a2aproject.sdk.client.TaskEvent;
 import org.a2aproject.sdk.client.TaskUpdateEvent;
@@ -35,7 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(DefaultWorkflowEngineClient.class);
     private static final ObjectMapper mapper = new ObjectMapper();
-    private final Map<String, Object> cardMap = new ConcurrentHashMap<>();
+    private final Map<String, AgentCard> cardMap = new ConcurrentHashMap<>();
     private final A2AJavaClientRuntime a2aClientRuntime;
     private final AgentAuthManager authManager;
     private final ExtensionRegistry extensionRegistry;
@@ -67,9 +70,15 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         this.a2atClient = initA2atClient(config.getA2atEnvPath());
         for (Object card : agentCards) {
-            String name = extractName(card);
-            if (name != null) {
-                cardMap.put(name, card);
+            if (card instanceof AgentCard ac) {
+                cardMap.put(ac.name(), ac);
+            } else if (card instanceof Map<?, ?> map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> cardMap2 = (Map<String, Object>) map;
+                AgentCard ac = AgentCardMapper.toSdkAgentCard(cardMap2);
+                if (!ac.name().isEmpty()) {
+                    cardMap.put(ac.name(), ac);
+                }
             }
         }
         this.maxNegotiationRounds = config.getMaxNegotiationRounds();
@@ -94,18 +103,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private String extractName(Object card) {
-        if (card instanceof Map) {
-            Object name = ((Map<String, Object>) card).get("name");
-            return name != null ? name.toString() : null;
-        }
-        try {
-            return (String) card.getClass().getMethod("getName").invoke(card);
-        } catch (Exception e) {
-            return null;
-        }
-    }
+
 
     @Override
     public void setEventCallback(EventCallback callback) {
@@ -132,7 +130,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     @Override
     public CompletableFuture<SendMessageResult> sendMessage(
             String agentName, String message, String contextId, Map<String, Object> metadata) {
-        Object agentCard = cardMap.get(agentName);
+        AgentCard agentCard = cardMap.get(agentName);
         if (agentCard == null) {
             log.error("[EngineClient] Agent not found: {}", agentName);
             return CompletableFuture.failedFuture(new RuntimeException("Agent not found: " + agentName));
@@ -163,7 +161,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     @Override
     public CompletableFuture<SendMessageResult> sendExtensionMessage(
             String agentName, String instruction, String naturalLanguageInput, String extensionUri) {
-        Object agentCard = cardMap.get(agentName);
+        AgentCard agentCard = cardMap.get(agentName);
         if (agentCard == null) {
             log.error("[EngineClient] Agent not found: {}", agentName);
             return CompletableFuture.failedFuture(new RuntimeException("Agent not found: " + agentName));
@@ -212,60 +210,51 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         return null;
     }
-    @SuppressWarnings("unchecked")
     private CompletableFuture<Map<String, Object>> runBeforeSendHandlers(
-            Object agentCard, String message, Map<String, Object> presetMetadata) {
+            AgentCard agentCard, String message, Map<String, Object> presetMetadata) {
         Map<String, Object> metadata = presetMetadata != null
                 ? new HashMap<>(presetMetadata) : new HashMap<>();
-        Map<String, Object> cardAsMap = toMap(agentCard);
-        List<String> extUris = extractExtensionUris(cardAsMap);
+        List<String> extUris = extractExtensionUris(agentCard);
         List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
-        log.debug("[EngineClient] beforeSend handlers for '{}': {}", cardAsMap.get("name"),
+        log.debug("[EngineClient] beforeSend handlers for '{}': {}", agentCard.name(),
                 handlers.stream().map(ExtensionHandler::extensionKeyword).toList());
         CompletableFuture<Map<String, Object>> future = CompletableFuture.completedFuture(metadata);
         for (ExtensionHandler handler : handlers) {
-            future = future.thenCompose(m -> handler.beforeSend(cardAsMap, message, m, a2atClient, controlPoint));
+            future = future.thenCompose(m -> handler.beforeSend(agentCard, message, m, a2atClient, controlPoint));
         }
         return future;
     }
-    @SuppressWarnings("unchecked")
-    private CompletableFuture<SendMessageResult> runAfterReceiveHandlers(Object agentCard, SendMessageResult result) {
-        Map<String, Object> cardAsMap = toMap(agentCard);
-        List<String> extUris = extractExtensionUris(cardAsMap);
+    private CompletableFuture<SendMessageResult> runAfterReceiveHandlers(AgentCard agentCard, SendMessageResult result) {
+        List<String> extUris = extractExtensionUris(agentCard);
         List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
-        log.debug("[EngineClient] afterReceive handlers for '{}': {}", cardAsMap.get("name"),
+        log.debug("[EngineClient] afterReceive handlers for '{}': {}", agentCard.name(),
                 handlers.stream().map(ExtensionHandler::extensionKeyword).toList());
         CompletableFuture<SendMessageResult> future = CompletableFuture.completedFuture(result);
         for (ExtensionHandler handler : handlers) {
-            future = future.thenCompose(r -> handler.afterReceive(cardAsMap, r, a2atClient, controlPoint, eventCallback));
+            future = future.thenCompose(r -> handler.afterReceive(agentCard, r, a2atClient, controlPoint, eventCallback));
         }
         return future;
     }
-    @SuppressWarnings("unchecked")
-    private List<String> extractExtensionUris(Map<String, Object> agentCard) {
+    private List<String> extractExtensionUris(AgentCard agentCard) {
         List<String> uris = new ArrayList<>();
-        Map<String, Object> caps = (Map<String, Object>) agentCard.get("capabilities");
-        if (caps == null) return uris;
-        List<Map<String, Object>> extensions = (List<Map<String, Object>>) caps.get("extensions");
-        if (extensions == null) return uris;
-        for (Map<String, Object> ext : extensions) {
-            Object uri = ext.get("uri");
-            if (uri != null && !uri.toString().isEmpty()) uris.add(uri.toString());
+        if (agentCard.capabilities() == null) return uris;
+        for (var ext : agentCard.capabilities().extensions()) {
+            String uri = ext.uri();
+            if (uri != null && !uri.isEmpty()) uris.add(uri);
         }
         return uris;
     }
     // --- Core A2A send via SDK runtime ---
     protected CompletableFuture<SendMessageResult> doSendViaA2ARuntime(
-            Object agentCard, String agentName, String message,
+            AgentCard agentCard, String agentName, String message,
             String contextId, Map<String, Object> metadata) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                Map<String, Object> cardAsMap = toMap(agentCard);
                 MessageSendParams params = buildMessageSendParams(message, contextId, metadata);
-                ClientCallContext callContext = buildClientCallContext(cardAsMap, agentName, metadata);
+                ClientCallContext callContext = buildClientCallContext(agentCard, agentName, metadata);
                 log.info("[EngineClient] Sending via A2A SDK to {}", agentName);
                 Iterable<ClientEvent> events = a2aClientRuntime.sendMessage(
-                        cardAsMap, params, callContext,
+                        agentCard, params, callContext,
                         event -> forwardIntermediateEvent(event, agentName),
                         s -> log.info("[A2A] {}", s));
                 String responseText = extractResponseText(events);
@@ -295,10 +284,10 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         return MessageSendParams.builder().message(msg).build();
     }
     @SuppressWarnings("unchecked")
-    private ClientCallContext buildClientCallContext(Map<String, Object> cardAsMap, String agentName, Map<String, Object> messageMetadata) {
+    private ClientCallContext buildClientCallContext(AgentCard agentCard, String agentName, Map<String, Object> messageMetadata) {
         Map<String, String> headers = new HashMap<>();
-        applyAuthHeaders(cardAsMap, agentName, headers);
-        List<ClientCallInterceptor> interceptors = authManager.buildInterceptors(cardAsMap, agentName);
+        applyAuthHeaders(agentCard, agentName, headers);
+        List<ClientCallInterceptor> interceptors = authManager.buildInterceptors(agentCard, agentName);
         for (ClientCallInterceptor interceptor : interceptors) {
             if (interceptor instanceof ExtensionInterceptor extInterceptor) {
                 try {
@@ -435,7 +424,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     }
     // --- autoNegotiate ---
     private CompletableFuture<SendMessageResult> autoNegotiate(
-            Object agentCard, String agentName, String originalMessage,
+            AgentCard agentCard, String agentName, String originalMessage,
             String contextId, SendMessageResult result, int round) {
         if (!isNegotiationNeeded(result) || round > maxNegotiationRounds) {
             emit(EventType.AGENT_RESPONSE, Map.of("agent", agentName, "response", result.getText()));
@@ -479,20 +468,18 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         return result.getTaskState() != null && result.getTaskState().contains("INPUT_REQUIRED");
     }
     // --- auth headers ---
-    @SuppressWarnings("unchecked")
-    private void applyAuthHeaders(Map<String, Object> cardAsMap, String agentName, Map<String, String> headerMap) {
+    private void applyAuthHeaders(AgentCard agentCard, String agentName, Map<String, String> headerMap) {
         AgentCredentialService credSvc = authManager.getService(agentName);
         if (credSvc == null) return;
         Map<String, Map<String, Object>> schemeConfigs = authManager.getConfig(agentName);
         if (schemeConfigs == null) schemeConfigs = Map.of();
-        Map<String, Object> secSchemes = (Map<String, Object>) cardAsMap.get("securitySchemes");
-        Object secReqsObj = cardAsMap.get("securityRequirements");
-        List<Map<String, Object>> secReqs = secReqsObj instanceof List ? (List<Map<String, Object>>) secReqsObj : List.of();
-        if (secSchemes == null || secSchemes.isEmpty() || secReqs.isEmpty()) return;
-        for (Map<String, Object> req : secReqs) {
-            Object schemes = req.get("schemes");
-            if (schemes instanceof Map) {
-                for (String schemeName : ((Map<String, Object>) schemes).keySet()) {
+        Map<String, SecurityScheme> secSchemes = agentCard.securitySchemes();
+        List<SecurityRequirement> secReqs = agentCard.securityRequirements();
+        if (secSchemes == null || secSchemes.isEmpty() || secReqs == null || secReqs.isEmpty()) return;
+        for (SecurityRequirement req : secReqs) {
+            Map<String, List<String>> schemes = req.schemes();
+            if (schemes != null) {
+                for (String schemeName : schemes.keySet()) {
                     Map<String, Object> schemeCfg = schemeConfigs.getOrDefault(schemeName, Map.of());
                     String credential = credSvc.getCredential(schemeName, null);
                     if (credential == null) continue;
@@ -513,15 +500,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
     }
     // --- utility ---
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> toMap(Object card) {
-        if (card instanceof Map) return (Map<String, Object>) card;
-        try {
-            return mapper.convertValue(card, Map.class);
-        } catch (Exception e) {
-            return Map.of();
-        }
-    }
+
     @Override
     public void close() {
         log.info("[EngineClient] Closing");
@@ -531,8 +510,13 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     public void updateAgentCards(List<?> agentCards) {
         cardMap.clear();
         for (Object card : agentCards) {
-            String name = extractName(card);
-            if (name != null) cardMap.put(name, card);
+            if (card instanceof AgentCard ac) {
+                cardMap.put(ac.name(), ac);
+            } else if (card instanceof Map<?, ?> map) {
+                @SuppressWarnings("unchecked")
+                AgentCard ac = AgentCardMapper.toSdkAgentCard((Map<String, Object>) map);
+                if (!ac.name().isEmpty()) cardMap.put(ac.name(), ac);
+            }
         }
         log.info("[EngineClient] Updated agent cards: {} agent(s)", cardMap.size());
     }

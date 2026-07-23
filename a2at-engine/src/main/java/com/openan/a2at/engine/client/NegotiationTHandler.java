@@ -20,6 +20,7 @@ package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.model.SendMessageResult;
 import net.openan.a2at.sdk.client.A2ATClient;
+import org.a2aproject.sdk.spec.AgentCard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +47,7 @@ public class NegotiationTHandler implements ExtensionHandler {
 
     @Override
     public CompletableFuture<Map<String, Object>> beforeSend(
-            Map<String, Object> agentCard,
+            AgentCard agentCard,
             String messageText,
             Map<String, Object> metadata,
             A2ATClient a2atClient,
@@ -58,7 +59,7 @@ public class NegotiationTHandler implements ExtensionHandler {
     @Override
     @SuppressWarnings("unchecked")
     public CompletableFuture<SendMessageResult> afterReceive(
-            Map<String, Object> agentCard,
+            AgentCard agentCard,
             SendMessageResult result,
             A2ATClient a2atClient,
             Object controlPoint,
@@ -126,7 +127,7 @@ public class NegotiationTHandler implements ExtensionHandler {
         return null;
     }
 
-    @SuppressWarnings("unchecked")
+
     private static String extractNegotiationText(Map<String, Object> metadata) {
         if (metadata == null) {
             return null;
@@ -141,18 +142,12 @@ public class NegotiationTHandler implements ExtensionHandler {
         return null;
     }
 
-    @SuppressWarnings("unchecked")
-    private static boolean supportsNegotiation(Map<String, Object> agentCard) {
-        Map<String, Object> caps = (Map<String, Object>) agentCard.get("capabilities");
-        if (caps == null) {
+    private static boolean supportsNegotiation(AgentCard agentCard) {
+        if (agentCard.capabilities() == null) {
             return false;
         }
-        List<Map<String, Object>> extensions = (List<Map<String, Object>>) caps.get("extensions");
-        if (extensions == null) {
-            return false;
-        }
-        for (Map<String, Object> ext : extensions) {
-            String uri = (String) ext.get("uri");
+        for (var ext : agentCard.capabilities().extensions()) {
+            String uri = ext.uri();
             if (uri != null && uri.contains("NEGOTIATION-T")) {
                 return true;
             }
@@ -160,8 +155,7 @@ public class NegotiationTHandler implements ExtensionHandler {
         return false;
     }
 
-    private static String getAgentName(Map<String, Object> agentCard) {
-        Object name = agentCard.get("name");
-        return name != null ? name.toString() : "?";
+    private static String getAgentName(AgentCard agentCard) {
+        return agentCard.name();
     }
 }

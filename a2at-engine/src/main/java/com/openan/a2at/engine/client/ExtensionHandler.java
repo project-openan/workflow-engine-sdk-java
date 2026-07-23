@@ -19,6 +19,7 @@
 package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.model.SendMessageResult;
+import org.a2aproject.sdk.spec.AgentCard;
 import net.openan.a2at.sdk.client.A2ATClient;
 
 import java.util.Map;
@@ -50,7 +51,7 @@ public interface ExtensionHandler {
      * @return updated metadata
      */
     CompletableFuture<Map<String, Object>> beforeSend(
-            Map<String, Object> agentCard,
+            AgentCard agentCard,
             String messageText,
             Map<String, Object> metadata,
             A2ATClient a2atClient,
@@ -69,7 +70,7 @@ public interface ExtensionHandler {
      * @return updated result
      */
     CompletableFuture<SendMessageResult> afterReceive(
-            Map<String, Object> agentCard,
+            AgentCard agentCard,
             SendMessageResult result,
             A2ATClient a2atClient,
             Object controlPoint,

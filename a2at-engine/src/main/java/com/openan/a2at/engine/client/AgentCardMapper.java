@@ -24,8 +24,14 @@ import org.a2aproject.sdk.spec.AgentExtension;
 import org.a2aproject.sdk.spec.AgentInterface;
 import org.a2aproject.sdk.spec.AgentProvider;
 import org.a2aproject.sdk.spec.AgentSkill;
+import org.a2aproject.sdk.spec.HTTPAuthSecurityScheme;
+import org.a2aproject.sdk.spec.SecurityScheme;
+import org.a2aproject.sdk.spec.SecurityRequirement;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map;
 
 /**
@@ -56,6 +62,35 @@ public final class AgentCardMapper {
                 : List.of();
         List<Map<String, Object>> skills = (List<Map<String, Object>>) card.getOrDefault("skills", List.of());
         List<Map<String, Object>> ifaces = (List<Map<String, Object>>) card.getOrDefault("supportedInterfaces", List.of());
+        // Convert security schemes from raw maps to SDK types
+        Map<String, Object> rawSecSchemes = (Map<String, Object>) card.get("securitySchemes");
+        Object rawSecReqs = card.get("securityRequirements");
+        Map<String, SecurityScheme> secSchemesMap = new LinkedHashMap<>();
+        if (rawSecSchemes != null) {
+            for (var entry : rawSecSchemes.entrySet()) {
+                String schemeName = entry.getKey();
+                Object schemeObj = entry.getValue();
+                if (schemeObj instanceof Map<?, ?> sm && sm.get("httpAuthSecurityScheme") instanceof Map<?, ?> httpAuth) {
+                    secSchemesMap.put(schemeName,
+                            new HTTPAuthSecurityScheme(
+                                    str(httpAuth.get("description")),
+                                    null,
+                                    str(httpAuth.get("scheme"))));
+                }
+            }
+        }
+        List<SecurityRequirement> secReqsList = new ArrayList<>();
+        if (rawSecReqs instanceof List<?> reqList) {
+            for (Object item : reqList) {
+                if (item instanceof Map<?, ?> req && req.get("schemes") instanceof Map<?, ?> schemes) {
+                    Map<String, List<String>> schemesMap = new LinkedHashMap<>();
+                    for (var se : schemes.entrySet()) {
+                        schemesMap.put(String.valueOf(se.getKey()), List.of());
+                    }
+                    secReqsList.add(new SecurityRequirement(schemesMap));
+                }
+            }
+        }
         return new AgentCard(
                 str(card.get("name")),
                 str(card.get("description")),
@@ -77,8 +112,8 @@ public final class AgentCardMapper {
                                 str(s.get("id")), str(s.get("name")), str(s.get("description")),
                                 strList(s.get("tags")), List.of(), List.of(), List.of(), List.of()))
                         .toList(),
-                Map.of(),
-                List.of(),
+                secSchemesMap,
+                secReqsList,
                 null,
                 ifaces.stream()
                         .map(i -> new AgentInterface(
