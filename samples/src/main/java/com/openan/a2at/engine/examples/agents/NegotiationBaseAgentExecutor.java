@@ -72,15 +72,19 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
         String taskId = ctx.getTaskId();
         String contextId = ctx.getContextId();
         String input = extractText(ctx.getMessage());
-        log.info("[{}] Received task: taskId={}, text={} chars, followUp={}",
+        log.info("[{}] Received task: taskId={}, text={} chars, followUp={}, prePositioned={}",
                 getClass().getSimpleName(), taskId, input.length(),
-                NegotiationUtils.isFollowUpTask(input));
+                NegotiationUtils.isFollowUpTask(input),
+                detectPrePositionedExtension(ctx) != null);
 
         emitter.submit(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Task received"));
         emitter.startWork(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Processing"));
 
         try {
-            if (NegotiationUtils.isFollowUpTask(input)) {
+            String prePositionedExt = detectPrePositionedExtension(ctx);
+            if (prePositionedExt != null) {
+                handlePrePositionedExtension(ctx, emitter, prePositionedExt);
+            } else if (NegotiationUtils.isFollowUpTask(input)) {
                 handleFollowUp(ctx, emitter, input);
             } else {
                 handleNewTask(ctx, emitter, input);
@@ -89,6 +93,52 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
             log.error("[{}] execute failed: {}", getClass().getSimpleName(), e.getMessage(), e);
             emitter.fail(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Failed: " + e.getMessage()));
         }
+    }
+
+    /**
+     * Detect whether the incoming message carries an Authorization-T or
+     * Notification-T extension in its metadata (pre-positioning message).
+     * Returns the extension keyword ("Authorization-T" or "Notification-T"),
+     * or null if this is a normal task message.
+     */
+    private static String detectPrePositionedExtension(RequestContext ctx) {
+        Message msg = ctx.getMessage();
+        if (msg == null || msg.metadata() == null) {
+            return null;
+        }
+        for (String key : msg.metadata().keySet()) {
+            if (key.contains("Authorization-T")) {
+                return "Authorization-T";
+            }
+            if (key.contains("Notification-T")) {
+                return "Notification-T";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Handle a pre-positioned Authorization-T or Notification-T message:
+     * acknowledge receipt and complete immediately (no negotiation, no business).
+     */
+    private void handlePrePositionedExtension(
+            RequestContext ctx, AgentEmitter emitter, String extKeyword) {
+        String taskId = ctx.getTaskId();
+        String contextId = ctx.getContextId();
+        Object payload = ctx.getMessage().metadata().entrySet().stream()
+                .filter(e -> e.getKey().contains(extKeyword))
+                .map(Map.Entry::getValue)
+                .findFirst().orElse("");
+        log.info("[{}] Pre-positioned {} received, payload length={}",
+                getClass().getSimpleName(), extKeyword,
+                payload instanceof String s ? s.length() : String.valueOf(payload).length());
+        String ackText = extKeyword + " pre-positioning acknowledged";
+        List<Part<?>> parts = List.of(new TextPart(ackText));
+        emitter.addArtifact(parts, "result", getClass().getSimpleName() + " ack", Map.of(), false, true);
+        emitStatus(emitter, TaskState.TASK_STATE_COMPLETED, contextId, taskId,
+                extKeyword + " pre-positioned successfully", Map.of());
+        emitter.complete(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Completed"));
+        log.info("[{}] {} pre-positioning completed", getClass().getSimpleName(), extKeyword);
     }
 
     /** New task: start negotiation and request input. Business runs on the follow-up. */

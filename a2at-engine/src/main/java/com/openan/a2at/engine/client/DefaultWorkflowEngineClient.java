@@ -151,6 +151,33 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                             .thenCompose(result -> autoNegotiate(agentCard, agentName, message, ctx, result, 1));
                 });
     }
+
+    /**
+     * One-shot extension message for pre-positioning (Authorization-T,
+     * Notification-T). Bypasses Task-T prompt generation and Negotiation-T
+     * auto-loop — the metadata is sent as-is via A2A message:stream.
+     */
+    @Override
+    public CompletableFuture<SendMessageResult> sendExtensionMessage(
+            String agentName, String message, Map<String, Object> metadata) {
+        Object agentCard = cardMap.get(agentName);
+        if (agentCard == null) {
+            log.error("[EngineClient] Agent not found: {}", agentName);
+            return CompletableFuture.failedFuture(new RuntimeException("Agent not found: " + agentName));
+        }
+        log.info("[EngineClient] sendExtensionMessage to {}: {} metadata key(s)", agentName,
+                metadata != null ? metadata.size() : 0);
+        emit(EventType.AGENT_REQUEST, Map.of(
+                "agent", agentName,
+                "request", message,
+                "metadata", metadata != null ? metadata : Map.of()));
+        return doSendViaA2ARuntime(agentCard, agentName, message, this.contextId, metadata)
+                .thenApply(result -> {
+                    emit(EventType.AGENT_RESPONSE, Map.of("agent", agentName, "response", result.getText()));
+                    log.info("[EngineClient] Extension response from {}: state={}", agentName, result.getTaskState());
+                    return result;
+                });
+    }
     @SuppressWarnings("unchecked")
     private CompletableFuture<Map<String, Object>> runBeforeSendHandlers(
             Object agentCard, String message, Map<String, Object> presetMetadata) {

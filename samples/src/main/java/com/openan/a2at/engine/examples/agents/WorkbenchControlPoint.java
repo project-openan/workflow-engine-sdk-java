@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ControlPoint for the SPN cross-city diagnosis workflow.
@@ -29,8 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class WorkbenchControlPoint extends DefaultControlPoint {
     private static final Logger log = LoggerFactory.getLogger(WorkbenchControlPoint.class);
 
-    private final AtomicBoolean authorizationCalled = new AtomicBoolean(false);
-    private final AtomicBoolean notificationCalled = new AtomicBoolean(false);
 
     private final String a2atEnvPath;
 
@@ -42,8 +39,6 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
         this.a2atEnvPath = a2atEnvPath != null ? a2atEnvPath : StartAgentsServer.resolveEnvPath();
     }
 
-    public boolean wasAuthorizationCalled() { return authorizationCalled.get(); }
-    public boolean wasNotificationCalled() { return notificationCalled.get(); }
 
     @Override
     public CompletableFuture<TaskResponse> onTask(
@@ -118,20 +113,4 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
         return CompletableFuture.completedFuture(clarification);
     }
 
-    @Override
-    public CompletableFuture<Boolean> onAuthorization(
-            String agentName, Map<String, Object> authRequest) {
-        authorizationCalled.set(true);
-        log.info("[onAuthorization] agent={}, repair_plan={}, risk={}",
-                agentName, authRequest.get("repair_plan"), authRequest.get("risk_level"));
-        return CompletableFuture.completedFuture(true);
-    }
-
-    @Override
-    public CompletableFuture<Void> onNotification(
-            String agentName, Map<String, Object> notification) {
-        notificationCalled.set(true);
-        log.info("[onNotification] {} reports: {}", agentName, notification.get("message"));
-        return CompletableFuture.completedFuture(null);
-    }
 }

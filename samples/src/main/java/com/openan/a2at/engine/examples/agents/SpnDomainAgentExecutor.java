@@ -9,7 +9,6 @@ import org.a2aproject.sdk.spec.TextPart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,9 +18,10 @@ import java.util.Map;
  * <p>Server-side negotiation-capable (extends {@link NegotiationBaseAgentExecutor}):
  * on a new task it replies INPUT_REQUIRED to start a Negotiation-T round, and on
  * the follow-up it runs the diagnosis/recovery business. Shanghai side has a
- * FAULT (port Down, optical power -28dBm). Diagnosis injects Authorization-T;
- * recovery injects Notification-T. Diagnosis/recovery text is LLM-generated
- * (deepseek) when the A2A-T .env is configured, else deterministic.
+ * FAULT (port Down, optical power -28dBm). Diagnosis/recovery text is
+ * LLM-generated (deepseek) when the A2A-T .env is configured, else deterministic.
+ * Authorization-T and Notification-T are pre-positioned before the workflow
+ * starts, so this agent no longer injects them in response metadata.
  */
 public class SpnDomainAgentExecutor extends NegotiationBaseAgentExecutor {
     private static final Logger log = LoggerFactory.getLogger(SpnDomainAgentExecutor.class);
@@ -72,28 +72,6 @@ public class SpnDomainAgentExecutor extends NegotiationBaseAgentExecutor {
                 BaseAgentExecutor.buildStatusMessage(contextId, taskId, "诊断中间结果：光功率-28dBm严重低于阈值，疑似光模块故障"));
         sleepBriefly();
         return llmDiagnosisResult(input, FAULT_DIAGNOSIS_RESULT);
-    }
-
-    @Override
-    protected Map<String, Object> buildResponseMetadata(RequestContext ctx, String response) {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        boolean isRecovery = response.contains("抢通") || response.contains("恢复Up")
-                || response.contains("recovery");
-        if (isRecovery) {
-            metadata.put("Notification-T", Map.of(
-                    "topic", "recovery_result",
-                    "status", "recovery_successful",
-                    "message", RECOVERY_RESULT));
-            log.info("[SPN-Domain-Agent] Injected Notification-T: recovery_successful");
-        } else {
-            metadata.put("Authorization-T", Map.of(
-                    "needs_authorization", true,
-                    "repair_plan", "更换上海OMC端口光模块，恢复端口Down状态",
-                    "risk_level", "medium",
-                    "affected_service", "客户A上海-广州间SPN专线"));
-            log.info("[SPN-Domain-Agent] Injected Authorization-T: needs_authorization=true");
-        }
-        return metadata;
     }
 
     @Override

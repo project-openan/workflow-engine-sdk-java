@@ -9,7 +9,6 @@ import org.a2aproject.sdk.spec.TextPart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,8 +16,9 @@ import java.util.Map;
  * SPN Domain Agent for City2 (Guangzhou OMC).
  *
  * <p>Server-side negotiation-capable (extends {@link NegotiationBaseAgentExecutor}).
- * Guangzhou side is NORMAL. Recovery injects Notification-T. Diagnosis text is
- * LLM-generated when the A2A-T .env is configured, else deterministic.
+ * Guangzhou side is NORMAL. Diagnosis/recovery text is LLM-generated when
+ * the A2A-T .env is configured, else deterministic. Authorization-T and
+ * Notification-T are pre-positioned before the workflow starts.
  */
 public class SpnDomainAgentCity2Executor extends NegotiationBaseAgentExecutor {
     private static final Logger log = LoggerFactory.getLogger(SpnDomainAgentCity2Executor.class);
@@ -62,21 +62,6 @@ public class SpnDomainAgentCity2Executor extends NegotiationBaseAgentExecutor {
                 BaseAgentExecutor.buildStatusMessage(contextId, taskId, "广州侧诊断中间结果：端口正常，光功率正常，无异常告警"));
         sleepBriefly();
         return llmDiagnosisResult(input, NORMAL_DIAGNOSIS_RESULT);
-    }
-
-    @Override
-    protected Map<String, Object> buildResponseMetadata(RequestContext ctx, String response) {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        boolean isRecovery = response.contains("抢通") || response.contains("业务恢复")
-                || response.contains("recovery");
-        if (isRecovery) {
-            metadata.put("Notification-T", Map.of(
-                    "topic", "recovery_result",
-                    "status", "recovery_successful",
-                    "message", RECOVERY_RESULT));
-            log.info("[SPN-Domain-Agent-City2] Injected Notification-T: recovery_successful");
-        }
-        return metadata;
     }
 
     @Override

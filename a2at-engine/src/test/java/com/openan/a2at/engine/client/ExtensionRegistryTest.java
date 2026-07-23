@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ExtensionRegistryTest {
 
     @Test
-    void preRegistersFourBuiltinHandlers() {
+    void preRegistersTwoBuiltinHandlers() {
         ExtensionRegistry reg = new ExtensionRegistry();
         List<ExtensionHandler> handlers = reg.getHandlersForExtensions(List.of(
                 "https://example.com/Task-T",
@@ -20,7 +20,9 @@ class ExtensionRegistryTest {
                 "https://example.com/Authorization-T",
                 "https://example.com/Notification-T"
         ));
-        assertEquals(4, handlers.size());
+        // Authorization-T and Notification-T are pre-positioning operations,
+        // not part of the workflow engine's extension handler chain.
+        assertEquals(2, handlers.size());
     }
 
     @Test

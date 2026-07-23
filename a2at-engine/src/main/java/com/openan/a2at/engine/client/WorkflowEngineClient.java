@@ -29,6 +29,21 @@ public interface WorkflowEngineClient {
         return sendMessage(agentName, message, null, null);
     }
 
+    /**
+     * Send a one-shot extension message (e.g. Authorization-T pre-positioning,
+     * Notification-T subscription) to an agent. This bypasses the Task-T
+     * prompt generation and Negotiation-T auto-loop — the metadata is sent
+     * as-is. Used for pre-positioning operations done before the workflow starts.
+     *
+     * @param agentName  target agent name
+     * @param message    short instruction text
+     * @param metadata   extension metadata (keyed by full extension URI)
+     */
+    default CompletableFuture<SendMessageResult> sendExtensionMessage(
+            String agentName, String message, Map<String, Object> metadata) {
+        return sendMessage(agentName, message, null, metadata);
+    }
+
     void setControlPoint(Object controlPoint);
     void setEventCallback(EventCallback callback);
     void close();

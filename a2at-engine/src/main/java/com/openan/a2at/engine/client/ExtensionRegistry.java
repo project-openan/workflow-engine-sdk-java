@@ -29,8 +29,11 @@ import java.util.Map;
 /**
  * Registry of A2A-T extension handlers.
  *
- * <p>Mirrors the Python SDK's {@code ExtensionRegistry}. Pre-registers
- * Task-T, Negotiation-T, Authorization-T, and Notification-T handlers.
+ * <p>The workflow engine only handles Task-T (task prompt generation)
+ * and Negotiation-T (auto negotiation loop). Authorization-T and
+ * Notification-T are pre-positioning operations done once before the
+ * workflow starts (see {@link WorkflowEngineClient#sendExtensionMessage}),
+ * so they are NOT part of the workflow's extension handler chain.
  */
 public class ExtensionRegistry {
 
@@ -41,8 +44,6 @@ public class ExtensionRegistry {
     public ExtensionRegistry() {
         register(new TaskTHandler());
         register(new NegotiationTHandler());
-        register(new AuthorizationTHandler());
-        register(new NotificationTHandler());
     }
 
     public void register(ExtensionHandler handler) {

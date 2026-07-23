@@ -5,6 +5,9 @@ import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.ExecutionResult;
 import com.openan.a2at.engine.model.Workflow;
 import com.openan.a2at.engine.model.WorkflowSearchResult;
+import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
+import com.openan.a2at.engine.client.WorkflowEngineClient;
+import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.registry.LoadPsop;
 import com.openan.a2at.engine.runner.ExecutePsop;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -108,11 +111,29 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
         Workflow workflow = LoadPsop.load(orchUrl, psopId, null, sslVerify);
         log.info("[Workbench-Agent] Workflow: {} ({} steps)", workflow.getName(), workflow.getSteps().size());
 
+        // Create engine client explicitly so we can pre-position extensions
+        // (Authorization-T + Notification-T) before starting the workflow.
+        WorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(
+                agentCards, null,
+                WorkflowEngineClientConfig.builder()
+                        .sslVerify(sslVerify)
+                        .a2atEnvPath(a2atEnvPath)
+                        .credentialsConfigPath(credentialsPath)
+                        .build());
+
+        // Pre-position Authorization-T and Notification-T to all SPN agents.
+        // These are one-shot operations: the workbench sends the authorization
+        // policy and notification subscription upfront. The act of sending
+        // the Authorization-T message means the policies are default-approved
+        // (whitelist authorization, no customer takeover needed).
+        prePositionExtensions(engineClient, agentCards);
+
         WorkbenchControlPoint controlPoint = new WorkbenchControlPoint(a2atEnvPath);
         ExecutionResult result = ExecutePsop.builder()
                 .psop(workflow)
                 .agentCards(agentCards)
                 .controlPoint(controlPoint)
+                .engineClient(engineClient)
                 .runtimeIntent(messageText)
                 .lang("zh")
                 .sslVerify(sslVerify)
@@ -127,6 +148,43 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
                 .join();
 
         return buildResultText(result, controlPoint);
+    }
+
+    private static void prePositionExtensions(WorkflowEngineClient engineClient,
+                                               List<Map<String, Object>> agentCards) {
+        String authUri = "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1";
+        String notifUri = "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1";
+        String authPayload =
+                "## 任务类型 新增授权\n" +
+                "## 操作授权规则列表\n" +
+                "- 操作名称：业务抢通\n" +
+                "- 操作类型：光模块更换/隧道调优\n" +
+                "- 操作对象：SPN专线业务\n" +
+                "- 授权策略：OMC自动执行\n" +
+                "- 触发执行条件：业务投诉诊断确认故障\n" +
+                "## 预期输出\n返回是否设置成功";
+        String notifPayload =
+                "## 通知主题\nservice-recovery-execution-result\n" +
+                "## 上报通知数据格式\n" +
+                "1. 专线业务投诉诊断任务标识\n" +
+                "2. 业务抢通方案是否执行成功\n" +
+                "3. 业务抢通方案执行结束时间\n" +
+                "4. 业务抢通方案名称\n" +
+                "5. 业务抢通方案详情\n" +
+                "## 预期输出\n订阅结果";
+        for (Map<String, Object> card : agentCards) {
+            String name = String.valueOf(card.get("name"));
+            if (name == null || name.contains("Workbench")) {
+                continue;
+            }
+            log.info("[Workbench-Agent] Pre-positioning Authorization-T to {}", name);
+            engineClient.sendExtensionMessage(name, "下发授权放行策略",
+                    Map.of(authUri, authPayload)).join();
+            log.info("[Workbench-Agent] Pre-positioning Notification-T to {}", name);
+            engineClient.sendExtensionMessage(name, "订阅业务抢通结果通知",
+                    Map.of(notifUri, notifPayload)).join();
+        }
+        log.info("[Workbench-Agent] Extension pre-positioning complete");
     }
 
     private static List<Map<String, Object>> loadAgentCardsFromConfig() {
@@ -172,8 +230,7 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
         if (result.getError() != null) {
             sb.append("Error: ").append(result.getError());
         }
-        sb.append("\nAuthorization triggered: ").append(controlPoint.wasAuthorizationCalled());
-        sb.append(", Notification received: ").append(controlPoint.wasNotificationCalled());
+        sb.append("\nPre-positioned Authorization-T + Notification-T before workflow");
         return sb.toString();
     }
 
