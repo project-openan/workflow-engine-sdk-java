@@ -5,6 +5,8 @@ import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.model.SendMessageResult;
+import net.openan.a2at.sdk.client.A2ATClient;
+import net.openan.a2at.sdk.client.model.PromptGenerationResult;
 import org.a2aproject.sdk.client.ClientEvent;
 import org.a2aproject.sdk.client.MessageEvent;
 import org.a2aproject.sdk.client.TaskEvent;
@@ -37,7 +39,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private final A2AJavaClientRuntime a2aClientRuntime;
     private final AgentAuthManager authManager;
     private final ExtensionRegistry extensionRegistry;
-    private final Object a2atClient;
+    private final A2ATClient a2atClient;
     private final boolean sslVerify;
     private final String contextId;
     private EventCallback eventCallback = new EventCallback();
@@ -80,14 +82,12 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 WorkflowEngineClientConfig.builder().sslVerify(false).build());
     }
 
-    private Object initA2atClient(String a2atEnvPath) {
+    private A2ATClient initA2atClient(String a2atEnvPath) {
         if (a2atEnvPath == null || a2atEnvPath.isEmpty()) {
             return null;
         }
         try {
-            Class<?> a2atClientClass = Class.forName("net.openan.a2at.sdk.client.A2ATClient");
-            java.nio.file.Path envPath = java.nio.file.Path.of(a2atEnvPath);
-            return a2atClientClass.getConstructor(java.nio.file.Path.class).newInstance(envPath);
+            return new A2ATClient(java.nio.file.Path.of(a2atEnvPath));
         } catch (Exception e) {
             log.warn("Failed to init A2ATClient: {}", e.getMessage());
             return null;
@@ -202,12 +202,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             return null;
         }
         try {
-            Object result = a2atClient.getClass()
-                    .getMethod("generateTaskPrompt", Object.class)
-                    .invoke(a2atClient, naturalLanguageInput);
-            Boolean success = (Boolean) result.getClass().getMethod("success").invoke(result);
-            if (Boolean.TRUE.equals(success)) {
-                return (String) result.getClass().getMethod("promptText").invoke(result);
+            PromptGenerationResult result = a2atClient.generateTaskPrompt(naturalLanguageInput);
+            if (result.success()) {
+                return result.promptText();
             }
             log.warn("[EngineClient] SDK prompt generation failed for input: {}", naturalLanguageInput);
         } catch (Exception e) {
@@ -321,8 +318,8 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         if (event instanceof TaskUpdateEvent tue) {
            if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
                String state = sue.status().state().name();
-                StringBuilder statusText = new StringBuilder();
-                extractTextFromMessage(sue.status().message(), statusText);
+               StringBuilder statusText = new StringBuilder();
+               extractTextFromMessage(sue.status().message(), statusText);
                Map<String, Object> data = new HashMap<>();
                data.put("agent", agentName);
                data.put("state", state);
@@ -543,7 +540,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     public void registerHandler(ExtensionHandler handler) {
         extensionRegistry.register(handler);
     }
-    public Object getA2atClient() { return a2atClient; }
+    public A2ATClient getA2atClient() { return a2atClient; }
     public static Map<String, Object> normalizeAgentDict(Map<String, Object> agentDict) {
         return AgentCardNormalizer.normalize(agentDict);
     }

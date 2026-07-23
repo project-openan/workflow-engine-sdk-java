@@ -19,6 +19,7 @@
 package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.model.SendMessageResult;
+import net.openan.a2at.sdk.client.A2ATClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +49,7 @@ public class NegotiationTHandler implements ExtensionHandler {
             Map<String, Object> agentCard,
             String messageText,
             Map<String, Object> metadata,
-            Object a2atClient,
+            A2ATClient a2atClient,
             Object controlPoint
     ) {
         return CompletableFuture.completedFuture(metadata);
@@ -59,7 +60,7 @@ public class NegotiationTHandler implements ExtensionHandler {
     public CompletableFuture<SendMessageResult> afterReceive(
             Map<String, Object> agentCard,
             SendMessageResult result,
-            Object a2atClient,
+            A2ATClient a2atClient,
             Object controlPoint,
             Object eventCallback
     ) {
@@ -84,11 +85,10 @@ public class NegotiationTHandler implements ExtensionHandler {
             if (contextMap == null) {
                 contextMap = metadata;
             }
-            Object receiveResult = a2atClient.getClass()
-                    .getMethod("receiveNegotiation", String.class, Map.class)
-                    .invoke(a2atClient, result.getText(), contextMap);
-            if (receiveResult instanceof Map) {
-                Map<String, Object> rr = (Map<String, Object>) receiveResult;
+            Map<String, Object> receiveResult = a2atClient.receiveNegotiation(
+                    result.getText(), contextMap);
+            {
+                Map<String, Object> rr = receiveResult;
                 Boolean needResponse = (Boolean) rr.get("needResponse");
                 if (Boolean.TRUE.equals(needResponse)) {
                     String negMsg = (String) rr.getOrDefault("message", "");

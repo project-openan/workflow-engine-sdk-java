@@ -19,6 +19,7 @@
 package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.model.SendMessageResult;
+import net.openan.a2at.sdk.client.A2ATClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +49,7 @@ public class AuthorizationTHandler implements ExtensionHandler {
             Map<String, Object> agentCard,
             String messageText,
             Map<String, Object> metadata,
-            Object a2atClient,
+            A2ATClient a2atClient,
             Object controlPoint
     ) {
         return CompletableFuture.completedFuture(metadata);
@@ -59,7 +60,7 @@ public class AuthorizationTHandler implements ExtensionHandler {
     public CompletableFuture<SendMessageResult> afterReceive(
             Map<String, Object> agentCard,
             SendMessageResult result,
-            Object a2atClient,
+            A2ATClient a2atClient,
             Object controlPoint,
             Object eventCallback
     ) {
