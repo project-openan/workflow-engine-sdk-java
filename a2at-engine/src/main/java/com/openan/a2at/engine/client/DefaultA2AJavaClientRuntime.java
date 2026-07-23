@@ -151,9 +151,18 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
                         }
                     }),
                     error -> {
-                        errorRef.set(error);
-                        log.error("[A2ARuntime] Error callback for '{}': {}", agentCard.name(), error.getMessage(), error);
-                        done.countDown();
+                        // If the terminal event was already received, this is a benign
+                        // connection closure during teardown (client.close() or server
+                        // shutdown). Don't set errorRef so the completed task isn't
+                        // marked as failed, and log at DEBUG instead of ERROR.
+                        if (done.getCount() == 0) {
+                            log.debug("[A2ARuntime] Connection closed after terminal event for '{}': {}",
+                                    agentCard.name(), error.getMessage());
+                        } else {
+                            errorRef.set(error);
+                            log.error("[A2ARuntime] Error callback for '{}': {}", agentCard.name(), error.getMessage(), error);
+                            done.countDown();
+                        }
                     },
                     callContext);
         } catch (A2AClientException e) {
