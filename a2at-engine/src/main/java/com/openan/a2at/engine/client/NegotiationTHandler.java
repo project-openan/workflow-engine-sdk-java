@@ -98,7 +98,15 @@ public class NegotiationTHandler implements ExtensionHandler {
                 }
             }
         } catch (Exception e) {
-            log.warn("[Negotiation-T] Failed for '{}': {}", getAgentName(agentCard), e.getMessage(), e);
+            log.warn("[Negotiation-T] receiveNegotiation failed for '{}': {}, using fallback",
+                    getAgentName(agentCard), e.getMessage());
+            // Fallback: extract negotiation text directly from metadata
+            String fallbackText = extractNegotiationText(metadata);
+            if (fallbackText != null && !fallbackText.isEmpty()) {
+                metadata.put("negotiation_message", fallbackText);
+                log.info("[Negotiation-T] Agent '{}' requested negotiation (fallback): {}",
+                        getAgentName(agentCard), fallbackText);
+            }
         }
         result.setMetadata(metadata);
         return CompletableFuture.completedFuture(result);
@@ -113,6 +121,21 @@ public class NegotiationTHandler implements ExtensionHandler {
         for (var entry : metadata.entrySet()) {
             if (entry.getKey().contains("DATA-NEGOTIATION-T") && entry.getValue() instanceof Map) {
                 return (Map<String, Object>) entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String extractNegotiationText(Map<String, Object> metadata) {
+        if (metadata == null) {
+            return null;
+        }
+        for (var entry : metadata.entrySet()) {
+            if (entry.getKey().contains("NEGOTIATION-T")
+                    && !entry.getKey().contains("DATA-NEGOTIATION-T")
+                    && entry.getValue() instanceof String) {
+                return (String) entry.getValue();
             }
         }
         return null;
