@@ -9,6 +9,7 @@ import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import org.a2aproject.sdk.spec.AgentCard;
+import com.openan.a2at.engine.client.AgentCardJacksonModule;
 import com.openan.a2at.engine.registry.LoadPsop;
 import com.openan.a2at.engine.runner.ExecutePsop;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,7 +40,8 @@ import java.util.concurrent.CompletableFuture;
  */
 public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecutor {
     private static final Logger log = LoggerFactory.getLogger(TransportWorkbenchAgentExecutor.class);
-    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new AgentCardJacksonModule());
 
     private static final String SUBTASK_MARKER = "## Current Task";
     private static final String MERGE_KEYWORD = "汇总";

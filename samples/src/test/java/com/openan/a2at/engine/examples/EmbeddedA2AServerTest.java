@@ -2,6 +2,7 @@ package com.openan.a2at.engine.examples;
 
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import org.a2aproject.sdk.spec.AgentCard;
+import com.openan.a2at.engine.client.AgentCardJacksonModule;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.examples.agents.SpnDomainAgentExecutor;
 import com.openan.a2at.engine.examples.server.EmbeddedA2AServer;
@@ -30,7 +31,8 @@ class EmbeddedA2AServerTest {
     private EmbeddedA2AServer server;
     private DefaultWorkflowEngineClient client;
     private int port;
-    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new AgentCardJacksonModule());
     private static final String AGENT_NAME = "Test Agent";
 
     @BeforeEach

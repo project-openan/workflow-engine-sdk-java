@@ -3,6 +3,7 @@ package com.openan.a2at.engine.examples;
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import org.a2aproject.sdk.spec.AgentCard;
+import com.openan.a2at.engine.client.AgentCardJacksonModule;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.SendMessageResult;
@@ -32,7 +33,8 @@ import java.util.concurrent.TimeUnit;
  */
 public class SpnCrossCityDiagnosisDemo {
     private static final Logger log = LoggerFactory.getLogger(SpnCrossCityDiagnosisDemo.class);
-    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new AgentCardJacksonModule());
 
     private static final String AGENT_CARD_RESOURCE = "agentcard/transport_workbench_agent.json";
     private static final String WB_AGENT_NAME = "Transport Workbench Agent";
