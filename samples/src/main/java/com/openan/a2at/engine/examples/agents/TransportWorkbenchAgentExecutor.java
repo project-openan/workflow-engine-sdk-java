@@ -8,7 +8,6 @@ import com.openan.a2at.engine.model.WorkflowSearchResult;
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
-import com.openan.a2at.engine.client.AgentCardMapper;
 import org.a2aproject.sdk.spec.AgentCard;
 import com.openan.a2at.engine.registry.LoadPsop;
 import com.openan.a2at.engine.runner.ExecutePsop;
@@ -183,9 +182,7 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
             try {
                 var url = TransportWorkbenchAgentExecutor.class.getClassLoader().getResource(res);
                 if (url != null) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> cardMap = mapper.readValue(new java.io.File(url.getPath()), Map.class);
-                    AgentCard card = AgentCardMapper.toSdkAgentCard(cardMap);
+                    AgentCard card = mapper.readValue(new java.io.File(url.getPath()), AgentCard.class);
                     byName.put(card.name(), card);
                 }
             } catch (Exception e) {

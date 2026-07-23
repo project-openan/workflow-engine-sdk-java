@@ -1,7 +1,6 @@
 package com.openan.a2at.engine.examples;
 
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
-import com.openan.a2at.engine.client.AgentCardMapper;
 import org.a2aproject.sdk.spec.AgentCard;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.examples.agents.SpnDomainAgentExecutor;
@@ -45,18 +44,18 @@ class EmbeddedA2AServerTest {
                 "description", "test",
                 "provider", Map.of("organization", "test", "url", ""),
                 "version", "1.0.0",
-                "capabilities", Map.of("streaming", true, "pushNotifications", false),
+                "capabilities", Map.of("streaming", true, "pushNotifications", false, "extendedAgentCard", false, "extensions", List.of()),
                 "defaultInputModes", List.of("text/plain"),
                 "defaultOutputModes", List.of("text/plain"),
                 "skills", List.of(Map.of("id", "test", "name", "test", "description", "test", "tags", List.of())),
-                "supportedInterfaces", List.of(Map.of("protocolBinding", "HTTP+JSON", "protocolVersion", "1.0", "url", "http://127.0.0.1:" + port))
+                "supportedInterfaces", List.of(Map.of("protocolBinding", "HTTP+JSON", "protocolVersion", "1.0", "url", "http://127.0.0.1:" + port, "tenant", ""))
         );
         server = new EmbeddedA2AServer("127.0.0.1", port, card, new SpnDomainAgentExecutor());
         server.start();
         Thread.sleep(500);
 
         client = new DefaultWorkflowEngineClient(
-                List.of(AgentCardMapper.toSdkAgentCard(card)), null,
+                List.of(mapper.convertValue(card, AgentCard.class)), null,
                 WorkflowEngineClientConfig.builder().sslVerify(false).build());
     }
 
