@@ -19,8 +19,9 @@ import java.util.concurrent.CompletableFuture;
  * ControlPoint for the SPN cross-city diagnosis workflow.
  *
  * <p>Handles task dispatch (with city-specific message enrichment),
- * route decisions (fault-based routing to recovery steps), negotiation
- * responses, authorization approvals, and notification reception.
+ * route decisions (fault-based routing to recovery steps), and negotiation
+ * responses. Authorization-T and Notification-T are pre-positioned
+ * before the workflow starts, not handled here.
  *
  * <p>SRP: this class only contains workflow decision logic, separating
  * it from the agent executor that handles message I/O.
@@ -72,7 +73,7 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
             case "diagnosis_city2" -> message + "\n\n## 城市差异化参数\n"
                     + "客户A上海-广州间SPN专线中断，广州OMC侧需排查端口状态和光功率是否正常。";
             case "recovery_city1", "recovery_city2" -> message + "\n\n## 抢通指令\n"
-                    + "向故障OMC下发抢通授权确认，执行抢通方案，完成后上报抢通成功结果。";
+                    + "执行抢通方案，完成后返回抢通结果。授权和通知订阅已预置。";
             default -> message;
         };
     }

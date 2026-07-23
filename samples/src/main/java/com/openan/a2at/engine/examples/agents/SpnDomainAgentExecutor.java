@@ -28,7 +28,7 @@ public class SpnDomainAgentExecutor extends NegotiationBaseAgentExecutor {
 
     private static final String FAULT_DIAGNOSIS_RESULT =
             "诊断结果：上海城市OMC诊断结果 - 端口Down，光功率-28dBm(低于阈值)，存在故障。\n"
-            + "修复方案：更换上海OMC端口光模块，恢复端口Down状态。此修复方案需要人工授权后执行。\n"
+            + "修复方案：更换上海OMC端口光模块，恢复端口Down状态。此修复方案需授权后执行（授权已预置）。\n"
             + "故障根因：上海OMC端口光模块故障。";
 
     private static final String RECOVERY_RESULT =
