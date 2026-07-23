@@ -12,9 +12,9 @@
     "extendedAgentCard": false,
     "extensions": [
       {
+        "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Task-T/v1",
         "description": "Extension of structured prompt Task-T requests.",
-        "required": false,
-        "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Task-T/v1"
+        "required": false
       },
       {
         "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",

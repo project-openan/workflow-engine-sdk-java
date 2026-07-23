@@ -21,17 +21,17 @@
         "description": "Extension for A2A-T negotiation text exchange.",
         "required": false
       },
-       {
-         "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/DATA-NEGOTIATION-T/v1",
-         "description": "Extension for A2A-T negotiation context data.",
-         "required": false
-       },
-       {
-         "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1",
-         "description": "Extension for A2A-T notification push.",
-         "required": false
-       }
-      ]
+      {
+        "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1",
+        "description": "Extension for A2A-T authorization.",
+        "required": false
+      },
+      {
+        "uri": "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1",
+        "description": "Extension for A2A-T notification push.",
+        "required": false
+      }
+    ]
   },
   "defaultInputModes": [
     "application/json",
