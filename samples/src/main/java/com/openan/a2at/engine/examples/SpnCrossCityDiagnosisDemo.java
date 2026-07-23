@@ -38,6 +38,7 @@ public class SpnCrossCityDiagnosisDemo {
     private static final long AGENT_STARTUP_WAIT_SECONDS = 3;
 
     public static void main(String[] args) throws Exception {
+//        java.security.Security.insertProviderAt(new com.sun.crypto.provider.SunJCE(), 1);
         log.info("=== SPN Cross-City Fault Diagnosis Demo ===");
 
         // Step 1: Start all agents in background
@@ -70,6 +71,9 @@ public class SpnCrossCityDiagnosisDemo {
         // Step 3: Shutdown
         log.info("=== Demo complete, shutting down ===");
         agentsServer.stop();
+        // Force exit: JDK HttpClient and SDK internal thread pools may leave
+        // non-daemon threads that prevent the JVM from exiting.
+        System.exit(0);
     }
 
     /**

@@ -99,7 +99,11 @@ public class EmbeddedA2AServer implements AutoCloseable {
                 typedCard, new AgentCardCacheMetadata(typedCard, null), requestHandler, Runnable::run);
 
         this.executorService = new ThreadPoolExecutor(
-                THREAD_COUNT, THREAD_COUNT, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+                THREAD_COUNT, THREAD_COUNT, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), r -> {
+                    Thread t = new Thread(r, "http-" + agentName + "-" + UUID.randomUUID().toString().substring(0, 8));
+                    t.setDaemon(true);
+                    return t;
+                });
         this.server = HttpServer.create(new InetSocketAddress(host, port), 0);
        this.server.setExecutor(executorService);
         this.server.createContext(pathPrefix.isEmpty() ? "/" : pathPrefix,
@@ -117,8 +121,14 @@ public class EmbeddedA2AServer implements AutoCloseable {
     @Override
     public void close() {
         server.stop(0);
-        executorService.shutdown();
-        agentExecutorService.shutdown();
+        agentExecutorService.shutdownNow();
+        executorService.shutdownNow();
+        try {
+            agentExecutorService.awaitTermination(1, TimeUnit.SECONDS);
+            executorService.awaitTermination(1, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
         log.info("[{}] A2A server stopped", agentName);
     }
 
