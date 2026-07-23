@@ -77,10 +77,16 @@ public class NegotiationTHandler implements ExtensionHandler {
         Map<String, Object> metadata = result.getMetadata() != null
                 ? new HashMap<>(result.getMetadata()) : new HashMap<>();
         try {
-            // Call a2atClient.receiveNegotiation(message, context) via reflection
+            // The negotiation context is nested under the DATA-NEGOTIATION-T key
+            // in the task metadata, not at the top level. Extract it before
+            // calling receiveNegotiation, which expects the context map directly.
+            Map<String, Object> contextMap = extractNegotiationContext(metadata);
+            if (contextMap == null) {
+                contextMap = metadata;
+            }
             Object receiveResult = a2atClient.getClass()
                     .getMethod("receiveNegotiation", String.class, Map.class)
-                    .invoke(a2atClient, result.getText(), metadata);
+                    .invoke(a2atClient, result.getText(), contextMap);
             if (receiveResult instanceof Map) {
                 Map<String, Object> rr = (Map<String, Object>) receiveResult;
                 Boolean needResponse = (Boolean) rr.get("needResponse");
@@ -96,6 +102,20 @@ public class NegotiationTHandler implements ExtensionHandler {
         }
         result.setMetadata(metadata);
         return CompletableFuture.completedFuture(result);
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> extractNegotiationContext(Map<String, Object> metadata) {
+        if (metadata == null) {
+            return null;
+        }
+        for (var entry : metadata.entrySet()) {
+            if (entry.getKey().contains("DATA-NEGOTIATION-T") && entry.getValue() instanceof Map) {
+                return (Map<String, Object>) entry.getValue();
+            }
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")
