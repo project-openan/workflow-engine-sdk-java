@@ -1,6 +1,8 @@
 package com.openan.a2at.engine.examples;
 
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
+import com.openan.a2at.engine.client.AgentCardMapper;
+import org.a2aproject.sdk.spec.AgentCard;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.examples.agents.SpnDomainAgentExecutor;
 import com.openan.a2at.engine.examples.server.EmbeddedA2AServer;
@@ -54,7 +56,7 @@ class EmbeddedA2AServerTest {
         Thread.sleep(500);
 
         client = new DefaultWorkflowEngineClient(
-                List.of(card), null,
+                List.of(AgentCardMapper.toSdkAgentCard(card)), null,
                 WorkflowEngineClientConfig.builder().sslVerify(false).build());
     }
 

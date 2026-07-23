@@ -1,6 +1,5 @@
 package com.openan.a2at.engine.client;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.control.ControlPoint;
@@ -37,7 +36,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(DefaultWorkflowEngineClient.class);
-    private static final ObjectMapper mapper = new ObjectMapper();
     private final Map<String, AgentCard> cardMap = new ConcurrentHashMap<>();
     private final A2AJavaClientRuntime a2aClientRuntime;
     private final AgentAuthManager authManager;
@@ -49,7 +47,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private Object controlPoint;
     private final int maxNegotiationRounds;
 
-    public DefaultWorkflowEngineClient(List<?> agentCards, A2AJavaClientRuntime a2aClientRuntime,
+    public DefaultWorkflowEngineClient(List<AgentCard> agentCards, A2AJavaClientRuntime a2aClientRuntime,
                                        WorkflowEngineClientConfig config) {
         this.a2aClientRuntime = a2aClientRuntime != null ? a2aClientRuntime
                 : new DefaultA2AJavaClientRuntime(config.isSslVerify(), config.getCaCertsPath());
@@ -69,16 +67,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             }
         }
         this.a2atClient = initA2atClient(config.getA2atEnvPath());
-        for (Object card : agentCards) {
-            if (card instanceof AgentCard ac) {
-                cardMap.put(ac.name(), ac);
-            } else if (card instanceof Map<?, ?> map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> cardMap2 = (Map<String, Object>) map;
-                AgentCard ac = AgentCardMapper.toSdkAgentCard(cardMap2);
-                if (!ac.name().isEmpty()) {
-                    cardMap.put(ac.name(), ac);
-                }
+        for (AgentCard card : agentCards) {
+            if (!card.name().isEmpty()) {
+                cardMap.put(card.name(), card);
             }
         }
         this.maxNegotiationRounds = config.getMaxNegotiationRounds();
@@ -86,7 +77,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 cardMap.size(), config.isSslVerify(), a2atClient != null, maxNegotiationRounds);
     }
 
-    public DefaultWorkflowEngineClient(List<?> agentCards, A2AJavaClientRuntime a2aClientRuntime) {
+    public DefaultWorkflowEngineClient(List<AgentCard> agentCards, A2AJavaClientRuntime a2aClientRuntime) {
         this(agentCards, a2aClientRuntime,
                 WorkflowEngineClientConfig.builder().sslVerify(false).build());
     }
@@ -507,16 +498,10 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         try { a2aClientRuntime.close(); } catch (Exception ignored) {}
     }
     @Override
-    public void updateAgentCards(List<?> agentCards) {
+    public void updateAgentCards(List<AgentCard> agentCards) {
         cardMap.clear();
-        for (Object card : agentCards) {
-            if (card instanceof AgentCard ac) {
-                cardMap.put(ac.name(), ac);
-            } else if (card instanceof Map<?, ?> map) {
-                @SuppressWarnings("unchecked")
-                AgentCard ac = AgentCardMapper.toSdkAgentCard((Map<String, Object>) map);
-                if (!ac.name().isEmpty()) cardMap.put(ac.name(), ac);
-            }
+        for (AgentCard card : agentCards) {
+            if (!card.name().isEmpty()) cardMap.put(card.name(), card);
         }
         log.info("[EngineClient] Updated agent cards: {} agent(s)", cardMap.size());
     }

@@ -2,6 +2,7 @@ package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.model.SendMessageResult;
+import org.a2aproject.sdk.spec.AgentCard;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -54,7 +55,7 @@ public interface WorkflowEngineClient {
     java.util.List<String> getAgentNames();
 
     /** Update the agent card map (e.g. after fetching new cards). */
-    default void updateAgentCards(java.util.List<?> agentCards) {
+    default void updateAgentCards(java.util.List<AgentCard> agentCards) {
         // Default no-op; implementations override
     }
 

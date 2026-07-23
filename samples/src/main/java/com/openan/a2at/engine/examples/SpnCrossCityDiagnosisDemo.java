@@ -2,6 +2,8 @@ package com.openan.a2at.engine.examples;
 
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
+import com.openan.a2at.engine.client.AgentCardMapper;
+import org.a2aproject.sdk.spec.AgentCard;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.SendMessageResult;
@@ -88,7 +90,8 @@ public class SpnCrossCityDiagnosisDemo {
         // Load the Workbench Agent's AgentCard from classpath
         String cardPath = SpnCrossCityDiagnosisDemo.class.getClassLoader()
                 .getResource(AGENT_CARD_RESOURCE).getPath();
-        Map<String, Object> agentCard = mapper.readValue(new java.io.File(cardPath), Map.class);
+        Map<String, Object> cardMap = mapper.readValue(new java.io.File(cardPath), Map.class);
+        AgentCard agentCard = AgentCardMapper.toSdkAgentCard(cardMap);
 
         // Create engine client with only the Workbench Agent's card
         DefaultWorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(

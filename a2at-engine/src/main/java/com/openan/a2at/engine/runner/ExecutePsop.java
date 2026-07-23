@@ -10,6 +10,7 @@ import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.core.WorkflowExecutor;
 import com.openan.a2at.engine.model.ExecutionResult;
 import com.openan.a2at.engine.model.Workflow;
+import org.a2aproject.sdk.spec.AgentCard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +52,7 @@ public class ExecutePsop {
     */
     public static CompletableFuture<ExecutionResult> execute(
             Object psop,
-            List<?> agentCards,
+            List<AgentCard> agentCards,
             ControlPoint controlPoint,
             WorkflowEngineClient engineClient,
             String runtimeIntent,
@@ -187,7 +188,7 @@ public class ExecutePsop {
      */
     public static CompletableFuture<ExecutionResult> execute(
             Object psop,
-            List<?> agentCards,
+            List<AgentCard> agentCards,
             ControlPoint controlPoint,
             WorkflowEngineClient engineClient,
             String runtimeIntent,
@@ -213,7 +214,7 @@ public class ExecutePsop {
 
     public static final class Builder {
         private Object psop;
-        private List<?> agentCards = List.of();
+        private List<AgentCard> agentCards = List.of();
         private ControlPoint controlPoint;
         private WorkflowEngineClient engineClient;
         private String runtimeIntent = "";
@@ -232,7 +233,7 @@ public class ExecutePsop {
             return this;
         }
 
-        public Builder agentCards(List<?> agentCards) {
+        public Builder agentCards(List<AgentCard> agentCards) {
             this.agentCards = agentCards;
             return this;
         }

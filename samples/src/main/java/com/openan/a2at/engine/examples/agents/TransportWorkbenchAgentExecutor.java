@@ -8,6 +8,8 @@ import com.openan.a2at.engine.model.WorkflowSearchResult;
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
+import com.openan.a2at.engine.client.AgentCardMapper;
+import org.a2aproject.sdk.spec.AgentCard;
 import com.openan.a2at.engine.registry.LoadPsop;
 import com.openan.a2at.engine.runner.ExecutePsop;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -104,7 +106,7 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
     private String handleTopLevelTask(String messageText) throws Exception {
         log.info("[Workbench-Agent] Top-level task, searching PSOP...");
 
-        List<Map<String, Object>> agentCards = loadAgentCardsFromConfig();
+        List<AgentCard> agentCards = loadAgentCardsFromConfig();
         log.info("[Workbench-Agent] Loaded {} agent card(s) from config", agentCards.size());
 
         String psopId = searchPsop(messageText);
@@ -151,7 +153,7 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
     }
 
     private static void prePositionExtensions(WorkflowEngineClient engineClient,
-                                               List<Map<String, Object>> agentCards) {
+                                               List<AgentCard> agentCards) {
         String authUri = "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1";
         String notifUri = "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1";
         // Natural-language input for the A2A-T SDK prompt generation (LLM + template).
@@ -160,8 +162,8 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
         // so generation will fall back to using the input text as-is.
         String authInput = "任务类型新增授权，操作名称业务抢通，操作类型光模块更换，操作对象SPN专线业务，授权策略OMC自动执行，触发执行条件业务投诉诊断确认故障，预期输出返回是否设置成功";
         String notifInput = "通知主题为service-recovery-execution-result，订阅条件为业务抢通方案执行结果，上报通知数据格式为TextPart";
-        for (Map<String, Object> card : agentCards) {
-            String name = String.valueOf(card.get("name"));
+        for (AgentCard card : agentCards) {
+            String name = card.name();
             if (name == null || name.contains("Workbench")) {
                 continue;
             }
@@ -175,14 +177,16 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
         log.info("[Workbench-Agent] Extension pre-positioning complete");
     }
 
-    private static List<Map<String, Object>> loadAgentCardsFromConfig() {
-        Map<String, Map<String, Object>> byName = new LinkedHashMap<>();
+    private static List<AgentCard> loadAgentCardsFromConfig() {
+        Map<String, AgentCard> byName = new LinkedHashMap<>();
         for (String res : AGENT_CARD_RESOURCES) {
             try {
                 var url = TransportWorkbenchAgentExecutor.class.getClassLoader().getResource(res);
                 if (url != null) {
-                    Map<String, Object> card = mapper.readValue(new java.io.File(url.getPath()), Map.class);
-                    byName.put(String.valueOf(card.get("name")), card);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> cardMap = mapper.readValue(new java.io.File(url.getPath()), Map.class);
+                    AgentCard card = AgentCardMapper.toSdkAgentCard(cardMap);
+                    byName.put(card.name(), card);
                 }
             } catch (Exception e) {
                 log.warn("Failed to load agent card {}: {}", res, e.getMessage());
