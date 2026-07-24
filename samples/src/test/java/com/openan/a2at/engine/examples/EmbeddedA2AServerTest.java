@@ -50,7 +50,7 @@ class EmbeddedA2AServerTest {
                 "defaultInputModes", List.of("text/plain"),
                 "defaultOutputModes", List.of("text/plain"),
                 "skills", List.of(Map.of("id", "test", "name", "test", "description", "test", "tags", List.of())),
-                "supportedInterfaces", List.of(Map.of("protocolBinding", "HTTP+JSON", "protocolVersion", "1.0", "url", "http://127.0.0.1:" + port, "tenant", ""))
+                "supportedInterfaces", List.of(Map.of("protocolBinding", "HTTP+JSON", "protocolVersion", "1.0", "url", "https://127.0.0.1:" + port, "tenant", ""))
         );
         server = new EmbeddedA2AServer("127.0.0.1", port, card, new SpnDomainAgentExecutor());
         server.start();
@@ -69,9 +69,11 @@ class EmbeddedA2AServerTest {
 
     @Test
     void testGetAgentCard() throws Exception {
-        HttpClient http = HttpClient.newBuilder().build();
+        HttpClient http = HttpClient.newBuilder()
+                .sslContext(createTrustAllSslContext())
+                .build();
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create("http://127.0.0.1:" + port + "/"))
+                .uri(URI.create("https://127.0.0.1:" + port + "/"))
                 .GET()
                 .build();
         HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
@@ -86,5 +88,14 @@ class EmbeddedA2AServerTest {
         assertNotNull(result);
         assertFalse(result.getText().isEmpty(), "Response text should not be empty, got: " + result.getText());
         assertTrue(result.getText().contains("\u4e0a\u6d77"), "Diagnosis result should mention Shanghai, got: " + result.getText());
+    }
+    private static javax.net.ssl.SSLContext createTrustAllSslContext() throws Exception {
+        javax.net.ssl.SSLContext ctx = javax.net.ssl.SSLContext.getInstance("TLS");
+        ctx.init(null, new javax.net.ssl.TrustManager[]{new javax.net.ssl.X509TrustManager() {
+            public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+            public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() { return new java.security.cert.X509Certificate[0]; }
+        }}, null);
+        return ctx;
     }
 }

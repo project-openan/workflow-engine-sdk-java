@@ -51,7 +51,7 @@ public class ExecutePsop {
     * @return CompletableFuture<ExecutionResult>
     */
     public static CompletableFuture<ExecutionResult> execute(
-            Object psop,
+            Workflow psop,
             List<AgentCard> agentCards,
             ControlPoint controlPoint,
             WorkflowEngineClient engineClient,
@@ -66,7 +66,7 @@ public class ExecutePsop {
             BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish,
             Function<Map<String, Object>, Object> onEvent) {
 
-        Workflow workflow = psop instanceof Workflow ? (Workflow) psop : Workflow.fromMap((Map<String, Object>) psop);
+        Workflow workflow = psop;
         EventCallback emitter = eventCallback != null ? eventCallback : new EventCallback();
         List<Map<String, Object>> collected = Collections.synchronizedList(new ArrayList<>());
 
@@ -187,7 +187,7 @@ public class ExecutePsop {
      * Simplified overload without SSL/auth/A2AT config (legacy compatibility).
      */
     public static CompletableFuture<ExecutionResult> execute(
-            Object psop,
+            Workflow psop,
             List<AgentCard> agentCards,
             ControlPoint controlPoint,
             WorkflowEngineClient engineClient,
@@ -213,7 +213,7 @@ public class ExecutePsop {
     }
 
     public static final class Builder {
-        private Object psop;
+        private Workflow psop;
         private List<AgentCard> agentCards = List.of();
         private ControlPoint controlPoint;
         private WorkflowEngineClient engineClient;
@@ -228,7 +228,7 @@ public class ExecutePsop {
         private BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish;
         private Function<Map<String, Object>, Object> onEvent;
 
-        public Builder psop(Object psop) {
+        public Builder psop(Workflow psop) {
             this.psop = psop;
             return this;
         }
@@ -320,7 +320,6 @@ public class ExecutePsop {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static Object serialize(Object data) {
         if (data == null) {
             return null;

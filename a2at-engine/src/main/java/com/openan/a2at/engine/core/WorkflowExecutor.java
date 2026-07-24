@@ -67,7 +67,7 @@ public class WorkflowExecutor {
         }
         log.info("[Executor] Workflow: {}, steps={}, intent={}, lang={}",
                 workflow.getName(), workflow.getSteps().size(),
-                runtimeIntent != null ? runtimeIntent : null, lang);
+                runtimeIntent, lang);
     }
 
     /**
@@ -213,7 +213,7 @@ public class WorkflowExecutor {
                 });
     }
 
-    private record StepResult(String taskDesc, Object output, boolean success, Map<String, Object> results) {}
+    private record StepResult(String taskDesc, String output, boolean success, Map<String, Object> results) {}
 
     private CompletableFuture<StepResult> executeSubtasks(WorkflowStep step) {
         String contextMessage = contextBuilder.buildContext(step, stepOutputs);

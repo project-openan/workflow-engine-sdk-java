@@ -1,6 +1,7 @@
 package com.openan.a2at.engine;
 
 import com.openan.a2at.engine.client.WorkflowEngineClient;
+import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.model.SendMessageResult;
 
@@ -33,7 +34,7 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
 
     private final List<SentMessage> sent = Collections.synchronizedList(new ArrayList<>());
     private EventCallback eventCallback = new EventCallback();
-    private Object controlPoint;
+    private ControlPoint controlPoint;
     private final Map<String, String> cannedResponses = new HashMap<>();
     private String defaultResponse = "stub-response";
     private String defaultTaskState = "COMPLETED";
@@ -78,7 +79,7 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
     }
 
     @Override
-    public void setControlPoint(Object controlPoint) {
+    public void setControlPoint(ControlPoint controlPoint) {
         this.controlPoint = controlPoint;
     }
 

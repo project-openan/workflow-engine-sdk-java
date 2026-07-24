@@ -90,7 +90,7 @@ class ExtensionRegistryTest {
             @Override
             public java.util.concurrent.CompletableFuture<java.util.Map<String, Object>> beforeSend(
                     org.a2aproject.sdk.spec.AgentCard agentCard, String messageText,
-                    java.util.Map<String, Object> metadata, net.openan.a2at.sdk.client.A2ATClient a2atClient, Object controlPoint) {
+                    java.util.Map<String, Object> metadata, net.openan.a2at.sdk.client.A2ATClient a2atClient, com.openan.a2at.engine.control.ControlPoint controlPoint) {
                 return java.util.concurrent.CompletableFuture.completedFuture(metadata);
             }
 
@@ -98,7 +98,7 @@ class ExtensionRegistryTest {
             public java.util.concurrent.CompletableFuture<com.openan.a2at.engine.model.SendMessageResult> afterReceive(
                     org.a2aproject.sdk.spec.AgentCard agentCard,
                     com.openan.a2at.engine.model.SendMessageResult result,
-                    net.openan.a2at.sdk.client.A2ATClient a2atClient, Object controlPoint, Object eventCallback) {
+                    net.openan.a2at.sdk.client.A2ATClient a2atClient, com.openan.a2at.engine.control.ControlPoint controlPoint, com.openan.a2at.engine.control.EventCallback eventCallback) {
                 return java.util.concurrent.CompletableFuture.completedFuture(result);
             }
         };

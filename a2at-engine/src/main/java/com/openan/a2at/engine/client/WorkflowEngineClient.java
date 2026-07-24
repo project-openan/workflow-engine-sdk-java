@@ -1,6 +1,7 @@
 package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.control.EventCallback;
+import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.model.SendMessageResult;
 import org.a2aproject.sdk.spec.AgentCard;
 import java.util.Map;
@@ -49,7 +50,7 @@ public interface WorkflowEngineClient {
         return sendMessage(agentName, instruction, null, Map.of(extensionUri, naturalLanguageInput));
     }
 
-    void setControlPoint(Object controlPoint);
+    void setControlPoint(ControlPoint controlPoint);
     void setEventCallback(EventCallback callback);
     void close();
     java.util.List<String> getAgentNames();

@@ -37,10 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import java.net.http.HttpClient;
-import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -213,26 +210,13 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
         if (sslVerify) {
             return new RestTransportConfig();
         }
-        // Trust-all SSL context for self-signed certs
-        try {
-            SSLContext trustAllCtx = SSLContext.getInstance("TLS");
-            trustAllCtx.init(null, new TrustManager[]{new X509TrustManager() {
-                public void checkClientTrusted(X509Certificate[] chain, String authType) {}
-                public void checkServerTrusted(X509Certificate[] chain, String authType) {}
-                public X509Certificate[] getAcceptedIssuers() {
-                    return new X509Certificate[0];
-                }
-            }}, null);
-            HttpClient httpClient = HttpClient.newBuilder()
-                    .version(HttpClient.Version.HTTP_1_1)
-                    .connectTimeout(Duration.ofSeconds(60))
-                    .sslContext(trustAllCtx)
-                    .build();
-            return new RestTransportConfig(new JdkA2AHttpClient(httpClient));
-        } catch (Exception e) {
-            log.warn("[A2ARuntime] Failed to create trust-all SSL context, using default: {}", e.getMessage());
-            return new RestTransportConfig();
-        }
+        SSLContext trustAllCtx = SslContextFactory.createTrustAll();
+        HttpClient httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(60))
+                .sslContext(trustAllCtx)
+                .build();
+        return new RestTransportConfig(new JdkA2AHttpClient(httpClient));
     }
 
     private static boolean isTerminal(ClientEvent event) {

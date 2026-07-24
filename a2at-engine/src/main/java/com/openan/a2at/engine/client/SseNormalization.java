@@ -59,7 +59,6 @@ public final class SseNormalization {
      * @param data the raw response as a map
      * @return normalized map
      */
-    @SuppressWarnings("unchecked")
     public static Map<String, Object> normalize(Map<String, Object> data) {
         if (data == null) {
             return data;

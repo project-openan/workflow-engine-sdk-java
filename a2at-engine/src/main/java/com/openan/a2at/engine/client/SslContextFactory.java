@@ -150,4 +150,20 @@ public final class SslContextFactory {
         tmf.init((KeyStore) null);
         return (X509TrustManager) tmf.getTrustManagers()[0];
     }
+
+    public static SSLContext createTrustAll() {
+        System.setProperty("jdk.internal.httpclient.disableHostnameVerification", "true");
+        try {
+            SSLContext ctx = SSLContext.getInstance("TLS");
+            ctx.init(null, new TrustManager[]{new X509TrustManager() {
+                public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+                public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+                public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+            }}, null);
+            log.warn("Trust-all SSL context created");
+            return ctx;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

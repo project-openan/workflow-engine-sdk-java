@@ -32,6 +32,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import com.openan.a2at.engine.client.SslContextFactory;
 import java.util.Map;
 
 /**
@@ -61,24 +62,7 @@ public class LoadPsop {
                 .connectTimeout(Duration.ofSeconds(30));
         clientBuilder.followRedirects(HttpClient.Redirect.ALWAYS);
         if (!sslVerify) {
-            // Disable TLS verification for development with self-signed certs
-            try {
-                javax.net.ssl.SSLContext trustAllCtx = javax.net.ssl.SSLContext.getInstance("TLS");
-                trustAllCtx.init(null, new javax.net.ssl.TrustManager[]{new javax.net.ssl.X509TrustManager() {
-                    public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-                    public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                        return new java.security.cert.X509Certificate[0];
-                    }
-                }}, null);
-                // Disable hostname verification: self-signed certs
-                // have no SAN, so endpoint identification fails.
-                System.setProperty("jdk.internal.httpclient.disableHostnameVerification", "true");
-                clientBuilder.sslContext(trustAllCtx);
-                log.warn("[Registry] TLS verification disabled for PSOP load (development only)");
-            } catch (Exception e) {
-                log.warn("[Registry] Failed to disable TLS: {}", e.getMessage());
-            }
+            clientBuilder.sslContext(SslContextFactory.createTrustAll());
         }
         HttpClient client = clientBuilder.build();
 
@@ -137,22 +121,7 @@ public class LoadPsop {
                 .connectTimeout(Duration.ofSeconds(30));
         clientBuilder.followRedirects(HttpClient.Redirect.ALWAYS);
         if (!sslVerify) {
-            try {
-                javax.net.ssl.SSLContext trustAllCtx = javax.net.ssl.SSLContext.getInstance("TLS");
-                trustAllCtx.init(null, new javax.net.ssl.TrustManager[]{new javax.net.ssl.X509TrustManager() {
-                    public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-                    public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                        return new java.security.cert.X509Certificate[0];
-                    }
-                }}, null);
-                // Disable hostname verification: self-signed certs
-                // have no SAN, so endpoint identification fails.
-                System.setProperty("jdk.internal.httpclient.disableHostnameVerification", "true");
-                clientBuilder.sslContext(trustAllCtx);
-            } catch (Exception e) {
-                log.warn("[Registry] Failed to disable TLS: {}", e.getMessage());
-            }
+            clientBuilder.sslContext(SslContextFactory.createTrustAll());
         }
         HttpClient client = clientBuilder.build();
 

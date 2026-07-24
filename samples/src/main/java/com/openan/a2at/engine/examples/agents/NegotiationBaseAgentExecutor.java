@@ -136,20 +136,20 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
             RequestContext ctx, AgentEmitter emitter, String extKeyword) {
         String taskId = ctx.getTaskId();
         String contextId = ctx.getContextId();
-        Object payload = ctx.getMessage().metadata().entrySet().stream()
+        // Store the policy/subscription text for later use during diagnosis
+        String payloadText = ctx.getMessage().metadata().entrySet().stream()
                 .filter(e -> e.getKey().contains(extKeyword))
                 .map(Map.Entry::getValue)
-                .findFirst().orElse("");
-        // Store the policy/subscription text for later use during diagnosis
-        String payloadText = payload instanceof String s ? s : String.valueOf(payload);
+                .findFirst()
+                .map(v -> v instanceof String s ? s : String.valueOf(v))
+                .orElse("");
         if (extKeyword.contains("Authorization")) {
             authorizationPolicy = payloadText;
         } else if (extKeyword.contains("Notification")) {
             notificationSubscription = payloadText;
         }
         log.info("[{}] Pre-positioned {} received, payload length={}",
-                getClass().getSimpleName(), extKeyword,
-                payload instanceof String s ? s.length() : String.valueOf(payload).length());
+                getClass().getSimpleName(), extKeyword, payloadText.length());
         String ackText = extKeyword + " pre-positioning acknowledged";
         List<Part<?>> parts = List.of(new TextPart(ackText));
         emitter.addArtifact(parts, "result", getClass().getSimpleName() + " ack", Map.of(), false, true);

@@ -19,6 +19,8 @@
 package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.model.SendMessageResult;
+import com.openan.a2at.engine.control.ControlPoint;
+import com.openan.a2at.engine.control.EventCallback;
 import org.a2aproject.sdk.spec.AgentCard;
 import net.openan.a2at.sdk.client.A2ATClient;
 
@@ -55,7 +57,7 @@ public interface ExtensionHandler {
             String messageText,
             Map<String, Object> metadata,
             A2ATClient a2atClient,
-            Object controlPoint
+            ControlPoint controlPoint
     );
 
     /**
@@ -73,7 +75,7 @@ public interface ExtensionHandler {
             AgentCard agentCard,
             SendMessageResult result,
             A2ATClient a2atClient,
-            Object controlPoint,
-            Object eventCallback
+            ControlPoint controlPoint,
+            EventCallback eventCallback
     );
 }

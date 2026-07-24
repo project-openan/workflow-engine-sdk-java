@@ -70,7 +70,7 @@
     {
       "protocolBinding": "HTTP+JSON",
       "protocolVersion": "1.0",
-      "url": "http://127.0.0.1:26335/a2a/json",
+      "url": "https://127.0.0.1:26335/a2a/json",
       "tenant": ""
     }
   ]

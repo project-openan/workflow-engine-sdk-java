@@ -1,8 +1,11 @@
 package com.openan.a2at.engine.examples.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openan.a2at.engine.client.AgentCardJacksonModule;
 import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpsParameters;
+import com.sun.net.httpserver.HttpsServer;
 import org.a2aproject.sdk.grpc.SendMessageRequest;
 import org.a2aproject.sdk.grpc.StreamResponse;
 import org.a2aproject.sdk.grpc.utils.ProtoUtils;
@@ -20,12 +23,7 @@ import org.a2aproject.sdk.server.tasks.InMemoryTaskStore;
 import org.a2aproject.sdk.server.tasks.PushNotificationConfigStore;
 import org.a2aproject.sdk.server.tasks.PushNotificationSender;
 import org.a2aproject.sdk.spec.A2AError;
-import org.a2aproject.sdk.spec.AgentCapabilities;
 import org.a2aproject.sdk.spec.AgentCard;
-import org.a2aproject.sdk.spec.AgentExtension;
-import org.a2aproject.sdk.spec.AgentInterface;
-import org.a2aproject.sdk.spec.AgentProvider;
-import org.a2aproject.sdk.spec.AgentSkill;
 import org.a2aproject.sdk.spec.Message;
 import org.a2aproject.sdk.spec.StreamingEventKind;
 import org.a2aproject.sdk.spec.Task;
@@ -37,9 +35,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -53,17 +53,24 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
 
 public class EmbeddedA2AServer implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(EmbeddedA2AServer.class);
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper cardMapper = new ObjectMapper().registerModule(new AgentCardJacksonModule());
     private static final int THREAD_COUNT = 8;
 
-    private final HttpServer server;
+    private static final String KEYSTORE_RESOURCE = "a2a-server-keystore.p12";
+    private static final String KEYSTORE_PASSWORD = "changeit";
+
+    private final HttpsServer server;
     private final ExecutorService executorService;
     private final ExecutorService agentExecutorService;
     private final Map<String, Object> agentCardMap;
-   private final String agentName;
+    private final String agentName;
     private final String pathPrefix;
 
     @SuppressWarnings("unchecked")
@@ -104,8 +111,16 @@ public class EmbeddedA2AServer implements AutoCloseable {
                     t.setDaemon(true);
                     return t;
                 });
-        this.server = HttpServer.create(new InetSocketAddress(host, port), 0);
-       this.server.setExecutor(executorService);
+        this.server = HttpsServer.create(new InetSocketAddress(host, port), 0);
+        SSLContext sslContext = createSslContext();
+        this.server.setHttpsConfigurator(new HttpsConfigurator(sslContext) {
+            @Override
+            public void configure(HttpsParameters params) {
+                SSLParameters sslParams = sslContext.getDefaultSSLParameters();
+                params.setSSLParameters(sslParams);
+            }
+        });
+        this.server.setExecutor(executorService);
         this.server.createContext(pathPrefix.isEmpty() ? "/" : pathPrefix,
                 exchange -> handleExchange(exchange, restHandler));
 
@@ -113,7 +128,26 @@ public class EmbeddedA2AServer implements AutoCloseable {
             this.server.createContext("/rest/plat/smapp/v1/oauth/token", this::handleLogin);
             log.info("[{}] Auth login endpoint enabled", agentName);
         }
-        log.info("[{}] A2A server started on http://{}:{}/", agentName, host, port);
+        log.info("[{}] A2A server started on https://{}:{}/", agentName, host, port);
+    }
+
+    private static SSLContext createSslContext() throws IOException {
+        try (InputStream is = EmbeddedA2AServer.class.getClassLoader()
+                .getResourceAsStream(KEYSTORE_RESOURCE)) {
+            if (is == null) {
+                throw new IOException("Keystore not found on classpath: " + KEYSTORE_RESOURCE);
+            }
+            KeyStore ks = KeyStore.getInstance("PKCS12");
+            ks.load(is, KEYSTORE_PASSWORD.toCharArray());
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance(
+                    KeyManagerFactory.getDefaultAlgorithm());
+            kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
+            SSLContext ctx = SSLContext.getInstance("TLS");
+            ctx.init(kmf.getKeyManagers(), null, null);
+            return ctx;
+        } catch (Exception e) {
+            throw new IOException("Failed to init SSL context: " + e.getMessage(), e);
+        }
     }
 
     public void start() { server.start(); }
@@ -135,7 +169,7 @@ public class EmbeddedA2AServer implements AutoCloseable {
     public Map<String, Object> getAgentCard() { return agentCardMap; }
     public String getAgentName() { return agentName; }
 
-   private void handleExchange(HttpExchange exchange, RestHandler restHandler) throws IOException {
+    private void handleExchange(HttpExchange exchange, RestHandler restHandler) throws IOException {
         String fullPath = exchange.getRequestURI().getPath();
         String method = exchange.getRequestMethod();
         String path = pathPrefix.isEmpty() || !fullPath.startsWith(pathPrefix)
@@ -281,42 +315,15 @@ public class EmbeddedA2AServer implements AutoCloseable {
         try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
     }
 
-    @SuppressWarnings("unchecked")
     private static AgentCard toTypedAgentCard(Map<String, Object> card) {
-        Map<String, Object> provider = (Map<String, Object>) card.get("provider");
-        Map<String, Object> caps = (Map<String, Object>) card.get("capabilities");
-        List<Map<String, Object>> exts = (List<Map<String, Object>>) caps.getOrDefault("extensions", List.of());
-        List<Map<String, Object>> skills = (List<Map<String, Object>>) card.getOrDefault("skills", List.of());
-        List<Map<String, Object>> ifaces = (List<Map<String, Object>>) card.getOrDefault("supportedInterfaces", List.of());
-        return new AgentCard(
-                str(card.get("name")), str(card.get("description")),
-                provider == null ? null : new AgentProvider(str(provider.get("organization")), str(provider.get("url"))),
-                str(card.get("version")), null,
-                new AgentCapabilities(
-                        Boolean.TRUE.equals(caps.get("streaming")),
-                        Boolean.TRUE.equals(caps.get("pushNotifications")),
-                        Boolean.TRUE.equals(caps.get("extendedAgentCard")),
-                        exts.stream().map(e -> new AgentExtension(str(e.get("description")), Map.of(), false, str(e.get("uri")))).toList()),
-                strList(card.get("defaultInputModes")), strList(card.get("defaultOutputModes")),
-                skills.stream().map(s -> new AgentSkill(str(s.get("id")), str(s.get("name")), str(s.get("description")),
-                        strList(s.get("tags")), List.of(), List.of(), List.of(), List.of())).toList(),
-                Map.of(), List.of(), null,
-                ifaces.stream().map(i -> new AgentInterface(str(i.get("protocolBinding")), str(i.get("url")), "", str(i.get("protocolVersion")))).toList(),
-                List.of());
+        return cardMapper.convertValue(card, AgentCard.class);
     }
 
-    @SuppressWarnings("unchecked")
     private static boolean hasSecuritySchemes(Map<String, Object> card) {
         return card.containsKey("securitySchemes") && card.get("securitySchemes") instanceof Map
                 && !((Map<?, ?>) card.get("securitySchemes")).isEmpty()
                 && card.containsKey("securityRequirements");
     }
-
-    private static List<String> strList(Object v) {
-        return v instanceof List<?> l ? l.stream().map(String::valueOf).toList() : List.of();
-    }
-
-    private static String str(Object v) { return v == null ? "" : String.valueOf(v); }
 
     @SuppressWarnings("unchecked")
     private static String extractPathPrefix(Map<String, Object> agentCard) {

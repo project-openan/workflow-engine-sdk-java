@@ -64,20 +64,7 @@ public class AgentCredentialService implements CredentialService {
                     .connectTimeout(Duration.ofSeconds(30))
                     .followRedirects(HttpClient.Redirect.ALWAYS);
             // Disable TLS verification (mirrors Python's verify=False for login endpoints)
-            try {
-                javax.net.ssl.SSLContext trustAllCtx = javax.net.ssl.SSLContext.getInstance("TLS");
-                trustAllCtx.init(null, new javax.net.ssl.TrustManager[]{new javax.net.ssl.X509TrustManager() {
-                    public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-                    public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                        return new java.security.cert.X509Certificate[0];
-                    }
-                }}, null);
-                System.setProperty("jdk.internal.httpclient.disableHostnameVerification", "true");
-                b.sslContext(trustAllCtx);
-            } catch (Exception e) {
-                log.warn("[Auth] Failed to disable TLS for login endpoint: {}", e.getMessage());
-            }
+            b.sslContext(SslContextFactory.createTrustAll());
             this.httpClient = b.build();
         }
     }

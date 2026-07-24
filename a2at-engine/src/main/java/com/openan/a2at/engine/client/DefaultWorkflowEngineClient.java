@@ -1,6 +1,7 @@
 package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.control.EventCallback;
+import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.model.SendMessageResult;
@@ -17,6 +18,7 @@ import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext;
 import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallInterceptor;
 import org.a2aproject.sdk.client.transport.spi.interceptors.PayloadAndHeaders;
 import org.a2aproject.sdk.spec.Artifact;
+import org.a2aproject.sdk.spec.Task;
 import org.a2aproject.sdk.spec.Message;
 import org.a2aproject.sdk.spec.MessageSendParams;
 import org.a2aproject.sdk.spec.Part;
@@ -44,7 +46,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private final boolean sslVerify;
     private final String contextId;
     private EventCallback eventCallback = new EventCallback();
-    private Object controlPoint;
+    private ControlPoint controlPoint;
     private final int maxNegotiationRounds;
 
     public DefaultWorkflowEngineClient(List<AgentCard> agentCards, A2AJavaClientRuntime a2aClientRuntime,
@@ -102,7 +104,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     }
 
     @Override
-    public void setControlPoint(Object controlPoint) {
+    public void setControlPoint(ControlPoint controlPoint) {
         this.controlPoint = controlPoint;
     }
 
@@ -251,7 +253,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 String responseText = extractResponseText(events);
                 String taskState = extractResponseTaskState(events);
                 Map<String, Object> respMetadata = extractResponseMetadata(events);
-                Object task = extractResponseTask(events);
+                Task task = extractResponseTask(events);
                 log.info("[EngineClient] Response from {}: {} chars, state={}", agentName, responseText.length(), taskState);
                 log.debug("[EngineClient] Response text from {}: [{}]", agentName, responseText);
                 if (respMetadata != null && !respMetadata.isEmpty()) {
@@ -274,7 +276,6 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 .build();
         return MessageSendParams.builder().message(msg).build();
     }
-    @SuppressWarnings("unchecked")
     private ClientCallContext buildClientCallContext(AgentCard agentCard, String agentName, Map<String, Object> messageMetadata) {
         Map<String, String> headers = new HashMap<>();
         applyAuthHeaders(agentCard, agentName, headers);
@@ -393,7 +394,6 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
      * Agents attach Authorization-T / Notification-T to artifact metadata, so
      * without this merge those extension payloads never reach the extension handlers.
      */
-    @SuppressWarnings("unchecked")
     private static void mergeTaskMetadata(Task task, Map<String, Object> metadata) {
         if (task == null) return;
         Map<String, Object> m = task.metadata();
@@ -405,8 +405,8 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             }
         }
     }
-    private static Object extractResponseTask(Iterable<ClientEvent> events) {
-        Object lastTask = null;
+    private static Task extractResponseTask(Iterable<ClientEvent> events) {
+        Task lastTask = null;
         for (ClientEvent event : events) {
             if (event instanceof TaskEvent te) lastTask = te.getTask();
             else if (event instanceof TaskUpdateEvent tue) lastTask = tue.getTask();
@@ -427,8 +427,8 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         log.debug("[Negotiation] Full metadata for '{}': {}", agentName, negMeta);
         emit(EventType.NEGOTIATION_REQUEST, Map.of("agent", agentName, "round", round, "concern", negText));
         CompletableFuture<String> clarFuture;
-        if (controlPoint instanceof ControlPoint cp) {
-            clarFuture = cp.onNegotiation(agentName, negText, negMeta);
+        if (controlPoint != null) {
+            clarFuture = controlPoint.onNegotiation(agentName, negText, negMeta);
         } else {
             clarFuture = CompletableFuture.completedFuture("Please proceed with the original task using available information.");
         }

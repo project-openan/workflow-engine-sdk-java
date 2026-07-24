@@ -19,6 +19,8 @@
 package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.model.SendMessageResult;
+import com.openan.a2at.engine.control.ControlPoint;
+import com.openan.a2at.engine.control.EventCallback;
 import net.openan.a2at.sdk.client.A2ATClient;
 import net.openan.a2at.sdk.client.model.PromptGenerationResult;
 import org.a2aproject.sdk.spec.AgentCard;
@@ -47,13 +49,12 @@ public class TaskTHandler implements ExtensionHandler {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public CompletableFuture<Map<String, Object>> beforeSend(
             AgentCard agentCard,
             String messageText,
             Map<String, Object> metadata,
             A2ATClient a2atClient,
-            Object controlPoint
+            ControlPoint controlPoint
     ) {
         if (a2atClient == null) {
             return CompletableFuture.completedFuture(metadata);
@@ -74,15 +75,9 @@ public class TaskTHandler implements ExtensionHandler {
             return CompletableFuture.completedFuture(result);
         }
         try {
-            // Call a2atClient.generateTaskPrompt(messageText) via reflection
-            Object promptResult = a2atClient.getClass()
-                    .getMethod("generateTaskPrompt", Object.class)
-                    .invoke(a2atClient, messageText);
-            // Extract prompt text from PromptGenerationResult
-            Boolean success = (Boolean) promptResult.getClass().getMethod("success").invoke(promptResult);
-            if (Boolean.TRUE.equals(success)) {
-                String promptText = (String) promptResult.getClass()
-                        .getMethod("promptText").invoke(promptResult);
+            PromptGenerationResult promptResult = a2atClient.generateTaskPrompt(messageText);
+            if (promptResult.success()) {
+                String promptText = promptResult.promptText();
                 if (promptText != null && !promptText.isEmpty()) {
                     result.put(taskTUri, promptText);
                     log.info("[Task-T] Generated prompt for '{}': {} chars", getAgentName(agentCard), promptText.length());
@@ -100,13 +95,12 @@ public class TaskTHandler implements ExtensionHandler {
             AgentCard agentCard,
             SendMessageResult result,
             A2ATClient a2atClient,
-            Object controlPoint,
-            Object eventCallback
+            ControlPoint controlPoint,
+            EventCallback eventCallback
     ) {
         return CompletableFuture.completedFuture(result);
     }
 
-    @SuppressWarnings("unchecked")
     private static String findTaskTUri(AgentCard agentCard) {
         if (agentCard.capabilities() == null) {
             return null;

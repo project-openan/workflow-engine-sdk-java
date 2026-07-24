@@ -73,7 +73,6 @@ public class AgentAuthManager {
         this(new HashMap<>());
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, Map<String, Map<String, Object>>> loadFromFile(String path) {
         if (path == null) {
             return new HashMap<>();

@@ -69,13 +69,6 @@ public class SpnDomainAgentCity2Executor extends NegotiationBaseAgentExecutor {
         return LlmHelper.text(env, sys, user, fallback);
     }
 
-    private static String llmRecoveryResult(String input, String fallback) {
-        String env = StartAgentsServer.resolveEnvPath();
-        String sys = "你是SPN领域广州OMC抢通执行专家。用一句话报告广州侧抢通完成、业务恢复。中文。";
-        String user = "输入：\n" + input + "\n\n广州侧无需更换光模块，业务正常。请输出抢通结果。";
-        return LlmHelper.text(env, sys, user, fallback);
-    }
-
     private static void sleepBriefly() {
         try {
             Thread.sleep(300);

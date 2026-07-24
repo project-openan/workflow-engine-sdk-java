@@ -77,7 +77,7 @@ public class StartAgentsServer implements Runnable {
                 server.start();
                 servers.add(server);
                 registerAgent(entry.card, sslVerify);
-                log.info("Started agent: {} on http://{}:{}/", entry.card.get("name"), entry.host, entry.port);
+                log.info("Started agent: {} on https://{}:{}/", entry.card.get("name"), entry.host, entry.port);
             } catch (Exception e) {
                 log.error("Failed to start agent {}: {}", entry.card.get("name"), e.getMessage(), e);
             }
@@ -102,7 +102,7 @@ public class StartAgentsServer implements Runnable {
         Map<String, Object> card = mapper.readValue(new java.io.File(path), Map.class);
         List<Map<String, Object>> ifaces =
                 (List<Map<String, Object>>) card.getOrDefault("supportedInterfaces", List.of());
-        String url = ifaces.isEmpty() ? "http://127.0.0.1:0" : String.valueOf(ifaces.get(0).get("url"));
+        String url = ifaces.isEmpty() ? "https://127.0.0.1:0" : String.valueOf(ifaces.get(0).get("url"));
         URI uri = URI.create(url);
         String host = uri.getHost() != null ? uri.getHost() : "127.0.0.1";
         int port = uri.getPort() > 0 ? uri.getPort() : 0;

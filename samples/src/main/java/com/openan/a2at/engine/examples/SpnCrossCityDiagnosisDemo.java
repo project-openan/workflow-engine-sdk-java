@@ -86,7 +86,6 @@ public class SpnCrossCityDiagnosisDemo {
      * A2A REST message:stream, SSE response parsing (statusUpdate/artifactUpdate),
      * Task-T prompt generation, and negotiation auto-loop.
      */
-    @SuppressWarnings("unchecked")
     private static String sendTaskToWorkbench(String taskText) throws Exception {
         // Load the Workbench Agent's AgentCard from classpath
         String cardPath = SpnCrossCityDiagnosisDemo.class.getClassLoader()
