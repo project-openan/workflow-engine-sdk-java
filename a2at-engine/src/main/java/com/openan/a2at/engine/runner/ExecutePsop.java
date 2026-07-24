@@ -38,161 +38,64 @@ public class ExecutePsop {
     /**
      * Execute a PSOP workflow end-to-end.
      *
-     * @param psop             workflow as Map or Workflow object
+     * @param psop             workflow object
      * @param agentCards       list of AgentCard objects
      * @param controlPoint     user's decision callbacks
      * @param engineClient     optional pre-created client (null = auto-create)
      * @param runtimeIntent    original user intent
      * @param lang             language hint (zh/en)
-    * @param a2aClientRuntime the A2A client runtime from a2a-java-sdk
-    * @param eventCallback    optional event callback (null = no-op)
-    * @param onFinish         optional persistence hook: (result, collectedEvents) -> CompletableFuture<Void> (async)
-    * @param onEvent          optional event transformer: event -> event | null | List<event>
-    * @return CompletableFuture<ExecutionResult>
-    */
-    public static CompletableFuture<ExecutionResult> execute(
-            Workflow psop,
-            List<AgentCard> agentCards,
-            ControlPoint controlPoint,
-            WorkflowEngineClient engineClient,
-            String runtimeIntent,
-            String lang,
-            String a2atEnvPath,
-            String credentialsConfigPath,
-            boolean sslVerify,
-            String caCertsPath,
-            A2AJavaClientRuntime a2aClientRuntime,
-            EventCallback eventCallback,
-            BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish,
-            Function<Map<String, Object>, Object> onEvent) {
-
-        Workflow workflow = psop;
-        EventCallback emitter = eventCallback != null ? eventCallback : new EventCallback();
-        List<Map<String, Object>> collected = Collections.synchronizedList(new ArrayList<>());
-
-        // Wrap the callback to collect events + apply on_event transformer
-        EventCallback collectingCallback = new EventCallback() {
-            @Override
-            public void onEvent(String eventType, Map<String, Object> data) {
-                Map<String, Object> event = new HashMap<>();
-                event.put("type", eventType);
-                event.put("data", serialize(data));
-                event.put("timestamp", System.currentTimeMillis() / 1000.0);
-                // Apply on_event transformer (same semantics as Python):
-                // null = skip, single event = replace, list = inject multiple
-                Object transformed = event;
-                if (onEvent != null) {
-                    try {
-                        transformed = onEvent.apply(event);
-                    } catch (Exception e) {
-                        log.warn("[execute_psop] on_event raised: {}", e.getMessage());
-                        transformed = event;
-                    }
-                }
-                if (transformed == null) {
-                    return;
-                }
-                if (transformed instanceof List<?> list) {
-                    for (Object e : list) {
-                        if (e instanceof Map<?, ?> m) {
-                            collected.add((Map<String, Object>) m);
-                            Object typeObj = m.get("type");
-                            Object dataObj = m.get("data");
-                            emitter.onEvent(
-                                    typeObj != null ? typeObj.toString() : eventType,
-                                    dataObj instanceof Map ? (Map<String, Object>) dataObj : Map.of());
-                        }
-                    }
-                } else if (transformed instanceof Map<?, ?> m) {
-                    collected.add((Map<String, Object>) m);
-                    Object typeObj = m.get("type");
-                    Object dataObj = m.get("data");
-                    emitter.onEvent(
-                            typeObj != null ? typeObj.toString() : eventType,
-                            dataObj instanceof Map ? (Map<String, Object>) dataObj : Map.of());
-                }
-            }
-        };
-
-        // Create engine client if not provided
-        WorkflowEngineClient client = engineClient != null ? engineClient
-                : new DefaultWorkflowEngineClient(agentCards, a2aClientRuntime,
-                WorkflowEngineClientConfig.builder()
-                        .sslVerify(sslVerify)
-                        .caCertsPath(caCertsPath)
-                        .credentialsConfigPath(credentialsConfigPath)
-                        .a2atEnvPath(a2atEnvPath)
-                        .build());
-        client.setEventCallback(collectingCallback);
-
-        // Create executor
-        WorkflowExecutor executor = new WorkflowExecutor(
-                workflow, controlPoint, client, collectingCallback,
-                runtimeIntent != null ? runtimeIntent : "", lang != null ? lang : "zh");
-
-        // Emit start
-        log.info("[execute_psop] Starting: workflow=" + workflow.getName() + ", " + workflow.getSteps().size() + " steps, intent=" + runtimeIntent + ", lang=" + lang);
-        collectingCallback.onEvent(EventType.START, Map.of("workflow", workflow.getName(), "steps", workflow.getSteps().size()));
-
-        // Run + finalize
-        return executor.run()
-                .exceptionally(error -> {
-                    log.error("[execute_psop] Execution failed: {}", error.getMessage());
-                    return ExecutionResult.builder()
-                            .success(false)
-                            .error(error.getMessage())
-                            .history(List.of())
-                            .stepOutputs(Map.of())
-                            .build();
-                })
-                .thenCompose(result -> {
-                    // Emit complete or error
-                    if (result.isSuccess()) {
-                        collectingCallback.onEvent(EventType.COMPLETE, Map.of(
-                                "history", result.getHistory(),
-                                "step_outputs", result.getStepOutputs()));
-                    } else {
-                        collectingCallback.onEvent(EventType.ERROR, Map.of(
-                                "error", result.getError() != null ? result.getError() : "Execution failed",
-                                "history", result.getHistory(),
-                                "step_outputs", result.getStepOutputs()));
-                    }
-                    // on_finish hook (async)
-                    CompletableFuture<Void> finishFuture;
-                    if (onFinish != null) {
-                        finishFuture = onFinish.apply(result, new ArrayList<>(collected))
-                                .exceptionally(e -> {
-                                    log.error("[execute_psop] on_finish failed: {}", e.getMessage());
-                                    return null;
-                                });
-                    } else {
-                        finishFuture = CompletableFuture.completedFuture(null);
-                    }
-                    return finishFuture.thenApply(v -> {
-                        // Emit close
-                        log.info("[execute_psop] Finished: workflow=" + workflow.getName() + ", success=" + result.isSuccess() + ", history=" + (result.getHistory() != null ? result.getHistory().size() : 0));
-                        collectingCallback.onEvent(EventType.CLOSE, Map.of());
-                        // Close engine client
-                        try {
-                            client.close();
-                        } catch (Exception ignored) {
-                            // Close failures are non-fatal during shutdown
-                        }
-                        return result;
-                    });
-                });
-    }
-
-    /**
-     * Simplified overload without SSL/auth/A2AT config (legacy compatibility).
+     * @param a2atEnvPath      path to A2A-T .env file
+     * @param credentialsConfigPath path to credentials JSON
+     * @param sslVerify        whether to verify TLS certificates
+     * @param caCertsPath      path to CA trust store
+     * @param a2aClientRuntime the A2A client runtime
+     * @param eventCallback    optional event callback (null = no-op)
+     * @param onFinish         optional persistence hook
+     * @param onEvent          optional event transformer
+     * @return CompletableFuture<ExecutionResult>
      */
     public static CompletableFuture<ExecutionResult> execute(
             Workflow psop,
             List<AgentCard> agentCards,
             ControlPoint controlPoint,
             WorkflowEngineClient engineClient,
-            String runtimeIntent,
-            String lang,
+            String runtimeIntent, String lang,
+            String a2atEnvPath, String credentialsConfigPath,
+            boolean sslVerify, String caCertsPath,
+            A2AJavaClientRuntime a2aClientRuntime,
+            EventCallback eventCallback,
+            BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish,
+            Function<Map<String, Object>, Object> onEvent) {
+
+        EventCallback emitter = eventCallback != null ? eventCallback : new EventCallback();
+        List<Map<String, Object>> collected = Collections.synchronizedList(new ArrayList<>());
+        EventCallback collectingCallback = createCollectingCallback(emitter, collected, onEvent);
+
+        WorkflowEngineClient client = engineClient != null ? engineClient
+                : createEngineClient(agentCards, a2aClientRuntime,
+                        sslVerify, caCertsPath, credentialsConfigPath, a2atEnvPath, collectingCallback);
+
+        WorkflowExecutor executor = new WorkflowExecutor(
+                psop, controlPoint, client, collectingCallback,
+                runtimeIntent != null ? runtimeIntent : "",
+                lang != null ? lang : "zh");
+
+        log.info("[execute_psop] Starting: workflow={}, {} steps, intent={}",
+                psop.getName(), psop.getSteps().size(), runtimeIntent);
+        collectingCallback.onEvent(EventType.START,
+                Map.of("workflow", psop.getName(), "steps", psop.getSteps().size()));
+
+        return executor.run()
+                .exceptionally(ExecutePsop::handleExecutionError)
+                .thenCompose(result -> finalizeResult(
+                        result, client, collectingCallback, collected, onFinish));
+    }
+
+    /** Simplified overload without SSL/auth/A2AT config (legacy compatibility). */
+    public static CompletableFuture<ExecutionResult> execute(
+            Workflow psop, List<AgentCard> agentCards,
+            ControlPoint controlPoint, WorkflowEngineClient engineClient,
+            String runtimeIntent, String lang,
             A2AJavaClientRuntime a2aClientRuntime,
             EventCallback eventCallback,
             BiConsumer<ExecutionResult, List<Map<String, Object>>> onFinish,
@@ -203,14 +106,161 @@ public class ExecutePsop {
                     return CompletableFuture.completedFuture(null);
                 } : null;
         return execute(psop, agentCards, controlPoint, engineClient,
-                runtimeIntent, lang,
-                null, null, false, null,
+                runtimeIntent, lang, null, null, false, null,
                 a2aClientRuntime, eventCallback, asyncOnFinish, onEvent);
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public static Builder builder() { return new Builder(); }
+
+    // ------------------------------------------------------------------
+    // Extracted sub-methods
+    // ------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private static EventCallback createCollectingCallback(
+            EventCallback emitter, List<Map<String, Object>> collected,
+            Function<Map<String, Object>, Object> onEvent) {
+        return new EventCallback() {
+            @Override
+            public void onEvent(String eventType, Map<String, Object> data) {
+                Map<String, Object> event = new HashMap<>();
+                event.put("type", eventType);
+                event.put("data", serialize(data));
+                event.put("timestamp", System.currentTimeMillis() / 1000.0);
+                Object transformed = transformEvent(event, onEvent);
+                if (transformed == null) return;
+                dispatchTransformed(transformed, eventType, emitter, collected);
+            }
+        };
     }
+
+    private static Object transformEvent(
+            Map<String, Object> event,
+            Function<Map<String, Object>, Object> onEvent) {
+        if (onEvent == null) return event;
+        try {
+            return onEvent.apply(event);
+        } catch (Exception e) {
+            log.warn("[execute_psop] on_event raised: {}", e.getMessage());
+            return event;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void dispatchTransformed(
+            Object transformed, String defaultType,
+            EventCallback emitter, List<Map<String, Object>> collected) {
+        if (transformed instanceof List<?> list) {
+            for (Object e : list) {
+                if (e instanceof Map<?, ?> m) {
+                    emitEventMap((Map<String, Object>) m, defaultType, emitter, collected);
+                }
+            }
+        } else if (transformed instanceof Map<?, ?> m) {
+            emitEventMap((Map<String, Object>) m, defaultType, emitter, collected);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void emitEventMap(
+            Map<String, Object> m, String defaultType,
+            EventCallback emitter, List<Map<String, Object>> collected) {
+        collected.add(m);
+        Object typeObj = m.get("type");
+        Object dataObj = m.get("data");
+        emitter.onEvent(
+                typeObj != null ? typeObj.toString() : defaultType,
+                dataObj instanceof Map ? (Map<String, Object>) dataObj : Map.of());
+    }
+
+    private static WorkflowEngineClient createEngineClient(
+            List<AgentCard> agentCards, A2AJavaClientRuntime a2aClientRuntime,
+            boolean sslVerify, String caCertsPath,
+            String credentialsConfigPath, String a2atEnvPath,
+            EventCallback callback) {
+        WorkflowEngineClient client = new DefaultWorkflowEngineClient(agentCards, a2aClientRuntime,
+                WorkflowEngineClientConfig.builder()
+                        .sslVerify(sslVerify)
+                        .caCertsPath(caCertsPath)
+                        .credentialsConfigPath(credentialsConfigPath)
+                        .a2atEnvPath(a2atEnvPath)
+                        .build());
+        client.setEventCallback(callback);
+        return client;
+    }
+
+    private static ExecutionResult handleExecutionError(Throwable error) {
+        log.error("[execute_psop] Execution failed: {}", error.getMessage());
+        return ExecutionResult.builder()
+                .success(false)
+                .error(error.getMessage())
+                .history(List.of())
+                .stepOutputs(Map.of())
+                .build();
+    }
+
+    private static CompletableFuture<ExecutionResult> finalizeResult(
+            ExecutionResult result, WorkflowEngineClient client,
+            EventCallback callback, List<Map<String, Object>> collected,
+            BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish) {
+        emitResultEvent(result, callback);
+        CompletableFuture<Void> finishFuture = invokeOnFinish(result, collected, onFinish);
+        return finishFuture.thenApply(v -> {
+            log.info("[execute_psop] Finished: workflow success={}, history={}",
+                    result.isSuccess(),
+                    result.getHistory() != null ? result.getHistory().size() : 0);
+            callback.onEvent(EventType.CLOSE, Map.of());
+            try { client.close(); } catch (Exception ignored) {}
+            return result;
+        });
+    }
+
+    private static void emitResultEvent(ExecutionResult result, EventCallback callback) {
+        if (result.isSuccess()) {
+            callback.onEvent(EventType.COMPLETE, Map.of(
+                    "history", result.getHistory(),
+                    "step_outputs", result.getStepOutputs()));
+        } else {
+            callback.onEvent(EventType.ERROR, Map.of(
+                    "error", result.getError() != null ? result.getError() : "Execution failed",
+                    "history", result.getHistory(),
+                    "step_outputs", result.getStepOutputs()));
+        }
+    }
+
+    private static CompletableFuture<Void> invokeOnFinish(
+            ExecutionResult result, List<Map<String, Object>> collected,
+            BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish) {
+        if (onFinish == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return onFinish.apply(result, new ArrayList<>(collected))
+                .exceptionally(e -> {
+                    log.error("[execute_psop] on_finish failed: {}", e.getMessage());
+                    return null;
+                });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object serialize(Object data) {
+        if (data == null) return null;
+        if (data instanceof String || data instanceof Number || data instanceof Boolean) return data;
+        if (data instanceof Map) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            for (var entry : ((Map<String, Object>) data).entrySet()) {
+                result.put(entry.getKey(), serialize(entry.getValue()));
+            }
+            return result;
+        }
+        if (data instanceof List) {
+            return ((List<?>) data).stream().map(ExecutePsop::serialize).toList();
+        }
+        return data.toString();
+    }
+
+    // ------------------------------------------------------------------
+    // Builder
+    // ------------------------------------------------------------------
 
     public static final class Builder {
         private Workflow psop;
@@ -228,115 +278,37 @@ public class ExecutePsop {
         private BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish;
         private Function<Map<String, Object>, Object> onEvent;
 
-        public Builder psop(Workflow psop) {
-            this.psop = psop;
+        public Builder psop(Workflow psop) { this.psop = psop; return this; }
+        public Builder agentCards(List<AgentCard> v) { this.agentCards = v; return this; }
+        public Builder controlPoint(ControlPoint v) { this.controlPoint = v; return this; }
+        public Builder engineClient(WorkflowEngineClient v) { this.engineClient = v; return this; }
+        public Builder runtimeIntent(String v) { this.runtimeIntent = v; return this; }
+        public Builder lang(String v) { this.lang = v; return this; }
+        public Builder a2atEnvPath(String v) { this.a2atEnvPath = v; return this; }
+        public Builder credentialsConfigPath(String v) { this.credentialsConfigPath = v; return this; }
+        public Builder sslVerify(boolean v) { this.sslVerify = v; return this; }
+        public Builder caCertsPath(String v) { this.caCertsPath = v; return this; }
+        public Builder a2aClientRuntime(A2AJavaClientRuntime v) { this.a2aClientRuntime = v; return this; }
+        public Builder eventCallback(EventCallback v) { this.eventCallback = v; return this; }
+
+        public Builder onFinish(BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> v) {
+            this.onFinish = v; return this;
+        }
+
+        public Builder onFinish(BiConsumer<ExecutionResult, List<Map<String, Object>>> v) {
+            this.onFinish = v != null ? (r, e) -> { v.accept(r, e); return CompletableFuture.completedFuture(null); } : null;
             return this;
         }
 
-        public Builder agentCards(List<AgentCard> agentCards) {
-            this.agentCards = agentCards;
-            return this;
-        }
-
-        public Builder controlPoint(ControlPoint controlPoint) {
-            this.controlPoint = controlPoint;
-            return this;
-        }
-
-        public Builder engineClient(WorkflowEngineClient engineClient) {
-            this.engineClient = engineClient;
-            return this;
-        }
-
-        public Builder runtimeIntent(String runtimeIntent) {
-            this.runtimeIntent = runtimeIntent;
-            return this;
-        }
-
-        public Builder lang(String lang) {
-            this.lang = lang;
-            return this;
-        }
-
-        public Builder a2atEnvPath(String a2atEnvPath) {
-            this.a2atEnvPath = a2atEnvPath;
-            return this;
-        }
-
-        public Builder credentialsConfigPath(String credentialsConfigPath) {
-            this.credentialsConfigPath = credentialsConfigPath;
-            return this;
-        }
-
-        public Builder sslVerify(boolean sslVerify) {
-            this.sslVerify = sslVerify;
-            return this;
-        }
-
-        public Builder caCertsPath(String caCertsPath) {
-            this.caCertsPath = caCertsPath;
-            return this;
-        }
-
-        public Builder a2aClientRuntime(A2AJavaClientRuntime a2aClientRuntime) {
-            this.a2aClientRuntime = a2aClientRuntime;
-            return this;
-        }
-
-        public Builder eventCallback(EventCallback eventCallback) {
-            this.eventCallback = eventCallback;
-            return this;
-        }
-
-        public Builder onFinish(BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish) {
-            this.onFinish = onFinish;
-            return this;
-        }
-
-        public Builder onFinish(BiConsumer<ExecutionResult, List<Map<String, Object>>> onFinish) {
-            this.onFinish = onFinish != null ? (r, e) -> {
-                onFinish.accept(r, e);
-                return CompletableFuture.completedFuture(null);
-            } : null;
-            return this;
-        }
-
-        public Builder onEvent(Function<Map<String, Object>, Object> onEvent) {
-            this.onEvent = onEvent;
-            return this;
-        }
+        public Builder onEvent(Function<Map<String, Object>, Object> v) { this.onEvent = v; return this; }
 
         public CompletableFuture<ExecutionResult> execute() {
-            if (psop == null) {
-                throw new IllegalArgumentException("psop is required");
-            }
-            if (controlPoint == null) {
-                throw new IllegalArgumentException("controlPoint is required");
-            }
+            if (psop == null) throw new IllegalArgumentException("psop is required");
+            if (controlPoint == null) throw new IllegalArgumentException("controlPoint is required");
             return ExecutePsop.execute(psop, agentCards, controlPoint, engineClient,
                     runtimeIntent, lang, a2atEnvPath, credentialsConfigPath,
                     sslVerify, caCertsPath, a2aClientRuntime,
                     eventCallback, onFinish, onEvent);
         }
-    }
-
-    private static Object serialize(Object data) {
-        if (data == null) {
-            return null;
-        }
-        if (data instanceof String || data instanceof Number || data instanceof Boolean) {
-            return data;
-        }
-        if (data instanceof Map) {
-            Map<String, Object> result = new LinkedHashMap<>();
-            for (var entry : ((Map<String, Object>) data).entrySet()) {
-                result.put(entry.getKey(), serialize(entry.getValue()));
-            }
-            return result;
-        }
-        if (data instanceof List) {
-            return ((List<?>) data).stream().map(ExecutePsop::serialize).toList();
-        }
-        return data.toString();
     }
 }

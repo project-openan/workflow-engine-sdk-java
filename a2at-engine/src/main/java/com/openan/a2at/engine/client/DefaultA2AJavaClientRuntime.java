@@ -101,100 +101,102 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
             ClientCallContext callContext,
             Consumer<ClientEvent> eventSink,
             Consumer<String> logSink) {
-        String agentUrl = "?";
-        if (agentCard.supportedInterfaces() != null && !agentCard.supportedInterfaces().isEmpty()) {
-            agentUrl = agentCard.supportedInterfaces().get(0).url();
-        }
-        RestTransportConfig transportConfig = createTransportConfig();
-        Client client;
-        try {
-            client = Client.builder(agentCard)
-                    .withTransport(RestTransport.class, transportConfig)
-                    .build();
-        } catch (A2AClientException e) {
-            log.error("[A2ARuntime] Failed to create client for '{}' ({}): {}", agentCard.name(), agentUrl, e.getMessage(), e);
-            throw new RuntimeException("Failed to create a2a-java client for "
-                    + agentCard.name() + ": " + e.getMessage(), e);
-        }
-        log.info("[A2ARuntime] sendMessage: agent='{}', url={}, messageId={}",
-                agentCard.name(), agentUrl,
-                params.message() != null ? params.message().messageId() : "?");
+        String agentUrl = extractAgentUrl(agentCard);
+        Client client = createClient(agentCard, agentUrl);
 
         List<ClientEvent> events = Collections.synchronizedList(new ArrayList<>());
         CountDownLatch done = new CountDownLatch(1);
         AtomicReference<Throwable> errorRef = new AtomicReference<>();
         AtomicReference<ClientEvent> lastEventRef = new AtomicReference<>();
 
+        if (logSink != null) logSink.accept("[A2A] Sending message to " + agentCard.name());
+
         try {
-            if (logSink != null) {
-                logSink.accept("[A2A] Sending message to " + agentCard.name());
-            }
-            client.sendMessage(
-                    params,
-                    List.of((event, card) -> {
-                        events.add(event);
-                        lastEventRef.set(event);
-                        logEvent(agentCard.name(), event);
-                        if (eventSink != null) {
-                            try {
-                                eventSink.accept(event);
-                            } catch (Exception e) {
-                                log.warn("[A2ARuntime] eventSink callback failed for {} (event_class={}): {}",
-                                        agentCard.name(), event.getClass().getSimpleName(), e.getMessage(), e);
-                            }
-                        }
-                        if (isTerminal(event)) {
-                            log.info("[A2ARuntime] Terminal event for '{}': {}",
-                                    agentCard.name(), describeTerminalEvent(event));
-                            done.countDown();
-                        }
-                    }),
-                    error -> {
-                        // If the terminal event was already received, this is a benign
-                        // connection closure during teardown (client.close() or server
-                        // shutdown). Don't set errorRef so the completed task isn't
-                        // marked as failed, and log at DEBUG instead of ERROR.
-                        if (done.getCount() == 0) {
-                            log.debug("[A2ARuntime] Connection closed after terminal event for '{}': {}",
-                                    agentCard.name(), error.getMessage());
-                        } else {
-                            errorRef.set(error);
-                            log.error("[A2ARuntime] Error callback for '{}': {}", agentCard.name(), error.getMessage(), error);
-                            done.countDown();
-                        }
-                    },
+            client.sendMessage(params,
+                    List.of((event, card) -> onEvent(agentCard.name(), event, events, lastEventRef, eventSink, done)),
+                    error -> onError(agentCard.name(), error, done, errorRef),
                     callContext);
         } catch (A2AClientException e) {
             client.close();
-            log.error("[A2ARuntime] message:send exception for '{}': {}", agentCard.name(), e.getMessage(), e);
-            throw new RuntimeException("A2A message:send failed for "
-                    + agentCard.name() + ": " + e.getMessage(), e);
+            throw new RuntimeException("A2A message:send failed for " + agentCard.name() + ": " + e.getMessage(), e);
         }
 
+        awaitCompletion(agentCard.name(), done, events, lastEventRef, client);
+        client.close();
+
+        if (errorRef.get() != null) {
+            throw new RuntimeException("A2A message:send failed for " + agentCard.name() + ": " + errorRef.get().getMessage(), errorRef.get());
+        }
+        log.info("[A2ARuntime] Completed for '{}': {} event(s)", agentCard.name(), events.size());
+        return events;
+    }
+
+    private static String extractAgentUrl(AgentCard agentCard) {
+        if (agentCard.supportedInterfaces() != null && !agentCard.supportedInterfaces().isEmpty()) {
+            return agentCard.supportedInterfaces().get(0).url();
+        }
+        return "?";
+    }
+
+    private Client createClient(AgentCard agentCard, String agentUrl) {
+        RestTransportConfig transportConfig = createTransportConfig();
+        try {
+            return Client.builder(agentCard)
+                    .withTransport(RestTransport.class, transportConfig)
+                    .build();
+        } catch (A2AClientException e) {
+            log.error("[A2ARuntime] Failed to create client for '{}' ({}): {}", agentCard.name(), agentUrl, e.getMessage(), e);
+            throw new RuntimeException("Failed to create a2a-java client for " + agentCard.name() + ": " + e.getMessage(), e);
+        }
+    }
+
+    private static void onEvent(String agentName, ClientEvent event,
+            List<ClientEvent> events, AtomicReference<ClientEvent> lastEventRef,
+            Consumer<ClientEvent> eventSink, CountDownLatch done) {
+        events.add(event);
+        lastEventRef.set(event);
+        logEvent(agentName, event);
+        if (eventSink != null) {
+            try {
+                eventSink.accept(event);
+            } catch (Exception e) {
+                log.warn("[A2ARuntime] eventSink callback failed for {} (event_class={}): {}",
+                        agentName, event.getClass().getSimpleName(), e.getMessage(), e);
+            }
+        }
+        if (isTerminal(event)) {
+            log.info("[A2ARuntime] Terminal event for '{}': {}", agentName, describeTerminalEvent(event));
+            done.countDown();
+        }
+    }
+
+    private static void onError(String agentName, Throwable error,
+            CountDownLatch done, AtomicReference<Throwable> errorRef) {
+        if (done.getCount() == 0) {
+            log.debug("[A2ARuntime] Connection closed after terminal event for '{}': {}", agentName, error.getMessage());
+        } else {
+            errorRef.set(error);
+            log.error("[A2ARuntime] Error callback for '{}': {}", agentName, error.getMessage(), error);
+            done.countDown();
+        }
+    }
+
+    private void awaitCompletion(String agentName, CountDownLatch done,
+            List<ClientEvent> events, AtomicReference<ClientEvent> lastEventRef, Client client) {
         try {
             if (!done.await(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 ClientEvent last = lastEventRef.get();
                 log.error("[A2ARuntime] TIMEOUT for '{}' after {}s: received {} event(s), last event_class={}",
-                        agentCard.name(), SEND_TIMEOUT_SECONDS, events.size(),
+                        agentName, SEND_TIMEOUT_SECONDS, events.size(),
                         last != null ? last.getClass().getSimpleName() : "none");
                 client.close();
-                throw new RuntimeException("A2A message:send timed out for " + agentCard.name());
+                throw new RuntimeException("A2A message:send timed out for " + agentName);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             client.close();
-            log.warn("[A2ARuntime] Interrupted while waiting for '{}'", agentCard.name());
-            throw new RuntimeException("A2A message:send interrupted for " + agentCard.name(), e);
+            throw new RuntimeException("A2A message:send interrupted for " + agentName, e);
         }
-
-        client.close();
-
-        if (errorRef.get() != null) {
-            throw new RuntimeException("A2A message:send failed for "
-                    + agentCard.name() + ": " + errorRef.get().getMessage(), errorRef.get());
-        }
-        log.info("[A2ARuntime] Completed for '{}': {} event(s)", agentCard.name(), events.size());
-        return events;
     }
 
     @Override
