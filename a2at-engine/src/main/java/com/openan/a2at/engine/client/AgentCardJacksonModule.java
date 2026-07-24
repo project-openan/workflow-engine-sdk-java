@@ -34,7 +34,6 @@ import org.a2aproject.sdk.spec.SecurityScheme;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * Jackson module that teaches Jackson how to deserialize the
@@ -75,24 +74,24 @@ public final class AgentCardJacksonModule extends SimpleModule {
                     JsonNode inner = node.get(entry.getKey());
                     return switch (entry.getKey()) {
                         case "httpAuthSecurityScheme" -> new HTTPAuthSecurityScheme(
-                                Objects.requireNonNull(textOrNull(inner, "bearerFormat")),
-                                Objects.requireNonNull(textOrNull(inner, "scheme")),
-                                Objects.requireNonNull(textOrNull(inner, "description")));
+                                textOrNull(inner, "bearerFormat"),
+                                textOrNull(inner, "scheme"),
+                                textOrNull(inner, "description"));
                         case "apiKeySecurityScheme" -> new APIKeySecurityScheme(
                                 inner.has("in") && inner.get("in").isTextual()
                                         ? APIKeySecurityScheme.Location.valueOf(inner.get("in").asText().toUpperCase())
                                         : null,
-                                Objects.requireNonNull(textOrNull(inner, "name")),
-                                Objects.requireNonNull(textOrNull(inner, "description")));
+                                textOrNull(inner, "name"),
+                                textOrNull(inner, "description"));
                         case "mtlsSecurityScheme" -> new MutualTLSSecurityScheme(
-                                Objects.requireNonNull(textOrNull(inner, "description")));
+                                textOrNull(inner, "description"));
                         case "oauth2SecurityScheme" -> new OAuth2SecurityScheme(
                                 null,
                                 textOrNull(inner, "description"),
                                 textOrNull(inner, "oauth2MetadataUrl"));
                         case "openIdConnectSecurityScheme" -> new OpenIdConnectSecurityScheme(
-                                Objects.requireNonNull(textOrNull(inner, "openIdConnectUrl")),
-                                Objects.requireNonNull(textOrNull(inner, "description")));
+                                textOrNull(inner, "openIdConnectUrl"),
+                                textOrNull(inner, "description"));
                        default -> null;
                     };
                 }
