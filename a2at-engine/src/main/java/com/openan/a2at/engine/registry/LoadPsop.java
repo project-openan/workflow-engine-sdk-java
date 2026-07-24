@@ -58,13 +58,7 @@ public class LoadPsop {
         String url = urlBuilder.toString();
         log.info("[Registry] Loading PSOP from {} (ssl_verify={})", url, sslVerify);
 
-        HttpClient.Builder clientBuilder = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(30));
-        clientBuilder.followRedirects(HttpClient.Redirect.ALWAYS);
-        if (!sslVerify) {
-            clientBuilder.sslContext(SslContextFactory.createTrustAll());
-        }
-        HttpClient client = clientBuilder.build();
+        HttpClient client = createHttpClient(sslVerify);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -103,6 +97,16 @@ public class LoadPsop {
      * @param sslVerify   set false for self-signed certs (dev only)
      * @return ranked list of workflow summaries
      */
+    private static HttpClient createHttpClient(boolean sslVerify) {
+        HttpClient.Builder b = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(30))
+                .followRedirects(HttpClient.Redirect.ALWAYS);
+        if (!sslVerify) {
+            b.sslContext(SslContextFactory.createTrustAll());
+        }
+        return b.build();
+    }
+
     public static List<WorkflowSearchResult> search(
             String baseUrl, String intent, int topN,
             String accessToken, boolean sslVerify) throws Exception {
@@ -117,13 +121,7 @@ public class LoadPsop {
 
         String jsonBody = mapper.writeValueAsString(Map.of("intent", intent, "top_n", topN));
 
-        HttpClient.Builder clientBuilder = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(30));
-        clientBuilder.followRedirects(HttpClient.Redirect.ALWAYS);
-        if (!sslVerify) {
-            clientBuilder.sslContext(SslContextFactory.createTrustAll());
-        }
-        HttpClient client = clientBuilder.build();
+        HttpClient client = createHttpClient(sslVerify);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -157,6 +155,7 @@ public class LoadPsop {
     }
 
     /** Convenience: search with defaults (top_n=5, no token, ssl_verify=true). */
+
     public static List<WorkflowSearchResult> search(String baseUrl, String intent) throws Exception {
         return search(baseUrl, intent, 5, null, true);
     }

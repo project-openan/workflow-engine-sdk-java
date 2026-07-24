@@ -9,6 +9,7 @@ import com.openan.a2at.engine.model.StepType;
 import com.openan.a2at.engine.model.Task;
 import com.openan.a2at.engine.model.TaskRequest;
 import com.openan.a2at.engine.model.TaskStatus;
+import com.openan.a2at.engine.model.TaskResponse;
 import com.openan.a2at.engine.model.Workflow;
 import com.openan.a2at.engine.model.WorkflowStep;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
@@ -237,24 +238,9 @@ public class WorkflowExecutor {
                     step.getName(), task.getAgent(), subtaskIndex, task.getDescription());
             log.debug("[Executor] Task message to {}: [{}]", task.getAgent(), taskMessage);
 
-            futures.add(controlPoint.onTask(request, engineClient).thenApply(response -> {
-                task.setStatus(response.isSuccess() ? TaskStatus.SUCCESS : TaskStatus.FAILED);
-                emit(EventType.TASK_STATUS_CHANGED, Map.of("step", step.getName(), "subtask_index", subtaskIndex, "agent", task.getAgent(), "status", task.getStatus().getValue()));
-                String status = response.isSuccess() ? "success" : "failed";
-                log.info("[Executor] Task {} -> {}: {}", task.getDescription(), task.getAgent(), status);
-                if (response.isSuccess() && response.getOutput() != null) {
-                    log.debug("[Executor] Task output from {}: [{}]", task.getAgent(), response.getOutput());
-                }
-                executionHistory.add(Map.of("step", step.getName(), "task", task.getDescription(), "agent", task.getAgent(), "status", status, "output", response.isSuccess() ? response.getOutput() : (response.getError() != null ? response.getError() : "")));
-                emit(EventType.TASK_RESPONSE, Map.of("step", step.getName(), "agent", task.getAgent(), "task", task.getDescription(), "output", response.isSuccess() ? response.getOutput() : (response.getError() != null ? response.getError() : "")));
-                return new StepResult(task.getDescription(), response.isSuccess() ? response.getOutput() : response.getError(), response.isSuccess(), null);
-            }).exceptionally(e -> {
-                task.setStatus(TaskStatus.FAILED);
-                emit(EventType.TASK_STATUS_CHANGED, Map.of("step", step.getName(), "subtask_index", subtaskIndex, "agent", task.getAgent(), "status", TaskStatus.FAILED.getValue()));
-                log.error("[Executor] Task {} -> {}: exception: {}", task.getDescription(), task.getAgent(), e.getMessage());
-                executionHistory.add(Map.of("step", step.getName(), "task", task.getDescription(), "agent", task.getAgent(), "status", "failed", "output", e.getMessage()));
-                return new StepResult(task.getDescription(), e.getMessage(), false, null);
-            }));
+            futures.add(controlPoint.onTask(request, engineClient)
+                    .thenApply(r -> processTaskResponse(step, task, subtaskIndex, r))
+                    .exceptionally(e -> processTaskError(step, task, subtaskIndex, e)));
         }
 
         if (step.getStepType() == StepType.ANY_SUCCESS) {
@@ -277,7 +263,38 @@ public class WorkflowExecutor {
                 });
     }
 
-    /**
+
+    private StepResult processTaskResponse(WorkflowStep step, Task task,
+            int subtaskIndex, TaskResponse response) {
+        task.setStatus(response.isSuccess() ? TaskStatus.SUCCESS : TaskStatus.FAILED);
+        emit(EventType.TASK_STATUS_CHANGED, Map.of("step", step.getName(), "subtask_index", subtaskIndex,
+                "agent", task.getAgent(), "status", task.getStatus().getValue()));
+        String status = response.isSuccess() ? "success" : "failed";
+        log.info("[Executor] Task {} -> {}: {}", task.getDescription(), task.getAgent(), status);
+        if (response.isSuccess() && response.getOutput() != null) {
+            log.debug("[Executor] Task output from {}: [{}]", task.getAgent(), response.getOutput());
+        }
+        String output = response.isSuccess() ? response.getOutput()
+                : (response.getError() != null ? response.getError() : "");
+        executionHistory.add(Map.of("step", step.getName(), "task", task.getDescription(),
+                "agent", task.getAgent(), "status", status, "output", output));
+        emit(EventType.TASK_RESPONSE, Map.of("step", step.getName(), "agent", task.getAgent(),
+                "task", task.getDescription(), "output", output));
+        return new StepResult(task.getDescription(), output, response.isSuccess(), null);
+    }
+
+    private StepResult processTaskError(WorkflowStep step, Task task,
+            int subtaskIndex, Throwable e) {
+        task.setStatus(TaskStatus.FAILED);
+        emit(EventType.TASK_STATUS_CHANGED, Map.of("step", step.getName(), "subtask_index", subtaskIndex,
+                "agent", task.getAgent(), "status", TaskStatus.FAILED.getValue()));
+        log.error("[Executor] Task {} -> {}: exception: {}", task.getDescription(), task.getAgent(), e.getMessage());
+        executionHistory.add(Map.of("step", step.getName(), "task", task.getDescription(),
+                "agent", task.getAgent(), "status", "failed", "output", e.getMessage()));
+        return new StepResult(task.getDescription(), e.getMessage(), false, null);
+    }
+
+/**
      * ANY_SUCCESS logic: iterate futures as they complete; on the first
      * success, cancel the rest and return success=true. If all fail,
      * return success=false. Mirrors Python's asyncio.as_completed loop.
