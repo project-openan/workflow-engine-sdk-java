@@ -11,3 +11,6 @@
 QuickTest*.java
 _*.py
 verify_sdk.py
+cp.txt
+logs/
+

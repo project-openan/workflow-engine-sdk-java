@@ -64,8 +64,7 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
         String step = request.getStepName();
         String agentName = request.getAgentName();
         String enrichedMessage = enrichMessageForStep(request.getMessage(), step);
-        final String finalMessage = enrichedMessage;
-        return engineClient.sendMessage(agentName, finalMessage)
+        return engineClient.sendMessage(agentName, enrichedMessage)
                 .thenApply(r -> {
                     boolean success = r.getText() != null && !r.getText().isEmpty();
                     log.info("[onTask] Response from {}: {} chars, success={}",

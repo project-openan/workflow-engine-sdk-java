@@ -86,6 +86,10 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 extensionRegistry.register(h);
             }
         }
+        EnvFileLoader.loadToSystemProperties(
+                config.getA2atEnvPath() != null
+                        ? java.nio.file.Path.of(config.getA2atEnvPath())
+                        : null);
         this.a2atClient = initA2atClient(config.getA2atEnvPath());
         for (AgentCard card : agentCards) {
             if (!card.name().isEmpty()) {

@@ -70,9 +70,9 @@ public final class CredentialCrypto {
         if (value == null || !value.startsWith(PREFIX)) {
             return value;
         }
-        String keyHex = System.getenv(ENV_KEY);
+        String keyHex = resolveKey();
         if (keyHex == null || keyHex.isBlank()) {
-            log.warn("[CredentialCrypto] Encrypted value found but {} env var not set, using as-is", ENV_KEY);
+            log.warn("[CredentialCrypto] Encrypted value found but {} not set (env var or system property), using as-is", ENV_KEY);
             return value;
         }
         try {
@@ -105,7 +105,7 @@ public final class CredentialCrypto {
      * @throws IllegalStateException if the key env var is not set
      */
     public static String encrypt(String plaintext) {
-        String keyHex = System.getenv(ENV_KEY);
+        String keyHex = resolveKey();
         if (keyHex == null || keyHex.isBlank()) {
             throw new IllegalStateException(ENV_KEY + " environment variable not set");
         }
@@ -122,6 +122,20 @@ public final class CredentialCrypto {
         } catch (Exception e) {
             throw new RuntimeException("Encryption failed: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Resolve the encryption key from OS environment variable first,
+     * then from system property (set by {@code .env} file loader).
+     *
+     * @return the hex key string, or null if not found
+     */
+    private static String resolveKey() {
+        String key = System.getenv(ENV_KEY);
+        if (key != null && !key.isBlank()) {
+            return key;
+        }
+        return System.getProperty(ENV_KEY);
     }
 
     private static byte[] hexToBytes(String hex) {

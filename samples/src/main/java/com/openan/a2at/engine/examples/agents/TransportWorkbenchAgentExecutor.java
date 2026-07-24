@@ -34,8 +34,6 @@ import com.openan.a2at.engine.runner.ExecutePsop;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.a2aproject.sdk.server.agentexecution.RequestContext;
 import org.a2aproject.sdk.server.tasks.AgentEmitter;
-import org.a2aproject.sdk.spec.Part;
-import org.a2aproject.sdk.spec.TextPart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +64,7 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
     private static final String MERGE_KEYWORD = "汇总";
     private static final String FALLBACK_PSOP_ID = "psop_spn_cross_city_diagnosis";
     private static final List<String> AGENT_CARD_RESOURCES = List.of(
-            "agentcard/spn_domain_agent.json",
+            "agentcard/spn_domain_agent_city1.json",
             "agentcard/spn_domain_agent_city2.json",
             "agentcard/transport_workbench_agent.json");
 
@@ -197,7 +195,7 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
         String notifInput = "通知主题为service-recovery-execution-result，订阅条件为业务抢通方案执行结果，上报通知数据格式为TextPart";
         for (AgentCard card : agentCards) {
             String name = card.name();
-            if (name == null || name.contains("Workbench")) {
+            if (name.contains("Workbench")) {
                 continue;
             }
             log.info("[Workbench-Agent] Pre-positioning Authorization-T to {}", name);
