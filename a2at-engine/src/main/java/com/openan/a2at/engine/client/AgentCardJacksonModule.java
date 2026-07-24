@@ -4,14 +4,14 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    Licensed under the Apache License, Version 2.0 (the "License"); you may
  *    not use this file except in compliance with the License. You may obtain
  *    a copy of the License at
  *
  *         http://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  *    License for the specific language governing permissions and limitations
  *    under the License.
@@ -44,6 +44,14 @@ import java.util.Map;
  * security schemes: each scheme object has exactly one key that
  * identifies the concrete type. This module maps those keys to the
  * SDK's concrete SecurityScheme record implementations.
+ *
+ * <p>Required fields (validated before passing to SDK constructors):
+ * <ul>
+ *   <li>httpAuthSecurityScheme: scheme (must not be null)</li>
+ *   <li>apiKeySecurityScheme: name (must not be null)</li>
+ *   <li>openIdConnectSecurityScheme: openIdConnectUrl (must not be null)</li>
+ * </ul>
+ * Optional fields (bearerFormat, description, oauth2MetadataUrl) accept null.
  */
 public final class AgentCardJacksonModule extends SimpleModule {
 
@@ -73,26 +81,47 @@ public final class AgentCardJacksonModule extends SimpleModule {
                 if (node.has(entry.getKey())) {
                     JsonNode inner = node.get(entry.getKey());
                     return switch (entry.getKey()) {
-                        case "httpAuthSecurityScheme" -> new HTTPAuthSecurityScheme(
-                                textOrNull(inner, "bearerFormat"),
-                                textOrNull(inner, "scheme"),
-                                textOrNull(inner, "description"));
-                        case "apiKeySecurityScheme" -> new APIKeySecurityScheme(
-                                inner.has("in") && inner.get("in").isTextual()
-                                        ? APIKeySecurityScheme.Location.valueOf(inner.get("in").asText().toUpperCase())
-                                        : null,
-                                textOrNull(inner, "name"),
-                                textOrNull(inner, "description"));
+                        case "httpAuthSecurityScheme" -> {
+                            String scheme = textOrNull(inner, "scheme");
+                            if (scheme == null) {
+                                throw ctxt.instantiationException(HTTPAuthSecurityScheme.class,
+                                        "httpAuthSecurityScheme: 'scheme' field is required");
+                            }
+                            yield new HTTPAuthSecurityScheme(
+                                    textOrNull(inner, "bearerFormat"),
+                                    scheme,
+                                    textOrNull(inner, "description"));
+                        }
+                        case "apiKeySecurityScheme" -> {
+                            String name = textOrNull(inner, "name");
+                            if (name == null) {
+                                throw ctxt.instantiationException(APIKeySecurityScheme.class,
+                                        "apiKeySecurityScheme: 'name' field is required");
+                            }
+                            yield new APIKeySecurityScheme(
+                                    inner.has("in") && inner.get("in").isTextual()
+                                            ? APIKeySecurityScheme.Location.valueOf(inner.get("in").asText().toUpperCase())
+                                            : null,
+                                    name,
+                                    textOrNull(inner, "description"));
+                        }
                         case "mtlsSecurityScheme" -> new MutualTLSSecurityScheme(
                                 textOrNull(inner, "description"));
                         case "oauth2SecurityScheme" -> new OAuth2SecurityScheme(
                                 null,
                                 textOrNull(inner, "description"),
                                 textOrNull(inner, "oauth2MetadataUrl"));
-                        case "openIdConnectSecurityScheme" -> new OpenIdConnectSecurityScheme(
-                                textOrNull(inner, "openIdConnectUrl"),
-                                textOrNull(inner, "description"));
-                       default -> null;
+                        case "openIdConnectSecurityScheme" -> {
+                            String url = textOrNull(inner, "openIdConnectUrl");
+                            if (url == null) {
+                                throw ctxt.instantiationException(OpenIdConnectSecurityScheme.class,
+                                        "openIdConnectSecurityScheme: 'openIdConnectUrl' field is required");
+                            }
+                            yield new OpenIdConnectSecurityScheme(
+                                    url,
+                                    textOrNull(inner, "description"));
+                        }
+                        default -> null;
                     };
                 }
             }
