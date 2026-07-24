@@ -35,7 +35,7 @@ import java.util.Map;
  * workflow starts (see {@link WorkflowEngineClient#sendExtensionMessage}),
  * so they are NOT part of the workflow's extension handler chain.
  */
-public class ExtensionRegistry {
+class ExtensionRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(ExtensionRegistry.class);
 

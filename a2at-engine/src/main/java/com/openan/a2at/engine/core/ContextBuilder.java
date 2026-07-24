@@ -14,7 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Context assembly from upstream step outputs. Mirrors Python ContextBuilder. */
-public class ContextBuilder {
+class ContextBuilder {
     private static final Logger log = LoggerFactory.getLogger(ContextBuilder.class);
     private final Workflow workflow;
     private final String runtimeIntent;

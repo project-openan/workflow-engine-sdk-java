@@ -38,7 +38,7 @@ import java.util.Set;
  * {@code A2A-Extensions} header so the remote agent knows which extensions
  * the client supports (e.g. Task-T, Negotiation-T).
  */
-public class ExtensionInterceptor extends ClientCallInterceptor {
+class ExtensionInterceptor extends ClientCallInterceptor {
 
     public static final String HTTP_EXTENSION_HEADER = "A2A-Extensions";
 

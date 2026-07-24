@@ -40,7 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Mirrors the Python SDK's {@code AgentAuthManager} + {@code AuthManager}.
  */
-public class AgentAuthManager {
+class AgentAuthManager {
 
     private static final Logger log = LoggerFactory.getLogger(AgentAuthManager.class);
     private static final ObjectMapper mapper = new ObjectMapper();

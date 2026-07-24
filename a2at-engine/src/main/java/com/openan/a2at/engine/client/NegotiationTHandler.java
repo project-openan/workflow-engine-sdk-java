@@ -38,7 +38,7 @@ import java.util.concurrent.CompletableFuture;
  * returns INPUT_REQUIRED and supports Negotiation-T, this handler calls
  * the A2ATClient to extract the negotiation context and message.
  */
-public class NegotiationTHandler implements ExtensionHandler {
+class NegotiationTHandler implements ExtensionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(NegotiationTHandler.class);
 

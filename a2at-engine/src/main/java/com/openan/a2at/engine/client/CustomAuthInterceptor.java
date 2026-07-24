@@ -35,7 +35,7 @@ import java.util.Map;
  * require tokens in custom headers (e.g. {@code X-API-Key}) or with custom
  * prefixes (e.g. {@code Token} instead of {@code Bearer}).
  */
-public class CustomAuthInterceptor extends ClientCallInterceptor {
+class CustomAuthInterceptor extends ClientCallInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(CustomAuthInterceptor.class);
 

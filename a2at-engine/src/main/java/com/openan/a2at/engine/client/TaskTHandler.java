@@ -39,7 +39,7 @@ import java.util.concurrent.CompletableFuture;
  * declares the Task-T extension, this handler calls the A2ATClient to
  * generate a structured task prompt and injects it into the message metadata.
  */
-public class TaskTHandler implements ExtensionHandler {
+class TaskTHandler implements ExtensionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(TaskTHandler.class);
 

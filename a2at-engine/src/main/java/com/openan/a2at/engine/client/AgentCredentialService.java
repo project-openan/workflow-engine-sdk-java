@@ -39,7 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Mirrors the Python SDK's {@code AgentCredentialService}. Caches tokens
  * with a configurable TTL and refreshes them before expiry.
  */
-public class AgentCredentialService implements CredentialService {
+class AgentCredentialService implements CredentialService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentCredentialService.class);
     private static final ObjectMapper mapper = new ObjectMapper();

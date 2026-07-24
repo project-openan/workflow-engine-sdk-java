@@ -36,7 +36,7 @@ import java.util.Set;
  * the Java version provides a standalone static method that the
  * DefaultWorkflowEngineClient calls after deserializing each response.
  */
-public final class SseNormalization {
+final class SseNormalization {
 
     private static final Logger log = LoggerFactory.getLogger(SseNormalization.class);
     private static final ObjectMapper mapper = new ObjectMapper();
