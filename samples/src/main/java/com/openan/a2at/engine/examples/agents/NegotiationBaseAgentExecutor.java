@@ -216,18 +216,22 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
 
     /** Start a fulfillment negotiation via A2ATClient, or return a fallback payload. */
     @SuppressWarnings("unchecked")
-    private Map<String, Object> startNegotiation(String input, String taskId, String contextId) {
-        A2ATClient client = a2at();
-        if (client == null) {
-            return fallbackNegotiationPayload(input, taskId, contextId);
-        }
-        try {
-            Map<String, Object> facts = new LinkedHashMap<>();
-            facts.put("agent", getClass().getSimpleName());
-            if (taskId != null) facts.put("task_id", taskId);
-            if (contextId != null) facts.put("context_id", contextId);
-            return client.startNegotiation(NegotiationType.FULFILLMENT, input, facts);
-        } catch (Exception e) {
+   private Map<String, Object> startNegotiation(String input, String taskId, String contextId) {
+       A2ATClient client = a2at();
+       if (client == null) {
+           return fallbackNegotiationPayload(input, taskId, contextId);
+       }
+       try {
+           Map<String, Object> facts = new LinkedHashMap<>();
+           facts.put("agent", getClass().getSimpleName());
+           if (taskId != null) facts.put("task_id", taskId);
+           if (contextId != null) facts.put("context_id", contextId);
+            // contentText should be the short negotiation request text, not
+            // the full task input. The full input is passed as a fact so the
+            // negotiation context retains the original task context.
+            facts.put("input", input);
+            return client.startNegotiation(NegotiationType.FULFILLMENT, defaultNegotiationText(), facts);
+       } catch (Exception e) {
             log.warn("[{}] startNegotiation failed, using fallback: {}", getClass().getSimpleName(), e.getMessage());
             return fallbackNegotiationPayload(input, taskId, contextId);
         }
