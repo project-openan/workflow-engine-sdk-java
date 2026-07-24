@@ -477,10 +477,10 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             log.info("[Negotiation] Clarification for '{}' round {}: {}", agentName, round, clarification);
             emit(EventType.NEGOTIATION_RESOLVED, Map.of("agent", agentName, "round", round, "clarification", clarification));
             String followUp = "[NEGOTIATION_RESOLUTION]\nThe engine has reviewed your negotiation request and provides the following clarification:\n\n" + clarification + "\n\n---\nOriginal Task:\n" + originalMessage + "\n\nPlease re-execute the task based on the clarification above.";
-            // Carry the negotiation resolution as natural-language metadata
+           // Carry the negotiation resolution as natural-language metadata
             // under the Negotiation-T URI key, per A2A-T protocol.
-            Map<String, Object> followUpMeta = new HashMap<>();
-            followUpMeta.put("https://projects.tmforum.org/a2aproject/telecommunication/extensions/Negotiation-T/v1",
+           Map<String, Object> followUpMeta = new HashMap<>();
+            followUpMeta.put("https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",
                     "## \u6570\u636e\u8fd4\u56de\u786e\u8ba4\n" + clarification + "\n");
             return runBeforeSendHandlers(agentCard, followUp, followUpMeta)
                     .thenCompose(meta -> {
