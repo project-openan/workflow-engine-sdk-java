@@ -21,6 +21,8 @@ package com.openan.a2at.engine.client;
 
 import lombok.Getter;
 
+import lombok.Getter;
+
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +38,7 @@ public class WorkflowEngineClientConfig {
     private final boolean sslVerify;
     private final String caCertsPath;
     private final long sendTimeoutSeconds;
+    private final AuthProvider authProvider;
     private final String credentialsConfigPath;
     private final Map<String, Map<String, Map<String, Object>>> credentialsConfig;
     private final String a2atEnvPath;
@@ -46,6 +49,7 @@ public class WorkflowEngineClientConfig {
         this.sslVerify = b.sslVerify;
         this.caCertsPath = b.caCertsPath;
         this.sendTimeoutSeconds = b.sendTimeoutSeconds;
+        this.authProvider = b.authProvider;
         this.credentialsConfigPath = b.credentialsConfigPath;
         this.credentialsConfig = b.credentialsConfig;
         this.a2atEnvPath = b.a2atEnvPath;
@@ -61,6 +65,7 @@ public class WorkflowEngineClientConfig {
         private boolean sslVerify = true;
         private String caCertsPath = null;
         private long sendTimeoutSeconds = 600;
+        private AuthProvider authProvider;
         private String credentialsConfigPath = null;
         private Map<String, Map<String, Map<String, Object>>> credentialsConfig = null;
         private String a2atEnvPath = null;
@@ -74,6 +79,11 @@ public class WorkflowEngineClientConfig {
 
         public Builder sendTimeoutSeconds(long v) {
             this.sendTimeoutSeconds = v;
+            return this;
+        }
+
+        public Builder authProvider(AuthProvider v) {
+            this.authProvider = v;
             return this;
         }
 

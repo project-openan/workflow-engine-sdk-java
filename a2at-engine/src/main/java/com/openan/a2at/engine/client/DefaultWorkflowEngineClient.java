@@ -60,6 +60,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private final Map<String, AgentCard> cardMap = new ConcurrentHashMap<>();
     private final A2AJavaClientRuntime a2aClientRuntime;
     private final AgentAuthManager authManager;
+    private final AuthProvider authProvider;
     private final ExtensionRegistry extensionRegistry;
     private final A2ATClient a2atClient;
     private final String contextId;
@@ -92,6 +93,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             }
         }
         this.maxNegotiationRounds = config.getMaxNegotiationRounds();
+        this.authProvider = config.getAuthProvider();
         log.info("[EngineClient] Initialized with {} agent(s), ssl_verify={}, a2at={}, maxNeg={}",
                 cardMap.size(), config.isSslVerify(), a2atClient != null, maxNegotiationRounds);
     }
@@ -299,6 +301,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
 
     private ClientCallContext buildClientCallContext(AgentCard agentCard, String agentName, Map<String, Object> messageMetadata) {
         Map<String, String> headers = new HashMap<>();
+        if (authProvider != null) {
+            authProvider.applyAuth(agentName, agentCard, headers);
+        }
         applyAuthHeaders(agentCard, agentName, headers);
         List<ClientCallInterceptor> interceptors = authManager.buildInterceptors(agentCard, agentName);
         for (ClientCallInterceptor interceptor : interceptors) {
