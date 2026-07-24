@@ -105,7 +105,23 @@ class EmbeddedA2AServerTest {
         SendMessageResult result = client.sendMessage(AGENT_NAME, "diagnose SPN fault").join();
         assertNotNull(result);
         assertFalse(result.getText().isEmpty(), "Response text should not be empty, got: " + result.getText());
-        assertTrue(result.getText().contains("\u4e0a\u6d77"), "Diagnosis result should mention Shanghai, got: " + result.getText());
+        // A2A-T extension content is in metadata (Task-T/v1), not in parts.text
+        String taskMeta = extractExtensionValue(result, "Task-T");
+        assertNotNull(taskMeta, "Task-T metadata should be present in response");
+        assertTrue(taskMeta.contains("\u4e0a\u6d77"),
+                "Diagnosis metadata should mention Shanghai, got: " + taskMeta);
+    }
+
+    private static String extractExtensionValue(SendMessageResult result, String extKeyword) {
+        Map<String, Object> meta = result.getMetadata();
+        if (meta == null) return null;
+        for (String key : meta.keySet()) {
+            if (key.contains(extKeyword)) {
+                Object v = meta.get(key);
+                return v instanceof String s ? s : String.valueOf(v);
+            }
+        }
+        return null;
     }
     private static javax.net.ssl.SSLContext createTrustAllSslContext() throws Exception {
         javax.net.ssl.SSLContext ctx = javax.net.ssl.SSLContext.getInstance("TLS");

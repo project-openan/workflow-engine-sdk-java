@@ -204,8 +204,10 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
         log.info("[{}] Follow-up received, re-executing business", getClass().getSimpleName());
         String response = executeBusiness(ctx, emitter, cleanInput);
         Map<String, Object> metadata = buildResponseMetadata(ctx, response);
-        List<Part<?>> parts = List.of(new TextPart(response));
-        emitter.addArtifact(parts, "result", getClass().getSimpleName() + " result", metadata, false, true);
+        // Per A2A-T protocol: parts.text is a short human-readable summary,
+        // the full extension content goes into artifact metadata.
+        List<Part<?>> parts = List.of(new TextPart(buildResultSummary()));
+        emitter.addArtifact(parts, "result", buildArtifactName(), metadata, false, true);
         emitStatus(emitter, TaskState.TASK_STATE_COMPLETED, contextId, taskId,
                 "Completed", metadata);
         emitter.complete(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Completed"));
@@ -269,6 +271,16 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
     /** Build the task metadata for the completed task (e.g. Authorization-T / Notification-T). */
     protected Map<String, Object> buildResponseMetadata(RequestContext ctx, String response) {
         return new LinkedHashMap<>();
+    }
+
+    /** Short human-readable summary for the artifact parts. Default: "业务处理结果" */
+    protected String buildResultSummary() {
+        return "业务处理结果";
+    }
+
+    /** Artifact display name. Default: subclass simple name + " result". */
+    protected String buildArtifactName() {
+        return getClass().getSimpleName() + " result";
     }
 
     /** Default negotiation text shown when A2ATClient is unavailable. */

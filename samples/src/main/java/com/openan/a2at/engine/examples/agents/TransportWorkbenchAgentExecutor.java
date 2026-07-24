@@ -119,6 +119,23 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
         return "workbench needs scope confirmation before orchestration";
     }
 
+    @Override
+    protected Map<String, Object> buildResponseMetadata(RequestContext ctx, String response) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put(NegotiationUtils.TASK_PROMPT_KEY, response);
+        return metadata;
+    }
+
+    @Override
+    protected String buildResultSummary() {
+        return "跨城故障协同诊断汇总结果";
+    }
+
+    @Override
+    protected String buildArtifactName() {
+        return "cross-city-diagnosis-summary";
+    }
+
     // ------------------------------------------------------------------
     // Top-level task: search PSOP, load workflow, execute
     // ------------------------------------------------------------------

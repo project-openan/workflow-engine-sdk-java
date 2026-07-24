@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 /**
  * SPN Domain Agent for City1 (Shanghai OMC).
@@ -127,6 +128,23 @@ public class SpnDomainAgentExecutor extends NegotiationBaseAgentExecutor {
     @Override
     protected String defaultNegotiationText() {
         return "上海OMC诊断需要确认客户专线故障的详细端口信息后再执行，请补充。";
+    }
+
+    @Override
+    protected Map<String, Object> buildResponseMetadata(RequestContext ctx, String response) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put(NegotiationUtils.TASK_PROMPT_KEY, response);
+        return metadata;
+    }
+
+    @Override
+    protected String buildResultSummary() {
+        return "SPN专线故障诊断结果";
+    }
+
+    @Override
+    protected String buildArtifactName() {
+        return "spn-fault-diagnosis";
     }
 
     private static String llmDiagnosisResult(String input, String fallback) {
