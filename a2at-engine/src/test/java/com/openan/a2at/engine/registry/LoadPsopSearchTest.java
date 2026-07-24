@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 package com.openan.a2at.engine.registry;
 
 import com.openan.a2at.engine.model.WorkflowSearchResult;
@@ -41,9 +60,7 @@ class LoadPsopSearchTest {
 
         try {
             List<WorkflowSearchResult> results = LoadPsop.search(baseUrl, "SPN fault", 5, null, false);
-
             assertEquals(2, results.size());
-
             WorkflowSearchResult r1 = results.get(0);
             assertEquals("psop-1", r1.getWorkflowId());
             assertEquals("psop", r1.getWorkflowType());
@@ -52,7 +69,6 @@ class LoadPsopSearchTest {
             assertEquals(0.95, r1.getScore(), 0.001);
             assertEquals("diagnose SPN", r1.getUserIntent());
             assertEquals("3 steps", r1.getTasksSummary());
-
             WorkflowSearchResult r2 = results.get(1);
             assertEquals("psop-2", r2.getWorkflowId());
             assertEquals("energy_saving", r2.getName());

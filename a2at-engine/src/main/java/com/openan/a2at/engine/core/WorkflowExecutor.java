@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 package com.openan.a2at.engine.core;
 
 import com.openan.a2at.engine.control.ControlPoint;
@@ -100,7 +119,6 @@ public class WorkflowExecutor {
         // not here. Mirrors Python SDK where the executor emits only
         // step/task/route events and the runner emits start/complete/error/close.
         log.info("[Executor] Starting workflow: {} ({} steps)", workflow.getName(), workflow.getSteps().size());
-
         Deque<Integer> pending = new ConcurrentLinkedDeque<>();
         for (int i = 0; i < workflow.getSteps().size(); i++) {
             var s = workflow.getSteps().get(i);
@@ -110,7 +128,6 @@ public class WorkflowExecutor {
         }
         Set<Integer> executed = ConcurrentHashMap.newKeySet();
         boolean[] failed = {false};
-
         Map<Integer, Integer> deferCount = new ConcurrentHashMap<>();
        return executeSteps(pending, executed, failed, deferCount)
                .thenApply(v -> {
@@ -237,7 +254,6 @@ public class WorkflowExecutor {
             log.info("[Executor] Dispatching task: step={}, agent={}, subtask_index={}, desc={}",
                     step.getName(), task.getAgent(), subtaskIndex, task.getDescription());
             log.debug("[Executor] Task message to {}: [{}]", task.getAgent(), taskMessage);
-
             futures.add(controlPoint.onTask(request, engineClient)
                     .thenApply(r -> processTaskResponse(step, task, subtaskIndex, r))
                     .exceptionally(e -> processTaskError(step, task, subtaskIndex, e)));
@@ -262,7 +278,6 @@ public class WorkflowExecutor {
                     return new StepResult(null, null, !anyFailed, results);
                 });
     }
-
 
     private StepResult processTaskResponse(WorkflowStep step, Task task,
             int subtaskIndex, TaskResponse response) {

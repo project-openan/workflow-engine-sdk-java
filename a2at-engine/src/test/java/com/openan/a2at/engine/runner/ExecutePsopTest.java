@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 package com.openan.a2at.engine.runner;
 
 import com.openan.a2at.engine.StubWorkflowEngineClient;
@@ -65,13 +84,11 @@ class ExecutePsopTest {
                 events.add(type);
             }
         };
-
         ExecutionResult result = ExecutePsop.execute(
                 linearWorkflow(), List.of(), autoCp(), stub,
                 "intent", "zh", null, null, false, null,
                 null, cb, (BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>>) null, null
         ).join();
-
         assertTrue(result.isSuccess());
         // Verify lifecycle bracket: start ... complete ... close
         assertEquals(EventType.START, events.get(0));
@@ -94,7 +111,6 @@ class ExecutePsopTest {
         StubWorkflowEngineClient stub = new StubWorkflowEngineClient("A", "B");
         AtomicInteger finishCalls = new AtomicInteger(0);
         AtomicReference<ExecutionResult> capturedResult = new AtomicReference<>();
-
         BiFunction<ExecutionResult, List<Map<String, Object>>, CompletableFuture<Void>> onFinish =
                 (r, e) -> {
                     finishCalls.incrementAndGet();
@@ -102,13 +118,11 @@ class ExecutePsopTest {
                     assertTrue(e.size() > 0, "events should be collected");
                     return CompletableFuture.completedFuture(null);
                 };
-
         ExecutionResult result = ExecutePsop.execute(
                 linearWorkflow(), List.of(), autoCp(), stub,
                 "intent", "zh", null, null, false, null,
                 null, new EventCallback(), onFinish, null
         ).join();
-
         assertEquals(1, finishCalls.get());
         assertTrue(capturedResult.get().isSuccess());
     }
@@ -133,13 +147,11 @@ class ExecutePsopTest {
             }
             return event;
         };
-
         ExecutePsop.execute(
                 linearWorkflow(), List.of(), autoCp(), stub,
                 "intent", "zh", null, null, false, null,
                 null, cb, null, onEvent
         ).join();
-
         assertTrue(events.contains("psop_update"));
         int psopIdx = events.indexOf("psop_update");
         int stepStartIdx = events.indexOf(EventType.STEP_START);
@@ -165,13 +177,11 @@ class ExecutePsopTest {
             }
             return event;
         };
-
         ExecutePsop.execute(
                 linearWorkflow(), List.of(), autoCp(), stub,
                 "intent", "zh", null, null, false, null,
                 null, cb, null, onEvent
         ).join();
-
         assertFalse(events.contains(EventType.TASK_REQUEST));
     }
 
@@ -179,13 +189,11 @@ class ExecutePsopTest {
     void builderProducesSameResultAsStaticExecute() {
         StubWorkflowEngineClient stub1 = new StubWorkflowEngineClient("A", "B");
         StubWorkflowEngineClient stub2 = new StubWorkflowEngineClient("A", "B");
-
         ExecutionResult r1 = ExecutePsop.execute(
                 linearWorkflow(), List.of(), autoCp(), stub1,
                 "intent", "zh", null, null, false, null,
                 null, new EventCallback(), null, null
         ).join();
-
         ExecutionResult r2 = ExecutePsop.builder()
                 .psop(linearWorkflow())
                 .agentCards(List.of())
@@ -196,7 +204,6 @@ class ExecutePsopTest {
                 .sslVerify(false)
                 .execute()
                 .join();
-
         assertEquals(r1.isSuccess(), r2.isSuccess());
         assertEquals(stub1.getSentCount(), stub2.getSentCount());
     }
@@ -244,13 +251,11 @@ class ExecutePsopTest {
                 events.add(type);
             }
         };
-
         ExecutionResult result = ExecutePsop.execute(
                 linearWorkflow(), List.of(), failCp, stub,
                 "intent", "zh", null, null, false, null,
                 null, cb, null, null
         ).join();
-
         assertFalse(result.isSuccess());
         assertEquals(EventType.START, events.get(0));
         assertEquals(EventType.CLOSE, events.get(events.size() - 1));

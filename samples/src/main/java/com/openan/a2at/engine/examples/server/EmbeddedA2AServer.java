@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 package com.openan.a2at.engine.examples.server;
 
 
@@ -126,13 +145,9 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     private static final int THREAD_COUNT = 8;
 
-
-
     private static final String KEYSTORE_RESOURCE = "a2a-server-keystore.p12";
 
     private static final String KEYSTORE_PASSWORD = "changeit";
-
-
 
     private final HttpsServer server;
 
@@ -146,60 +161,34 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     private final String pathPrefix;
 
-
-
     @SuppressWarnings("unchecked")
 
     public EmbeddedA2AServer(String host, int port,
-
                              Map<String, Object> agentCard,
-
                              AgentExecutor agentExecutor) throws IOException {
 
         this.agentCardMap = agentCard;
-
         this.agentName = String.valueOf(agentCard.getOrDefault("name", "unknown"));
-
         this.pathPrefix = extractPathPrefix(agentCard);
-
         AgentCard typedCard = toTypedAgentCard(agentCard);
-
-
-
         this.agentExecutorService = new ThreadPoolExecutor(
-
                 THREAD_COUNT, THREAD_COUNT, 0L, TimeUnit.MILLISECONDS,
-
                 new LinkedBlockingQueue<>(), r -> {
 
                     Thread t = new Thread(r, "agent-" + agentName + "-" + UUID.randomUUID().toString().substring(0, 8));
-
                     t.setDaemon(true);
-
                     return t;
-
                 });
-
-
-
         RestHandler restHandler = initServerComponents(agentCard, agentExecutor, typedCard);
-
         this.executorService = new ThreadPoolExecutor(
-
                 THREAD_COUNT, THREAD_COUNT, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), r -> {
 
                     Thread t = new Thread(r, "http-" + agentName + "-" + UUID.randomUUID().toString().substring(0, 8));
-
                     t.setDaemon(true);
-
                     return t;
-
                 });
-
         this.server = HttpsServer.create(new InetSocketAddress(host, port), 0);
-
         SSLContext sslContext = createSslContext();
-
         this.server.setHttpsConfigurator(new HttpsConfigurator(sslContext) {
 
             @Override
@@ -207,25 +196,18 @@ public class EmbeddedA2AServer implements AutoCloseable {
             public void configure(HttpsParameters params) {
 
                 SSLParameters sslParams = sslContext.getDefaultSSLParameters();
-
                 params.setSSLParameters(sslParams);
 
             }
 
         });
-
         this.server.setExecutor(executorService);
-
         this.server.createContext(pathPrefix.isEmpty() ? "/" : pathPrefix,
-
                 exchange -> handleExchange(exchange, restHandler));
-
-
 
         if (hasSecuritySchemes(agentCard)) {
 
             this.server.createContext("/rest/plat/smapp/v1/oauth/token", this::handleLogin);
-
             log.info("[{}] Auth login endpoint enabled", agentName);
 
         }
@@ -234,12 +216,9 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     }
 
-
-
     private static SSLContext createSslContext() throws IOException {
 
         try (InputStream is = EmbeddedA2AServer.class.getClassLoader()
-
                 .getResourceAsStream(KEYSTORE_RESOURCE)) {
 
             if (is == null) {
@@ -249,21 +228,13 @@ public class EmbeddedA2AServer implements AutoCloseable {
             }
 
             KeyStore ks = KeyStore.getInstance("PKCS12");
-
             ks.load(is, KEYSTORE_PASSWORD.toCharArray());
-
             KeyManagerFactory kmf = KeyManagerFactory.getInstance(
-
                     KeyManagerFactory.getDefaultAlgorithm());
-
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
-
             SSLContext ctx = SSLContext.getInstance("TLS");
-
             ctx.init(kmf.getKeyManagers(), null, null);
-
             return ctx;
-
         } catch (Exception e) {
 
             throw new IOException("Failed to init SSL context: " + e.getMessage(), e);
@@ -272,28 +243,20 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     }
 
-
-
     public void start() { server.start(); }
-
-
 
     @Override
 
     public void close() {
 
         server.stop(0);
-
         agentExecutorService.shutdownNow();
-
         executorService.shutdownNow();
 
         try {
 
             agentExecutorService.awaitTermination(1, TimeUnit.SECONDS);
-
             executorService.awaitTermination(1, TimeUnit.SECONDS);
-
         } catch (InterruptedException e) {
 
             Thread.currentThread().interrupt();
@@ -304,14 +267,9 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     }
 
-
-
     public Map<String, Object> getAgentCard() { return agentCardMap; }
 
     public String getAgentName() { return agentName; }
-
-
-
 
     private RestHandler initServerComponents(Map<String, Object> agentCard,
             AgentExecutor agentExecutor, AgentCard typedCard) {
@@ -331,11 +289,8 @@ public class EmbeddedA2AServer implements AutoCloseable {
     private void handleExchange(HttpExchange exchange, RestHandler restHandler) throws IOException {
 
         String fullPath = exchange.getRequestURI().getPath();
-
         String method = exchange.getRequestMethod();
-
         String path = pathPrefix.isEmpty() || !fullPath.startsWith(pathPrefix)
-
                 ? fullPath : fullPath.substring(pathPrefix.length());
 
         if (path.isEmpty()) path = "/";
@@ -345,7 +300,6 @@ public class EmbeddedA2AServer implements AutoCloseable {
             if ("GET".equalsIgnoreCase(method) && "/".equals(path)) {
 
                 sendJson(exchange, 200, restHandler.getAgentCard().getBody());
-
                 return;
 
             }
@@ -353,9 +307,7 @@ public class EmbeddedA2AServer implements AutoCloseable {
             if ("POST".equalsIgnoreCase(method) && "/message:send".equals(path)) {
 
                 var resp = restHandler.sendMessage(buildCallContext(exchange), "", readBody(exchange));
-
                 sendJson(exchange, resp.getStatusCode(), resp.getBody());
-
                 return;
 
             }
@@ -363,19 +315,15 @@ public class EmbeddedA2AServer implements AutoCloseable {
             if ("POST".equalsIgnoreCase(method) && "/message:stream".equals(path)) {
 
                 handleStream(exchange, restHandler, readBody(exchange));
-
                 return;
 
             }
 
             exchange.sendResponseHeaders(404, -1);
-
         } catch (Exception e) {
 
             log.error("[{}] Handler error: {}", agentName, e.getMessage(), e);
-
             sendJson(exchange, 500, Map.of("error", Map.of("code", 500, "message", e.getMessage())));
-
         } finally {
 
             exchange.close();
@@ -384,40 +332,30 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     }
 
-
-
     @SuppressWarnings("unchecked")
 
     private void handleLogin(HttpExchange exchange) throws IOException {
 
         if (!"PUT".equalsIgnoreCase(exchange.getRequestMethod())
-
                 && !"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
 
             sendJson(exchange, 405, Map.of("error", "Method not allowed"));
-
             return;
 
         }
 
         String body = readBody(exchange);
-
         String userName = "";
-
         String password = "";
 
         try {
 
             Map<String, Object> data = mapper.readValue(body, Map.class);
-
             userName = String.valueOf(data.getOrDefault("userName", data.getOrDefault("username", "")));
-
             password = String.valueOf(data.getOrDefault("value", data.getOrDefault("password", "")));
-
         } catch (Exception e) {
 
             sendJson(exchange, 400, Map.of("error", "Invalid request body"));
-
             return;
 
         }
@@ -425,20 +363,15 @@ public class EmbeddedA2AServer implements AutoCloseable {
         if ("admin".equals(userName) && "Admin@123".equals(password)) {
 
             log.info("[{}] Login succeeded, token issued", agentName);
-
             sendJson(exchange, 200, Map.of("accessSession", UUID.randomUUID().toString()));
-
         } else {
 
             log.warn("[{}] Login failed: bad credentials", agentName);
-
             sendJson(exchange, 401, Map.of("error", "Invalid credentials"));
 
         }
 
     }
-
-
 
     @SuppressWarnings("unchecked")
 
@@ -447,27 +380,16 @@ public class EmbeddedA2AServer implements AutoCloseable {
         try {
 
             RequestHandler inner = extractRequestHandler(restHandler);
-
             SendMessageRequest.Builder builder = SendMessageRequest.newBuilder();
-
             JsonFormat.parser().merge(requestBody, builder);
-
             var request = ProtoUtils.FromProto.messageSendParams(builder.build());
-
             inner.validateRequestedTask(request.message().taskId());
-
             Flow.Publisher<StreamingEventKind> publisher = inner.onMessageSendStream(request, buildCallContext(exchange));
-
             exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
-
             exchange.sendResponseHeaders(200, 0);
-
             AtomicLong seq = new AtomicLong(0);
-
             CountDownLatch done = new CountDownLatch(1);
-
             OutputStream os = exchange.getResponseBody();
-
             publisher.subscribe(new Flow.Subscriber<>() {
 
                 private Flow.Subscription sub;
@@ -479,11 +401,8 @@ public class EmbeddedA2AServer implements AutoCloseable {
                     try {
 
                         String payload = JsonFormat.printer().print(toStreamResponse(item));
-
                         os.write(formatSse(seq.incrementAndGet(), payload).getBytes(StandardCharsets.UTF_8));
-
                         os.flush(); sub.request(1);
-
                     } catch (IOException e) { sub.cancel(); done.countDown(); }
 
                 }
@@ -491,13 +410,10 @@ public class EmbeddedA2AServer implements AutoCloseable {
                 public void onError(Throwable t) { done.countDown(); }
 
                 public void onComplete() { done.countDown(); }
-
             });
 
             try { done.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-
             finally { os.close(); }
-
         } catch (A2AError e) {
 
             sendJson(exchange, 500, Map.of("error", e.getMessage()));
@@ -506,19 +422,13 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     }
 
-
-
     private static String formatSse(long seq, String payload) {
 
         String compact = payload == null ? "" : payload.replace("\r\n", "\n").replace('\r', '\n')
-
                 .lines().map(String::trim).reduce("", String::concat);
-
         return String.format(Locale.ROOT, "id:%d%n", seq) + "data:" + compact + "\n\n";
 
     }
-
-
 
     private static StreamResponse toStreamResponse(StreamingEventKind event) {
 
@@ -531,23 +441,17 @@ public class EmbeddedA2AServer implements AutoCloseable {
         if (event instanceof TaskStatusUpdateEvent e) { b.setStatusUpdate(ProtoUtils.ToProto.taskStatusUpdateEvent(e)); return b.build(); }
 
         if (event instanceof TaskArtifactUpdateEvent e) { b.setArtifactUpdate(ProtoUtils.ToProto.taskArtifactUpdateEvent(e)); return b.build(); }
-
         throw new IllegalArgumentException("Unsupported event: " + event);
 
     }
-
-
 
     private static RequestHandler extractRequestHandler(RestHandler restHandler) {
 
         try {
 
             var f = RestHandler.class.getDeclaredField("requestHandler");
-
             f.setAccessible(true);
-
             return (RequestHandler) f.get(restHandler);
-
         } catch (ReflectiveOperationException e) {
 
             throw new IllegalStateException("Failed to access request handler", e);
@@ -556,45 +460,30 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     }
 
-
-
     private static ServerCallContext buildCallContext(HttpExchange exchange) {
 
         Map<String, String> headers = new LinkedHashMap<>();
-
         exchange.getRequestHeaders().forEach((k, v) -> headers.put(k.toLowerCase(Locale.ROOT), String.join(",", v)));
-
         String ext = firstHeader(headers, "A2A-Extensions", "X-A2A-Extensions");
-
         Set<String> exts = ext.isBlank() ? Set.of() : Set.of(ext.split(","));
-
         return new ServerCallContext(null, Map.of("headers", headers), exts,
-
                 firstNullableHeader(headers, "A2A-Protocol-Version", "A2A-Version"));
 
     }
 
-
-
     private static String firstHeader(Map<String, String> h, String a, String b) {
 
         String v = firstNullableHeader(h, a, b);
-
         return v == null ? "" : v;
 
     }
 
-
-
     private static String firstNullableHeader(Map<String, String> h, String a, String b) {
 
         String v = h.get(a.toLowerCase(Locale.ROOT));
-
         return v != null ? v : h.get(b.toLowerCase(Locale.ROOT));
 
     }
-
-
 
     private static String readBody(HttpExchange exchange) throws IOException {
 
@@ -602,23 +491,16 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     }
 
-
-
     private static void sendJson(HttpExchange exchange, int status, Object data) throws IOException {
 
         String json = data instanceof String ? (String) data : mapper.writeValueAsString(data);
-
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-
         exchange.getResponseHeaders().set("Content-Type", "application/json");
-
         exchange.sendResponseHeaders(status, bytes.length);
 
         try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
 
     }
-
-
 
     private static AgentCard toTypedAgentCard(Map<String, Object> card) {
 
@@ -626,26 +508,19 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     }
 
-
-
     private static boolean hasSecuritySchemes(Map<String, Object> card) {
 
         return card.containsKey("securitySchemes") && card.get("securitySchemes") instanceof Map
-
                 && !((Map<?, ?>) card.get("securitySchemes")).isEmpty()
-
                 && card.containsKey("securityRequirements");
 
     }
-
-
 
     @SuppressWarnings("unchecked")
 
     private static String extractPathPrefix(Map<String, Object> agentCard) {
 
         List<Map<String, Object>> interfaces =
-
                 (List<Map<String, Object>>) agentCard.getOrDefault("supportedInterfaces", List.of());
 
         for (Map<String, Object> iface : interfaces) {
@@ -665,7 +540,6 @@ public class EmbeddedA2AServer implements AutoCloseable {
                     }
 
                 } catch (Exception ignored) {}
-
                 break;
 
             }
@@ -676,18 +550,13 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     }
 
-
-
     private static void startEventBus(MainEventBusProcessor proc) {
 
         try {
 
             var m = MainEventBusProcessor.class.getDeclaredMethod("start");
-
             m.setAccessible(true);
-
             m.invoke(proc);
-
         } catch (ReflectiveOperationException e) {
 
             throw new IllegalStateException("Failed to start event bus", e);

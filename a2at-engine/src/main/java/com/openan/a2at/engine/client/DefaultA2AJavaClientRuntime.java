@@ -1,19 +1,20 @@
 /*
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * All Rights Reserved.
+ *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License. You may obtain
- * a copy of the License at
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *         http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations
- * under the License.
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
  */
 
 package com.openan.a2at.engine.client;
@@ -103,7 +104,6 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
             Consumer<String> logSink) {
         String agentUrl = extractAgentUrl(agentCard);
         Client client = createClient(agentCard, agentUrl);
-
         List<ClientEvent> events = Collections.synchronizedList(new ArrayList<>());
         CountDownLatch done = new CountDownLatch(1);
         AtomicReference<Throwable> errorRef = new AtomicReference<>();
@@ -132,7 +132,7 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
     }
 
     private static String extractAgentUrl(AgentCard agentCard) {
-        if (agentCard.supportedInterfaces() != null && !agentCard.supportedInterfaces().isEmpty()) {
+        if (!agentCard.supportedInterfaces().isEmpty()) {
             return agentCard.supportedInterfaces().get(0).url();
         }
         return "?";
@@ -252,29 +252,29 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
 
     private static void logEvent(String agentName, ClientEvent event) {
         if (event instanceof TaskEvent te) {
-            TaskStatus st = te.getTask() != null ? te.getTask().status() : null;
+            TaskStatus st = te.getTask().status();
             log.info("[A2ARuntime] Event[Task] agent='{}', state={}, final={}",
                     agentName,
-                    st != null ? st.state() : "?",
-                    st != null && st.state() != null && isTerminal(st.state()));
+                    st.state(),
+                    isTerminal(st.state()));
         } else if (event instanceof TaskUpdateEvent tue) {
             if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
                 TaskStatus st = sue.status();
                 log.info("[A2ARuntime] Event[StatusUpdate] agent='{}', state={}, final={}",
                         agentName,
-                        st != null ? st.state() : "?",
+                        st.state(),
                         sue.isFinal());
             } else if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae) {
                 log.info("[A2ARuntime] Event[ArtifactUpdate] agent='{}', name={}, append={}, lastChunk={}",
                         agentName,
-                        ae.artifact() != null ? ae.artifact().name() : "?",
+                        ae.artifact().name(),
                         ae.append(), ae.lastChunk());
             }
         } else if (event instanceof MessageEvent me) {
             log.info("[A2ARuntime] Event[Message] agent='{}', role={}, parts={}",
                     agentName,
-                    me.getMessage() != null && me.getMessage().role() != null ? me.getMessage().role() : "?",
-                    me.getMessage() != null && me.getMessage().parts() != null ? me.getMessage().parts().size() : 0);
+                    me.getMessage().role(),
+                    me.getMessage().parts().size());
         } else {
             log.debug("[A2ARuntime] Event[{}] agent='{}'", event.getClass().getSimpleName(), agentName);
         }
@@ -282,13 +282,11 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
 
     private static String describeTerminalEvent(ClientEvent event) {
         if (event instanceof TaskEvent te) {
-            return te.getTask() != null && te.getTask().status() != null
-                    ? te.getTask().status().state().name() : "?";
+            return te.getTask().status().state().name();
         }
         if (event instanceof TaskUpdateEvent tue
                 && tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
-            return sue.status() != null && sue.status().state() != null
-                    ? sue.status().state().name() : "?";
+            return sue.status().state().name();
         }
         return event.getClass().getSimpleName();
     }

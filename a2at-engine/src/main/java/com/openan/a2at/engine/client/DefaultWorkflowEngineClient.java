@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.control.EventCallback;
@@ -95,8 +114,6 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             return null;
         }
     }
-
-
 
     @Override
     public void setEventCallback(EventCallback callback) {
@@ -230,10 +247,10 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     }
     private List<String> extractExtensionUris(AgentCard agentCard) {
         List<String> uris = new ArrayList<>();
-        if (agentCard.capabilities() == null) return uris;
+        assert agentCard.capabilities().extensions() != null;
         for (var ext : agentCard.capabilities().extensions()) {
             String uri = ext.uri();
-            if (uri != null && !uri.isEmpty()) uris.add(uri);
+            if (!uri.isEmpty()) uris.add(uri);
         }
         return uris;
     }
@@ -256,7 +273,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 Task task = extractResponseTask(events);
                 log.info("[EngineClient] Response from {}: {} chars, state={}", agentName, responseText.length(), taskState);
                 log.debug("[EngineClient] Response text from {}: [{}]", agentName, responseText);
-                if (respMetadata != null && !respMetadata.isEmpty()) {
+                if (!respMetadata.isEmpty()) {
                     log.info("[EngineClient] Response metadata keys for {}: {}", agentName, respMetadata.keySet());
                 }
                 return SendMessageResult.builder().text(responseText).task(task).metadata(respMetadata).taskState(taskState).build();
@@ -307,11 +324,11 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                data.put("is_final", sue.isFinal());
                 if (!statusText.isEmpty()) data.put("text", statusText.toString());
                if (sue.metadata() != null && !sue.metadata().isEmpty()) data.put("metadata", sue.metadata());
-                log.info("[EngineClient] Agent {} status update: {} (final={})", agentName, state, sue.isFinal());
-                if (!statusText.isEmpty()) {
-                    log.debug("[EngineClient] Agent {} status text: {}", agentName, statusText);
-                }
-                emit(EventType.AGENT_STATUS_UPDATE, data);
+               log.info("[EngineClient] Agent {} status update: {} (final={})", agentName, state, sue.isFinal());
+               if (!statusText.isEmpty()) {
+                   log.debug("[EngineClient] Agent {} status text: {}", agentName, statusText);
+               }
+               emit(EventType.AGENT_STATUS_UPDATE, data);
             } else if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae) {
                 StringBuilder text = new StringBuilder();
                 extractTextFromArtifact(ae.artifact(), text);
@@ -332,9 +349,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             extractTextFromMessage(msg, text);
             Map<String, Object> data = new HashMap<>();
             data.put("agent", agentName);
-            if (msg != null) data.put("role", msg.role().name());
+            data.put("role", msg.role().name());
             if (!text.isEmpty()) data.put("text", text.toString());
-            if (msg != null && msg.metadata() != null && !msg.metadata().isEmpty()) {
+            if (msg.metadata() != null && !msg.metadata().isEmpty()) {
                 data.put("metadata", msg.metadata());
             }
             log.info("[EngineClient] Agent {} message event: {} chars", agentName, text.length());
@@ -360,11 +377,11 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         if (task.artifacts() != null) for (Artifact a : task.artifacts()) extractTextFromArtifact(a, sb);
     }
     private static void extractTextFromArtifact(Artifact artifact, StringBuilder sb) {
-        if (artifact.parts() != null) for (Part<?> part : artifact.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
+        for (Part<?> part : artifact.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
     }
     private static void extractTextFromMessage(Message message, StringBuilder sb) {
         // status().message() is legitimately null for terminal events emitted via complete()/fail()
-        if (message == null || message.parts() == null) return;
+        if (message == null) return;
         for (Part<?> part : message.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
     }
     private static String extractResponseTaskState(Iterable<ClientEvent> events) {
@@ -469,24 +486,22 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         if (secSchemes == null || secSchemes.isEmpty() || secReqs == null || secReqs.isEmpty()) return;
         for (SecurityRequirement req : secReqs) {
             Map<String, List<String>> schemes = req.schemes();
-            if (schemes != null) {
-                for (String schemeName : schemes.keySet()) {
-                    Map<String, Object> schemeCfg = schemeConfigs.getOrDefault(schemeName, Map.of());
-                    String credential = credSvc.getCredential(schemeName, null);
-                    if (credential == null) continue;
-                    String authHeader = (String) schemeCfg.get("auth_header");
-                    if (authHeader != null && !authHeader.isEmpty()) {
-                        String prefix = (String) schemeCfg.getOrDefault("auth_header_prefix", "");
-                        headerMap.put(authHeader, prefix + credential);
-                        log.info("[Auth] Set header {} for agent {}", authHeader, agentName);
-                    } else {
-                        headerMap.put("Authorization", "Bearer " + credential);
-                        log.info("[Auth] Set Bearer header for agent {}", agentName);
-                    }
-                    String acceptHeader = (String) schemeCfg.get("accept_header");
-                    if (acceptHeader != null && !acceptHeader.isEmpty()) headerMap.put("Accept", acceptHeader);
-                    break;
+            for (String schemeName : schemes.keySet()) {
+                Map<String, Object> schemeCfg = schemeConfigs.getOrDefault(schemeName, Map.of());
+                String credential = credSvc.getCredential(schemeName, null);
+                if (credential == null) continue;
+                String authHeader = (String) schemeCfg.get("auth_header");
+                if (authHeader != null && !authHeader.isEmpty()) {
+                    String prefix = (String) schemeCfg.getOrDefault("auth_header_prefix", "");
+                    headerMap.put(authHeader, prefix + credential);
+                    log.info("[Auth] Set header {} for agent {}", authHeader, agentName);
+                } else {
+                    headerMap.put("Authorization", "Bearer " + credential);
+                    log.info("[Auth] Set Bearer header for agent {}", agentName);
                 }
+                String acceptHeader = (String) schemeCfg.get("accept_header");
+                if (acceptHeader != null && !acceptHeader.isEmpty()) headerMap.put("Accept", acceptHeader);
+                break;
             }
         }
     }

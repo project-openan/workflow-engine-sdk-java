@@ -1,19 +1,20 @@
 /*
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * All Rights Reserved.
+ *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License. You may obtain
- * a copy of the License at
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *         http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations
- * under the License.
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
  */
 
 package com.openan.a2at.engine.client;
@@ -139,18 +140,14 @@ class AgentAuthManager {
         List<ClientCallInterceptor> interceptors = new ArrayList<>();
         Map<String, SecurityScheme> secSchemes = agentCard.securitySchemes();
         var secReqs = agentCard.securityRequirements();
-
         boolean hasSecurity = secSchemes != null && !secSchemes.isEmpty()
                 && secReqs != null && !secReqs.isEmpty();
-
         AgentCredentialService credSvc = null;
         if (hasSecurity) {
             credSvc = getService(agentName);
         } else {
             log.info("[AuthManager] Agent {}: no security schemes, skipping auth", agentName);
-            if (agentCard.capabilities() == null
-                    || agentCard.capabilities().extensions() == null
-                    || agentCard.capabilities().extensions().isEmpty()) {
+            if (agentCard.capabilities().extensions() == null || agentCard.capabilities().extensions().isEmpty()) {
                 return interceptors;
             }
         }
@@ -162,7 +159,7 @@ class AgentAuthManager {
             }
             // Check for custom header configuration
             boolean useCustomHeaders = agentCfg.values().stream()
-                    .anyMatch(v -> v instanceof Map
+                    .anyMatch(v -> v != null
                             && (((Map<String, Object>) v).containsKey("auth_header")
                                     || ((Map<String, Object>) v).containsKey("accept_header")));
             if (useCustomHeaders) {
@@ -185,12 +182,10 @@ class AgentAuthManager {
 
     private static List<String> extractExtensionUris(AgentCard agentCard) {
         List<String> uris = new ArrayList<>();
-        if (agentCard.capabilities() == null) {
-            return uris;
-        }
+        assert agentCard.capabilities().extensions() != null;
         for (var ext : agentCard.capabilities().extensions()) {
             String uri = ext.uri();
-            if (uri != null && !uri.isEmpty()) {
+            if (!uri.isEmpty()) {
                 uris.add(uri);
             }
         }

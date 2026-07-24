@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 package com.openan.a2at.engine.examples.agents;
 
 import net.openan.a2at.sdk.client.A2ATClient;
@@ -87,7 +106,6 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
                 getClass().getSimpleName(), taskId, input.length(),
                 NegotiationUtils.isFollowUpTask(input),
                 detectPrePositionedExtension(ctx) != null);
-
         emitter.submit(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Task received"));
         emitter.startWork(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Processing"));
 
@@ -169,7 +187,6 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
         String negText = neg != null && neg.get(NegotiationUtils.NEGOTIATION_TEXT_KEY) instanceof String
                 ? (String) neg.get(NegotiationUtils.NEGOTIATION_TEXT_KEY) : defaultNegotiationText();
         String concern = defaultNegotiationConcern();
-
         Map<String, Object> metadata = NegotiationUtils.negotiationResponseMetadata(contextData, negText, concern);
         // Carry the negotiation context as a task-status event so the client-side
         // NegotiationTHandler / autoNegotiate can parse it from task metadata.
@@ -185,7 +202,6 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
         String contextId = ctx.getContextId();
         String cleanInput = NegotiationUtils.cleanupResolutionMarker(input);
         log.info("[{}] Follow-up received, re-executing business", getClass().getSimpleName());
-
         String response = executeBusiness(ctx, emitter, cleanInput);
         Map<String, Object> metadata = buildResponseMetadata(ctx, response);
         List<Part<?>> parts = List.of(new TextPart(response));

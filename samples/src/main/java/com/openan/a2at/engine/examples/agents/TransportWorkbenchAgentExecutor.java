@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 package com.openan.a2at.engine.examples.agents;
 
 import com.openan.a2at.engine.control.EventCallback;
@@ -106,10 +125,8 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
 
     private String handleTopLevelTask(String messageText) throws Exception {
         log.info("[Workbench-Agent] Top-level task, searching PSOP...");
-
         List<AgentCard> agentCards = loadAgentCardsFromConfig();
         log.info("[Workbench-Agent] Loaded {} agent card(s) from config", agentCards.size());
-
         String psopId = searchPsop(messageText);
         Workflow workflow = LoadPsop.load(orchUrl, psopId, null, sslVerify);
         log.info("[Workbench-Agent] Workflow: {} ({} steps)", workflow.getName(), workflow.getSteps().size());
@@ -130,7 +147,6 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
         // the Authorization-T message means the policies are default-approved
         // (whitelist authorization, no customer takeover needed).
         prePositionExtensions(engineClient, agentCards);
-
         WorkbenchControlPoint controlPoint = new WorkbenchControlPoint(a2atEnvPath);
         ExecutionResult result = ExecutePsop.builder()
                 .psop(workflow)
@@ -149,7 +165,6 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
                 })
                 .execute()
                 .join();
-
         return buildResultText(result, controlPoint);
     }
 

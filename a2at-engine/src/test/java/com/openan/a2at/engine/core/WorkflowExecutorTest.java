@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 package com.openan.a2at.engine.core;
 
 import com.openan.a2at.engine.StubWorkflowEngineClient;
@@ -68,9 +87,7 @@ class WorkflowExecutorTest {
         Workflow wf = Workflow.builder().name("linear").steps(List.of(s1, s2)).build();
         StubWorkflowEngineClient stub = new StubWorkflowEngineClient("A", "B");
         WorkflowExecutor exec = new WorkflowExecutor(wf, autoCp(), stub, recordingCallback(), "intent", "zh");
-
         ExecutionResult result = exec.run().join();
-
         assertTrue(result.isSuccess());
         assertEquals(2, exec.getHistory().size());
         assertEquals(2, stub.getSentCount());
@@ -97,9 +114,7 @@ class WorkflowExecutorTest {
         Workflow wf = Workflow.builder().name("fanout").steps(List.of(s1, s2, s3)).build();
         StubWorkflowEngineClient stub = new StubWorkflowEngineClient("A", "B", "C");
         WorkflowExecutor exec = new WorkflowExecutor(wf, autoCp(), stub, recordingCallback(), "", "zh");
-
         ExecutionResult result = exec.run().join();
-
         assertTrue(result.isSuccess());
         assertEquals(3, exec.getHistory().size());
         assertEquals(3, stub.getSentCount());
@@ -139,9 +154,7 @@ class WorkflowExecutorTest {
             }
         };
         WorkflowExecutor exec = new WorkflowExecutor(wf, cp, stub, recordingCallback(), "", "zh");
-
         ExecutionResult result = exec.run().join();
-
         assertTrue(result.isSuccess());
         // s1 -> s3 only (s2 skipped)
         assertEquals(2, stub.getSentCount());
@@ -174,7 +187,6 @@ class WorkflowExecutorTest {
             }
         };
         WorkflowExecutor exec = new WorkflowExecutor(wf, cp, stub, recordingCallback(), "", "zh");
-
         ExecutionResult result = exec.run().join();
 
         // s1 executes, then invalid route ends workflow (s2 never runs)
@@ -211,9 +223,7 @@ class WorkflowExecutorTest {
             }
         };
         WorkflowExecutor exec = new WorkflowExecutor(wf, cp, stub, recordingCallback(), "", "zh");
-
         ExecutionResult result = exec.run().join();
-
         assertFalse(result.isSuccess());
         assertNotNull(result.getError());
         // Agent A fails directly (no send), agent B must never be reached.
@@ -238,9 +248,7 @@ class WorkflowExecutorTest {
         StubWorkflowEngineClient stub = new StubWorkflowEngineClient("A", "B", "C");
         // All succeed; the step should complete as soon as the first returns.
         WorkflowExecutor exec = new WorkflowExecutor(wf, autoCp(), stub, recordingCallback(), "", "zh");
-
         ExecutionResult result = exec.run().join();
-
         assertTrue(result.isSuccess());
         // At least one task was sent (could be all 3 racing, but >= 1)
         assertTrue(stub.getSentCount() >= 1);
@@ -270,9 +278,7 @@ class WorkflowExecutorTest {
             }
         };
         WorkflowExecutor exec = new WorkflowExecutor(wf, cp, stub, recordingCallback(), "", "zh");
-
         ExecutionResult result = exec.run().join();
-
         assertFalse(result.isSuccess());
     }
 
@@ -285,7 +291,6 @@ class WorkflowExecutorTest {
         Workflow wf = Workflow.builder().name("seq").steps(List.of(s1)).build();
         StubWorkflowEngineClient stub = new StubWorkflowEngineClient("A");
         WorkflowExecutor exec = new WorkflowExecutor(wf, autoCp(), stub, recordingCallback(), "", "zh");
-
         exec.run().join();
 
         // Executor emits: step_start, task_request, task_status_changed,
@@ -296,7 +301,6 @@ class WorkflowExecutorTest {
         int taskRespIdx = events.indexOf(EventType.TASK_RESPONSE);
         int stepCompleteIdx = events.indexOf(EventType.STEP_COMPLETE);
         int wfCompleteIdx = events.indexOf(EventType.WORKFLOW_COMPLETE);
-
         assertNotEquals(-1, startIdx);
         assertTrue(startIdx < taskReqIdx);
         assertTrue(taskReqIdx < taskStatusIdx);
@@ -314,7 +318,6 @@ class WorkflowExecutorTest {
                 .build();
         Workflow wf = Workflow.builder().name("intent").steps(List.of(s1)).build();
         StubWorkflowEngineClient stub = new StubWorkflowEngineClient("A");
-
         List<String> messages = Collections.synchronizedList(new ArrayList<>());
         ControlPoint cp = new ControlPoint() {
             @Override
@@ -330,7 +333,6 @@ class WorkflowExecutorTest {
         };
         WorkflowExecutor exec = new WorkflowExecutor(wf, cp, stub, new EventCallback(), "my intent", "zh");
         exec.run().join();
-
         assertFalse(messages.isEmpty());
         assertTrue(messages.get(0).contains("my intent"));
     }

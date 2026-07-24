@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 package com.openan.a2at.engine.examples;
 
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
@@ -50,7 +69,6 @@ public class SpnCrossCityDiagnosisDemo {
         Thread agentThread = new Thread(agentsServer, "agents-server");
         agentThread.setDaemon(true);
         agentThread.start();
-
         log.info("Waiting for agents to start...");
         TimeUnit.SECONDS.sleep(AGENT_STARTUP_WAIT_SECONDS);
 
@@ -62,7 +80,6 @@ public class SpnCrossCityDiagnosisDemo {
                 + "汇总分析确定故障在哪个地市，"
                 + "授权抢通，OMC上报抢通结果";
         log.info("Sending task: {}", taskText);
-
         String response = sendTaskToWorkbench(taskText);
         log.info("=== Workbench Agent Response ===");
        if (response != null) {

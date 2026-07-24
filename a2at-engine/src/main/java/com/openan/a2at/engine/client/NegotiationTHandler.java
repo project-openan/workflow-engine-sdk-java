@@ -1,19 +1,20 @@
 /*
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * All Rights Reserved.
+ *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License. You may obtain
- * a copy of the License at
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *         http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations
- * under the License.
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
  */
 
 package com.openan.a2at.engine.client;
@@ -114,7 +115,6 @@ class NegotiationTHandler implements ExtensionHandler {
         return CompletableFuture.completedFuture(result);
     }
 
-
     @SuppressWarnings("unchecked")
     private static Map<String, Object> extractNegotiationContext(Map<String, Object> metadata) {
         if (metadata == null) {
@@ -127,7 +127,6 @@ class NegotiationTHandler implements ExtensionHandler {
         }
         return null;
     }
-
 
     private static String extractNegotiationText(Map<String, Object> metadata) {
         if (metadata == null) {
@@ -144,12 +143,10 @@ class NegotiationTHandler implements ExtensionHandler {
     }
 
     private static boolean supportsNegotiation(AgentCard agentCard) {
-        if (agentCard.capabilities() == null) {
-            return false;
-        }
+        assert agentCard.capabilities().extensions() != null;
         for (var ext : agentCard.capabilities().extensions()) {
             String uri = ext.uri();
-            if (uri != null && uri.contains("NEGOTIATION-T")) {
+            if (uri.contains("NEGOTIATION-T")) {
                 return true;
             }
         }

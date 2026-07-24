@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 package com.openan.a2at.engine.client;
 
 import com.fasterxml.jackson.core.JsonParser;
@@ -15,6 +34,7 @@ import org.a2aproject.sdk.spec.SecurityScheme;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Jackson module that teaches Jackson how to deserialize the
@@ -55,17 +75,17 @@ public final class AgentCardJacksonModule extends SimpleModule {
                     JsonNode inner = node.get(entry.getKey());
                     return switch (entry.getKey()) {
                         case "httpAuthSecurityScheme" -> new HTTPAuthSecurityScheme(
-                                textOrNull(inner, "bearerFormat"),
-                                textOrNull(inner, "scheme"),
-                                textOrNull(inner, "description"));
+                                Objects.requireNonNull(textOrNull(inner, "bearerFormat")),
+                                Objects.requireNonNull(textOrNull(inner, "scheme")),
+                                Objects.requireNonNull(textOrNull(inner, "description")));
                         case "apiKeySecurityScheme" -> new APIKeySecurityScheme(
                                 inner.has("in") && inner.get("in").isTextual()
                                         ? APIKeySecurityScheme.Location.valueOf(inner.get("in").asText().toUpperCase())
                                         : null,
-                                textOrNull(inner, "name"),
-                                textOrNull(inner, "description"));
+                                Objects.requireNonNull(textOrNull(inner, "name")),
+                                Objects.requireNonNull(textOrNull(inner, "description")));
                         case "mtlsSecurityScheme" -> new MutualTLSSecurityScheme(
-                                textOrNull(inner, "description"));
+                                Objects.requireNonNull(textOrNull(inner, "description")));
                         case "oauth2SecurityScheme" -> null; // TODO: map OAuth2 fields
                         case "openIdConnectSecurityScheme" -> null; // TODO: map OpenIdConnect fields
                         default -> null;
