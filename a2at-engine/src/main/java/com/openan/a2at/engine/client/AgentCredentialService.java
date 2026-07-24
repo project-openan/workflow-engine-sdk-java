@@ -178,10 +178,13 @@ class AgentCredentialService implements CredentialService {
         Map<String, Object> body = new HashMap<>();
         Object requestFields = schemeCfg.get("request_fields");
         if (requestFields instanceof Map) {
-            body.putAll((Map<String, Object>) requestFields);
+            for (var entry : ((Map<String, Object>) requestFields).entrySet()) {
+                String val = entry.getValue() != null ? entry.getValue().toString() : "";
+                body.put(entry.getKey(), CredentialCrypto.decryptIfNeeded(val));
+            }
         } else {
             String username = (String) schemeCfg.get("username");
-            String password = (String) schemeCfg.get("password");
+            String password = CredentialCrypto.decryptIfNeeded((String) schemeCfg.get("password"));
             if (username == null || password == null) return body;
             body.put(schemeCfg.getOrDefault("username_field", "username").toString(), username);
             body.put(schemeCfg.getOrDefault("password_field", "password").toString(), password);

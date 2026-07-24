@@ -70,7 +70,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     public DefaultWorkflowEngineClient(List<AgentCard> agentCards, A2AJavaClientRuntime a2aClientRuntime,
                                        WorkflowEngineClientConfig config) {
         this.a2aClientRuntime = a2aClientRuntime != null ? a2aClientRuntime
-                : new DefaultA2AJavaClientRuntime(config.isSslVerify(), config.getCaCertsPath());
+                : new DefaultA2AJavaClientRuntime(config.isSslVerify(), config.getCaCertsPath(), config.getSendTimeoutSeconds());
         this.contextId = UUID.randomUUID().toString();
         if (config.getCredentialsConfigPath() != null) {
             this.authManager = new AgentAuthManager(config.getCredentialsConfigPath());

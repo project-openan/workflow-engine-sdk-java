@@ -66,31 +66,36 @@ import java.util.function.Consumer;
 public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultA2AJavaClientRuntime.class);
-    private static final long SEND_TIMEOUT_SECONDS = 120;
+
 
     private final boolean sslVerify;
+    private final String caCertsPath;
+    private final long sendTimeoutSeconds;
 
     /**
      * Create a runtime with the given SSL configuration.
      *
      * @param sslVerify   whether to verify server TLS certificates
-     * @param caCertsPath optional path to a PEM CA trust store (null = use default)
-     */
-    public DefaultA2AJavaClientRuntime(boolean sslVerify, String caCertsPath) {
+    * @param caCertsPath optional path to a PEM CA trust store (null = use default)
+    * @param sendTimeoutSeconds SSE response wait timeout in seconds
+    */
+    public DefaultA2AJavaClientRuntime(boolean sslVerify, String caCertsPath, long sendTimeoutSeconds) {
         this.sslVerify = sslVerify;
+        this.caCertsPath = caCertsPath;
+        this.sendTimeoutSeconds = sendTimeoutSeconds;
         if (!sslVerify) {
             // Must be set before any HttpClient is created: the JDK caches
             // this property at class-load time.
             System.setProperty("jdk.internal.httpclient.disableHostnameVerification", "true");
         }
-        log.info("[A2ARuntime] Initialized: sslVerify={}, caCerts={}", sslVerify, caCertsPath);
+        log.info("[A2ARuntime] Initialized: sslVerify={}, caCerts={}, timeout={}s", sslVerify, caCertsPath, sendTimeoutSeconds);
     }
 
     /**
      * Simplified constructor without CA trust store (SSL verify defaults to false).
      */
     public DefaultA2AJavaClientRuntime() {
-        this(false, null);
+        this(false, null, 600L);
     }
 
     @Override
@@ -182,10 +187,10 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
     private void awaitCompletion(String agentName, CountDownLatch done,
             List<ClientEvent> events, AtomicReference<ClientEvent> lastEventRef, Client client) {
         try {
-            if (!done.await(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            if (!done.await(sendTimeoutSeconds, TimeUnit.SECONDS)) {
                 ClientEvent last = lastEventRef.get();
                 log.error("[A2ARuntime] TIMEOUT for '{}' after {}s: received {} event(s), last event_class={}",
-                        agentName, SEND_TIMEOUT_SECONDS, events.size(),
+                        agentName, sendTimeoutSeconds, events.size(),
                         last != null ? last.getClass().getSimpleName() : "none");
                 client.close();
                 throw new RuntimeException("A2A message:send timed out for " + agentName);

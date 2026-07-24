@@ -35,6 +35,7 @@ public class WorkflowEngineClientConfig {
 
     private final boolean sslVerify;
     private final String caCertsPath;
+    private final long sendTimeoutSeconds;
     private final String credentialsConfigPath;
     private final Map<String, Map<String, Map<String, Object>>> credentialsConfig;
     private final String a2atEnvPath;
@@ -44,6 +45,7 @@ public class WorkflowEngineClientConfig {
     private WorkflowEngineClientConfig(Builder b) {
         this.sslVerify = b.sslVerify;
         this.caCertsPath = b.caCertsPath;
+        this.sendTimeoutSeconds = b.sendTimeoutSeconds;
         this.credentialsConfigPath = b.credentialsConfigPath;
         this.credentialsConfig = b.credentialsConfig;
         this.a2atEnvPath = b.a2atEnvPath;
@@ -58,6 +60,7 @@ public class WorkflowEngineClientConfig {
     public static class Builder {
         private boolean sslVerify = true;
         private String caCertsPath = null;
+        private long sendTimeoutSeconds = 600;
         private String credentialsConfigPath = null;
         private Map<String, Map<String, Map<String, Object>>> credentialsConfig = null;
         private String a2atEnvPath = null;
@@ -66,6 +69,11 @@ public class WorkflowEngineClientConfig {
 
         public Builder sslVerify(boolean v) {
             this.sslVerify = v;
+            return this;
+        }
+
+        public Builder sendTimeoutSeconds(long v) {
+            this.sendTimeoutSeconds = v;
             return this;
         }
 
