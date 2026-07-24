@@ -158,8 +158,9 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
             Consumer<ClientEvent> eventSink, CountDownLatch done) {
         events.add(event);
         lastEventRef.set(event);
-        logEvent(agentName, event);
-        if (eventSink != null) {
+       logEvent(agentName, event);
+       ProtocolLogger.logResponseEvent(agentName, event);
+       if (eventSink != null) {
             try {
                 eventSink.accept(event);
             } catch (Exception e) {

@@ -264,9 +264,12 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             String contextId, Map<String, Object> metadata) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                MessageSendParams params = buildMessageSendParams(message, contextId, metadata);
-                ClientCallContext callContext = buildClientCallContext(agentCard, agentName, metadata);
-                log.info("[EngineClient] Sending via A2A SDK to {}", agentName);
+               MessageSendParams params = buildMessageSendParams(message, contextId, metadata);
+               ClientCallContext callContext = buildClientCallContext(agentCard, agentName, metadata);
+               String endpoint = agentCard.supportedInterfaces().isEmpty() ? "?"
+                       : agentCard.supportedInterfaces().get(0).url();
+               ProtocolLogger.logRequest(agentName, endpoint, params, callContext.getHeaders());
+               log.info("[EngineClient] Sending via A2A SDK to {}", agentName);
                 Iterable<ClientEvent> events = a2aClientRuntime.sendMessage(
                         agentCard, params, callContext,
                         event -> forwardIntermediateEvent(event, agentName),
