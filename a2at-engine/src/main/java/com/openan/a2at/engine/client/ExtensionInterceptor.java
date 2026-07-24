@@ -34,10 +34,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Injects A2A extension URIs from AgentCard into HTTP headers.
+ * Injects A2A extension URIs into HTTP headers — but only the extensions
+ * that are actually present in the current message's metadata.
  *
- * <p> Sets the{@code A2A-Extensions} header so the remote agent knows which extensions
- * the client supports (e.g. Task-T, Negotiation-T).
+ * <p>Sets the {@code A2A-Extensions} header so the remote agent knows which
+ * extensions this specific message uses. Extensions declared on the AgentCard
+ * but not present in the message metadata are not included.
  */
 class ExtensionInterceptor extends ClientCallInterceptor {
 
@@ -60,10 +62,11 @@ class ExtensionInterceptor extends ClientCallInterceptor {
             AgentCard agentCard,
             ClientCallContext context
     ) {
-        if (extensionUris.isEmpty()) {
+        // Only advertise extensions that are actually present in this message's metadata
+        Set<String> activeExtensions = filterActiveExtensions(payload);
+        if (activeExtensions.isEmpty()) {
             return new PayloadAndHeaders(payload, headers);
         }
-        // Merge existing extension header values with our URIs
         Set<String> merged = new LinkedHashSet<>();
         String existing = headers.get(HTTP_EXTENSION_HEADER);
         if (existing != null && !existing.isEmpty()) {
@@ -74,12 +77,27 @@ class ExtensionInterceptor extends ClientCallInterceptor {
                 }
             }
         }
-        merged.addAll(extensionUris);
+        merged.addAll(activeExtensions);
         String extensionValue = String.join(",", merged);
         Map<String, String> newHeaders = new java.util.HashMap<>(headers);
         newHeaders.put(HTTP_EXTENSION_HEADER, extensionValue);
-        newHeaders.put("x-a2a-extensions", extensionValue);
         log.info("[Extensions] Set {}={}", HTTP_EXTENSION_HEADER, extensionValue);
         return new PayloadAndHeaders(payload, newHeaders);
+    }
+
+    /**
+     * Return only the extension URIs that appear as keys in the message metadata.
+     */
+    private Set<String> filterActiveExtensions(Object payload) {
+        if (!(payload instanceof Map<?, ?> meta)) {
+            return Set.of();
+        }
+        Set<String> active = new LinkedHashSet<>();
+        for (String uri : extensionUris) {
+            if (meta.containsKey(uri)) {
+                active.add(uri);
+            }
+        }
+        return active;
     }
 }
