@@ -19,6 +19,8 @@
 
 package com.openan.a2at.engine.client;
 
+import lombok.Getter;
+
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +30,7 @@ import java.util.Map;
  * <p>Mirrors the Python SDK's {@code WorkflowEngineClient.__init__} parameters.
  * Use the builder to create an instance.
  */
+@Getter
 public class WorkflowEngineClientConfig {
 
     private final boolean sslVerify;
@@ -46,34 +49,6 @@ public class WorkflowEngineClientConfig {
         this.a2atEnvPath = b.a2atEnvPath;
         this.maxNegotiationRounds = b.maxNegotiationRounds;
         this.customHandlers = b.customHandlers;
-    }
-
-    public boolean isSslVerify() {
-        return sslVerify;
-    }
-
-    public String getCaCertsPath() {
-        return caCertsPath;
-    }
-
-    public String getCredentialsConfigPath() {
-        return credentialsConfigPath;
-    }
-
-    public Map<String, Map<String, Map<String, Object>>> getCredentialsConfig() {
-        return credentialsConfig;
-    }
-
-    public String getA2atEnvPath() {
-        return a2atEnvPath;
-    }
-
-    public int getMaxNegotiationRounds() {
-        return maxNegotiationRounds;
-    }
-
-    public List<ExtensionHandler> getCustomHandlers() {
-        return customHandlers;
     }
 
     public static Builder builder() {

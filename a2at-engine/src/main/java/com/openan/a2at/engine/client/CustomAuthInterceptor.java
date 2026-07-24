@@ -50,6 +50,7 @@ class CustomAuthInterceptor extends ClientCallInterceptor {
         this.schemeConfigs = schemeConfigs != null ? schemeConfigs : Map.of();
     }
 
+    @NotNull
     @Override
     public PayloadAndHeaders intercept(
             @NotNull String method,

@@ -30,7 +30,6 @@ import java.util.concurrent.CompletableFuture;
  * Communication client for sending A2A messages to remote agents.
  * Handles: AgentCard lookup, client creation, auth, A2A-T extensions,
  * streaming response handling, text extraction.
- *
  * The user calls sendMessage() from their ControlPoint implementation.
  */
 public interface WorkflowEngineClient {

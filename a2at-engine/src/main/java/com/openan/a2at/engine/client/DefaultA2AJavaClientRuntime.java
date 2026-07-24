@@ -69,7 +69,6 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
     private static final long SEND_TIMEOUT_SECONDS = 120;
 
     private final boolean sslVerify;
-    private final String caCertsPath;
 
     /**
      * Create a runtime with the given SSL configuration.
@@ -79,7 +78,6 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
      */
     public DefaultA2AJavaClientRuntime(boolean sslVerify, String caCertsPath) {
         this.sslVerify = sslVerify;
-        this.caCertsPath = caCertsPath;
         if (!sslVerify) {
             // Must be set before any HttpClient is created: the JDK caches
             // this property at class-load time.
@@ -209,7 +207,7 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
     // ------------------------------------------------------------------
 
     private RestTransportConfig createTransportConfig() {
-        if (sslVerify) {
+        if (this.sslVerify) {
             return new RestTransportConfig();
         }
         SSLContext trustAllCtx = SslContextFactory.createTrustAll();

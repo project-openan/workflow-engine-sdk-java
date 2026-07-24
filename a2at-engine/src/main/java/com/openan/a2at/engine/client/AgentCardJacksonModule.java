@@ -86,9 +86,14 @@ public final class AgentCardJacksonModule extends SimpleModule {
                                 Objects.requireNonNull(textOrNull(inner, "description")));
                         case "mtlsSecurityScheme" -> new MutualTLSSecurityScheme(
                                 Objects.requireNonNull(textOrNull(inner, "description")));
-                        case "oauth2SecurityScheme" -> null; // TODO: map OAuth2 fields
-                        case "openIdConnectSecurityScheme" -> null; // TODO: map OpenIdConnect fields
-                        default -> null;
+                        case "oauth2SecurityScheme" -> new OAuth2SecurityScheme(
+                                null,
+                                textOrNull(inner, "description"),
+                                textOrNull(inner, "oauth2MetadataUrl"));
+                        case "openIdConnectSecurityScheme" -> new OpenIdConnectSecurityScheme(
+                                Objects.requireNonNull(textOrNull(inner, "openIdConnectUrl")),
+                                Objects.requireNonNull(textOrNull(inner, "description")));
+                       default -> null;
                     };
                 }
             }

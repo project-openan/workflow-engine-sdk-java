@@ -36,8 +36,7 @@ import java.util.Set;
 /**
  * Injects A2A extension URIs from AgentCard into HTTP headers.
  *
- * <p>Mirrors the Python SDK's {@code ExtensionInterceptor}. Sets the
- * {@code A2A-Extensions} header so the remote agent knows which extensions
+ * <p> Sets the{@code A2A-Extensions} header so the remote agent knows which extensions
  * the client supports (e.g. Task-T, Negotiation-T).
  */
 class ExtensionInterceptor extends ClientCallInterceptor {

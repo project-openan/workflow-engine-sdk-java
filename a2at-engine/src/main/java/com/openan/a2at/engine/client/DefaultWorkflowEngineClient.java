@@ -62,7 +62,6 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private final AgentAuthManager authManager;
     private final ExtensionRegistry extensionRegistry;
     private final A2ATClient a2atClient;
-    private final boolean sslVerify;
     private final String contextId;
     private EventCallback eventCallback = new EventCallback();
     private ControlPoint controlPoint;
@@ -73,7 +72,6 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         this.a2aClientRuntime = a2aClientRuntime != null ? a2aClientRuntime
                 : new DefaultA2AJavaClientRuntime(config.isSslVerify(), config.getCaCertsPath());
         this.contextId = UUID.randomUUID().toString();
-        this.sslVerify = config.isSslVerify();
         if (config.getCredentialsConfigPath() != null) {
             this.authManager = new AgentAuthManager(config.getCredentialsConfigPath());
         } else if (config.getCredentialsConfig() != null) {
@@ -220,6 +218,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         return null;
     }
+
     private CompletableFuture<Map<String, Object>> runBeforeSendHandlers(
             AgentCard agentCard, String message, Map<String, Object> presetMetadata) {
         Map<String, Object> metadata = presetMetadata != null
@@ -234,6 +233,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         return future;
     }
+
     private CompletableFuture<SendMessageResult> runAfterReceiveHandlers(AgentCard agentCard, SendMessageResult result) {
         List<String> extUris = extractExtensionUris(agentCard);
         List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
@@ -245,6 +245,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         return future;
     }
+
     private List<String> extractExtensionUris(AgentCard agentCard) {
         List<String> uris = new ArrayList<>();
         assert agentCard.capabilities().extensions() != null;
@@ -254,6 +255,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         return uris;
     }
+
     // --- Core A2A send via SDK runtime ---
     protected CompletableFuture<SendMessageResult> doSendViaA2ARuntime(
             AgentCard agentCard, String agentName, String message,
@@ -283,6 +285,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             }
         });
     }
+
     private MessageSendParams buildMessageSendParams(String message, String contextId, Map<String, Object> metadata) {
         Message msg = Message.builder()
                 .messageId(UUID.randomUUID().toString())
@@ -293,6 +296,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 .build();
         return MessageSendParams.builder().message(msg).build();
     }
+
     private ClientCallContext buildClientCallContext(AgentCard agentCard, String agentName, Map<String, Object> messageMetadata) {
         Map<String, String> headers = new HashMap<>();
         applyAuthHeaders(agentCard, agentName, headers);
@@ -373,17 +377,21 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         return text.toString();
     }
+
     private static void extractTextFromTask(Task task, StringBuilder sb) {
         if (task.artifacts() != null) for (Artifact a : task.artifacts()) extractTextFromArtifact(a, sb);
     }
+
     private static void extractTextFromArtifact(Artifact artifact, StringBuilder sb) {
         for (Part<?> part : artifact.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
     }
+
     private static void extractTextFromMessage(Message message, StringBuilder sb) {
         // status().message() is legitimately null for terminal events emitted via complete()/fail()
         if (message == null) return;
         for (Part<?> part : message.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
     }
+
     private static String extractResponseTaskState(Iterable<ClientEvent> events) {
         String state = "";
         for (ClientEvent event : events) {
@@ -394,6 +402,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         return state;
     }
+
     private static Map<String, Object> extractResponseMetadata(Iterable<ClientEvent> events) {
         Map<String, Object> metadata = new HashMap<>();
         for (ClientEvent event : events) {
@@ -422,6 +431,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             }
         }
     }
+
     private static Task extractResponseTask(Iterable<ClientEvent> events) {
         Task lastTask = null;
         for (ClientEvent event : events) {
@@ -430,6 +440,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         return lastTask;
     }
+
     // --- autoNegotiate ---
     private CompletableFuture<SendMessageResult> autoNegotiate(
             AgentCard agentCard, String agentName, String originalMessage,
@@ -472,6 +483,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                     });
         });
     }
+
     private static boolean isNegotiationNeeded(SendMessageResult result) {
         return result.getTaskState() != null && result.getTaskState().contains("INPUT_REQUIRED");
     }
@@ -505,13 +517,14 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             }
         }
     }
-    // --- utility ---
 
+    // --- utility ---
     @Override
     public void close() {
         log.info("[EngineClient] Closing");
         try { a2aClientRuntime.close(); } catch (Exception ignored) {}
     }
+
     @Override
     public void updateAgentCards(List<AgentCard> agentCards) {
         cardMap.clear();
@@ -520,12 +533,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         log.info("[EngineClient] Updated agent cards: {} agent(s)", cardMap.size());
     }
+
     @Override
     public void registerHandler(ExtensionHandler handler) {
         extensionRegistry.register(handler);
-    }
-    public A2ATClient getA2atClient() { return a2atClient; }
-    public static Map<String, Object> normalizeAgentDict(Map<String, Object> agentDict) {
-        return AgentCardNormalizer.normalize(agentDict);
     }
 }

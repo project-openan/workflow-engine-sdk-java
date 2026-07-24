@@ -41,12 +41,10 @@ public class RegistryClient {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     private final String baseUrl;
-    private final boolean sslVerify;
     private final HttpClient httpClient;
 
     public RegistryClient(String url, boolean sslVerify) {
         this.baseUrl = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-        this.sslVerify = sslVerify;
         HttpClient.Builder clientBuilder = HttpClient.newBuilder()
                 .connectTimeout(java.time.Duration.ofSeconds(30))
                 .followRedirects(HttpClient.Redirect.ALWAYS);
