@@ -21,7 +21,6 @@ package com.openan.a2at.engine.examples.agents;
 
 import net.openan.a2at.sdk.client.A2ATClient;
 import net.openan.a2at.sdk.negotiation.types.model.NegotiationType;
-import org.a2aproject.sdk.server.agentexecution.AgentExecutor;
 import org.a2aproject.sdk.server.agentexecution.RequestContext;
 import org.a2aproject.sdk.server.tasks.AgentEmitter;
 import org.a2aproject.sdk.spec.A2AError;
@@ -55,7 +54,7 @@ import java.util.UUID;
  * absent or LLM is disabled, the negotiation context falls back to a minimal
  * in-process context and the business text falls back to the subclass default.
  */
-public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
+public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(NegotiationBaseAgentExecutor.class);
 
@@ -106,8 +105,8 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
                 getClass().getSimpleName(), taskId, input.length(),
                 NegotiationUtils.isFollowUpTask(input),
                 detectPrePositionedExtension(ctx) != null);
-        emitter.submit(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Task received"));
-        emitter.startWork(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Processing"));
+        emitter.submit(buildStatusMessage(contextId, taskId, "Task received"));
+        emitter.startWork(buildStatusMessage(contextId, taskId, "Processing"));
 
         try {
             String prePositionedExt = detectPrePositionedExtension(ctx);
@@ -120,7 +119,7 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
             }
         } catch (Exception e) {
             log.error("[{}] execute failed: {}", getClass().getSimpleName(), e.getMessage(), e);
-            emitter.fail(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Failed: " + e.getMessage()));
+            emitter.fail(buildStatusMessage(contextId, taskId, "Failed: " + e.getMessage()));
         }
     }
 
@@ -173,7 +172,7 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
         emitter.addArtifact(parts, "result", getClass().getSimpleName() + " ack", Map.of(), false, true);
         emitStatus(emitter, TaskState.TASK_STATE_COMPLETED, contextId, taskId,
                 extKeyword + " pre-positioned successfully", Map.of());
-        emitter.complete(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Completed"));
+        emitter.complete(buildStatusMessage(contextId, taskId, "Completed"));
         log.info("[{}] {} pre-positioning completed", getClass().getSimpleName(), extKeyword);
     }
 
@@ -210,7 +209,7 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
         emitter.addArtifact(parts, "result", buildArtifactName(), metadata, false, true);
         emitStatus(emitter, TaskState.TASK_STATE_COMPLETED, contextId, taskId,
                 "Completed", metadata);
-        emitter.complete(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Completed"));
+        emitter.complete(buildStatusMessage(contextId, taskId, "Completed"));
         log.info("[{}] Task completed after negotiation", getClass().getSimpleName());
     }
 
@@ -257,7 +256,7 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
     private void emitStatus(AgentEmitter emitter, TaskState state, String contextId, String taskId,
                             String text, Map<String, Object> metadata) {
         TaskStatus status = new TaskStatus(state,
-                BaseAgentExecutor.buildStatusMessage(contextId, taskId, text), null);
+                buildStatusMessage(contextId, taskId, text), null);
         TaskStatusUpdateEvent event = TaskStatusUpdateEvent.builder()
                 .taskId(taskId)
                 .contextId(contextId)
@@ -300,14 +299,5 @@ public abstract class NegotiationBaseAgentExecutor implements AgentExecutor {
     @Override
     public void cancel(RequestContext ctx, AgentEmitter emitter) throws A2AError {
         emitter.cancel();
-    }
-
-    private static String extractText(Message message) {
-        if (message == null) return "";
-        StringBuilder sb = new StringBuilder();
-        for (Part<?> part : message.parts()) {
-            if (part instanceof TextPart tp) sb.append(tp.text());
-        }
-        return sb.toString();
     }
 }
