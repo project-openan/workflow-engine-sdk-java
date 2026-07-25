@@ -24,6 +24,7 @@ import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import net.openan.a2at.sdk.client.A2ATClient;
 import net.openan.a2at.sdk.client.model.PromptGenerationResult;
+import net.openan.a2at.sdk.client.model.PromptGenerationFailure;
 import org.a2aproject.sdk.spec.AgentCard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,6 +85,13 @@ class TaskTHandler implements ExtensionHandler {
                     log.info("[Task-T] Generated prompt for '{}': {} chars", getAgentName(agentCard), promptText.length());
                     log.debug("[Task-T] Prompt content: [{}]", promptText);
                 }
+            } else {
+                PromptGenerationFailure f = promptResult.failure();
+                log.warn("[Task-T] Prompt generation failed for '{}': code={}, stage={}, message={}",
+                        getAgentName(agentCard),
+                        f != null ? f.code() : "unknown",
+                        f != null ? f.stage() : "unknown",
+                        f != null ? f.message() : "unknown");
             }
         } catch (Exception e) {
             log.warn("[Task-T] Failed: {}", e.getMessage());

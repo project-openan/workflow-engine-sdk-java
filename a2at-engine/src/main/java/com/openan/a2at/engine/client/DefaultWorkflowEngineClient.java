@@ -26,6 +26,7 @@ import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.model.SendMessageResult;
 import net.openan.a2at.sdk.client.A2ATClient;
 import net.openan.a2at.sdk.client.model.PromptGenerationResult;
+import net.openan.a2at.sdk.client.model.PromptGenerationFailure;
 import org.a2aproject.sdk.client.ClientEvent;
 import org.a2aproject.sdk.spec.AgentCard;
 import org.a2aproject.sdk.spec.SecurityScheme;
@@ -213,7 +214,11 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             if (result.success()) {
                 return result.promptText();
             }
-            log.warn("[EngineClient] SDK prompt generation failed for input: {}", naturalLanguageInput);
+            PromptGenerationFailure f = result.failure();
+            log.warn("[EngineClient] SDK prompt generation failed: code={}, stage={}, message={}",
+                    f != null ? f.code() : "unknown",
+                    f != null ? f.stage() : "unknown",
+                    f != null ? f.message() : "unknown");
         } catch (Exception e) {
             log.warn("[EngineClient] SDK prompt generation error: {}", e.getMessage());
         }
