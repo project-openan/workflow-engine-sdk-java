@@ -411,7 +411,7 @@ WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
 - 简短摘要放在 `artifact.parts[].text`
 - 完整扩展内容放在 `artifact.metadata[extension-uri]`
 - 协商文本放在 `status.metadata[NEGOTIATION-T]`
-- 协商上下文放在 `status.metadata[DATA-NEGOTIATION-T/v1]`
+- SDK 内部协商上下文放在 `status.metadata[DATA-NEGOTIATION-T/v1]`（不是扩展点；携带 negotiationType/round/negotiationId/status）
 
 ## 12. 事件回调
 

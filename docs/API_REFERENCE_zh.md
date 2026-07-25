@@ -445,9 +445,14 @@ Map<String, Object> registerAgentCard(Map<String, Object> agentCard)
 |---|---|
 | Task-T | `https://projects.tmforum.org/a2aproject/telecommunication/extensions/Task-T/v1` |
 | Negotiation-T | `https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T` |
-| Data-Negotiation-T | `https://projects.tmforum.org/a2aproject/telecommunication/extensions/DATA-NEGOTIATION-T/v1` |
 | Authorization-T | `https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1` |
 | Notification-T | `https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1` |
+
+> **注意：** `DATA-NEGOTIATION-T/v1` **不是** A2A-T 扩展。它是 A2A-T SDK
+> 协商模块内部使用的 metadata key，用于携带结构化协商上下文
+>（`negotiationType`、`round`、`negotiationId`、`status`）。
+> 不在 AgentCard 上声明，不被 ExtensionHandler 处理，也不出现在
+> `A2A-Extensions` 头中。
 
 ---
 

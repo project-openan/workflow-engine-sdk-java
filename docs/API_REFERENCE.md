@@ -454,9 +454,15 @@ orchestration center API response.
 |---|---|
 | Task-T | `https://projects.tmforum.org/a2aproject/telecommunication/extensions/Task-T/v1` |
 | Negotiation-T | `https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T` |
-| Data-Negotiation-T | `https://projects.tmforum.org/a2aproject/telecommunication/extensions/DATA-NEGOTIATION-T/v1` |
 | Authorization-T | `https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1` |
 | Notification-T | `https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1` |
+
+> **Note:** `DATA-NEGOTIATION-T/v1` is **not** an A2A-T extension. It is an
+> SDK-internal metadata key used by the A2A-T SDK negotiation module to carry
+> structured context (`negotiationType`, `round`, `negotiationId`,
+> `status`) alongside the Negotiation-T text. It is not declared on
+> AgentCard, not handled by ExtensionHandler, and not advertised in the
+> `A2A-Extensions` header.
 
 ---
 

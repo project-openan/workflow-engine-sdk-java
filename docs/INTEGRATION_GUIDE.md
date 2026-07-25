@@ -446,7 +446,7 @@ Response messages (from agents) should place:
 - Short summary in `artifact.parts[].text`
 - Full extension content in `artifact.metadata[extension-uri]`
 - Negotiation text in `status.metadata[NEGOTIATION-T]`
-- Negotiation context in `status.metadata[DATA-NEGOTIATION-T/v1]`
+- SDK-internal negotiation context in `status.metadata[DATA-NEGOTIATION-T/v1]` (not an extension; carries negotiationType/round/negotiationId/status)
 
 ## 12. Event Callback
 
