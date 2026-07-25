@@ -24,12 +24,16 @@ import org.a2aproject.sdk.client.ClientEvent;
 import org.a2aproject.sdk.client.TaskEvent;
 import org.a2aproject.sdk.client.TaskUpdateEvent;
 import org.a2aproject.sdk.client.MessageEvent;
+import org.a2aproject.sdk.client.http.A2AHttpClient;
 import org.a2aproject.sdk.client.http.JdkA2AHttpClient;
 import org.a2aproject.sdk.client.transport.rest.RestTransport;
+import org.a2aproject.sdk.client.transport.jsonrpc.JSONRPCTransport;
+import org.a2aproject.sdk.client.transport.jsonrpc.JSONRPCTransportConfig;
 import org.a2aproject.sdk.client.transport.rest.RestTransportConfig;
 import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext;
 import org.a2aproject.sdk.spec.A2AClientException;
 import org.a2aproject.sdk.spec.AgentCard;
+import org.a2aproject.sdk.spec.AgentInterface;
 import org.a2aproject.sdk.spec.TaskArtifactUpdateEvent;
 import org.a2aproject.sdk.spec.TaskStatus;
 import org.a2aproject.sdk.spec.TaskState;
@@ -71,6 +75,7 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
     private final boolean sslVerify;
     private final String caCertsPath;
     private final long sendTimeoutSeconds;
+    private final String preferredProtocol;
 
     /**
      * Create a runtime with the given SSL configuration.
@@ -79,10 +84,12 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
     * @param caCertsPath optional path to a PEM CA trust store (null = use default)
     * @param sendTimeoutSeconds SSE response wait timeout in seconds
     */
-    public DefaultA2AJavaClientRuntime(boolean sslVerify, String caCertsPath, long sendTimeoutSeconds) {
+    public DefaultA2AJavaClientRuntime(boolean sslVerify, String caCertsPath,
+                                             long sendTimeoutSeconds, String preferredProtocol) {
         this.sslVerify = sslVerify;
         this.caCertsPath = caCertsPath;
         this.sendTimeoutSeconds = sendTimeoutSeconds;
+        this.preferredProtocol = preferredProtocol;
         if (!sslVerify) {
             // Must be set before any HttpClient is created: the JDK caches
             // this property at class-load time.
@@ -95,7 +102,7 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
      * Simplified constructor without CA trust store (SSL verify defaults to false).
      */
     public DefaultA2AJavaClientRuntime() {
-        this(false, null, 600L);
+        this(false, null, 600L, null);
     }
 
     @Override
@@ -142,15 +149,60 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
     }
 
     private Client createClient(AgentCard agentCard, String agentUrl) {
-        RestTransportConfig transportConfig = createTransportConfig();
+        AgentInterface selected = selectInterface(agentCard);
+        String protocolBinding = selected.protocolBinding();
+        A2AHttpClient httpClient = createHttpClient();
         try {
-            return Client.builder(agentCard)
-                    .withTransport(RestTransport.class, transportConfig)
-                    .build();
+            Client client = buildClientWithTransport(agentCard, protocolBinding, httpClient);
+            log.info("[A2ARuntime] Transport: {} for '{}' ({})", protocolBinding, agentCard.name(), selected.url());
+            return client;
         } catch (A2AClientException e) {
             log.error("[A2ARuntime] Failed to create client for '{}' ({}): {}", agentCard.name(), agentUrl, e.getMessage(), e);
             throw new RuntimeException("Failed to create a2a-java client for " + agentCard.name() + ": " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Select the best AgentInterface based on preferredProtocol or first available.
+     */
+    private AgentInterface selectInterface(AgentCard agentCard) {
+        List<AgentInterface> interfaces = agentCard.supportedInterfaces();
+        if (interfaces == null || interfaces.isEmpty()) {
+            throw new RuntimeException("AgentCard has no supportedInterfaces: " + agentCard.name());
+        }
+        if (preferredProtocol != null && !preferredProtocol.isBlank()) {
+            for (AgentInterface iface : interfaces) {
+                if (preferredProtocol.equalsIgnoreCase(iface.protocolBinding())) {
+                    log.info("[A2ARuntime] Selected preferred protocol {} for '{}'",
+                            preferredProtocol, agentCard.name());
+                    return iface;
+                }
+            }
+            log.warn("[A2ARuntime] Preferred protocol '{}' not in supportedInterfaces for '{}', using first available: {}",
+                    preferredProtocol, agentCard.name(), interfaces.get(0).protocolBinding());
+        }
+        return interfaces.get(0);
+    }
+
+    /**
+     * Build the client with the transport matching the protocol binding.
+     * Both RestTransportConfig and JSONRPCTransportConfig accept A2AHttpClient,
+     * so the same SSL-configured HTTP client works for both.
+     */
+    private Client buildClientWithTransport(AgentCard agentCard,
+                                             String protocolBinding,
+                                             A2AHttpClient httpClient) throws A2AClientException {
+        if ("JSONRPC".equalsIgnoreCase(protocolBinding)) {
+            return Client.builder(agentCard)
+                    .withTransport(JSONRPCTransport.class, new JSONRPCTransportConfig(httpClient))
+                    .build();
+        }
+        if ("GRPC".equalsIgnoreCase(protocolBinding)) {
+            throw new A2AClientException("GRPC transport not supported by a2at-engine");
+        }
+        return Client.builder(agentCard)
+                .withTransport(RestTransport.class, new RestTransportConfig(httpClient))
+                .build();
     }
 
     private static void onEvent(String agentName, ClientEvent event,
@@ -212,9 +264,9 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
     // Internal helpers
     // ------------------------------------------------------------------
 
-    private RestTransportConfig createTransportConfig() {
+    private A2AHttpClient createHttpClient() {
         if (this.sslVerify) {
-            return new RestTransportConfig();
+            return new JdkA2AHttpClient();
         }
         SSLContext trustAllCtx = SslContextFactory.createTrustAll();
         HttpClient httpClient = HttpClient.newBuilder()
@@ -222,7 +274,7 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
                 .connectTimeout(Duration.ofSeconds(60))
                 .sslContext(trustAllCtx)
                 .build();
-        return new RestTransportConfig(new JdkA2AHttpClient(httpClient));
+        return new JdkA2AHttpClient(httpClient);
     }
 
     private static boolean isTerminal(ClientEvent event) {

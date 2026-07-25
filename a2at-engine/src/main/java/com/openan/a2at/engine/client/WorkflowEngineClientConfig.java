@@ -44,6 +44,7 @@ public class WorkflowEngineClientConfig {
     private final String a2atEnvPath;
     private final int maxNegotiationRounds;
     private final List<ExtensionHandler> customHandlers;
+    private final String preferredProtocol;
 
     private WorkflowEngineClientConfig(Builder b) {
         this.sslVerify = b.sslVerify;
@@ -55,6 +56,7 @@ public class WorkflowEngineClientConfig {
         this.a2atEnvPath = b.a2atEnvPath;
         this.maxNegotiationRounds = b.maxNegotiationRounds;
         this.customHandlers = b.customHandlers;
+        this.preferredProtocol = b.preferredProtocol;
     }
 
     public static Builder builder() {
@@ -71,6 +73,7 @@ public class WorkflowEngineClientConfig {
         private String a2atEnvPath = null;
         private int maxNegotiationRounds = 3;
         private List<ExtensionHandler> customHandlers = null;
+        private String preferredProtocol = null;
 
         public Builder sslVerify(boolean v) {
             this.sslVerify = v;
@@ -109,6 +112,11 @@ public class WorkflowEngineClientConfig {
 
         public Builder maxNegotiationRounds(int v) {
             this.maxNegotiationRounds = v;
+            return this;
+        }
+
+        public Builder preferredProtocol(String v) {
+            this.preferredProtocol = v;
             return this;
         }
 
