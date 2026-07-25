@@ -185,8 +185,8 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
 
     private static void prePositionExtensions(WorkflowEngineClient engineClient,
                                                List<AgentCard> agentCards) {
-        String authUri = "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1";
-        String notifUri = "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1";
+        
+        
         // Natural-language input for the A2A-T SDK prompt generation (LLM + template).
         // For Notification-T the SDK has a "subscribe_incident" scenario that renders
         // the subscription template. For Authorization-T the SDK has no scenario yet,
@@ -199,11 +199,9 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
                 continue;
             }
             log.info("[Workbench-Agent] Pre-positioning Authorization-T to {}", name);
-            engineClient.sendExtensionMessage(name, "下发授权放行策略",
-                    authInput, authUri).join();
+            engineClient.sendAuthorization(name, "下发授权放行策略", authInput).join();
             log.info("[Workbench-Agent] Pre-positioning Notification-T to {}", name);
-            engineClient.sendExtensionMessage(name, "订阅业务抢通结果通知",
-                    notifInput, notifUri).join();
+            engineClient.sendNotification(name, "订阅业务抢通结果通知", notifInput).join();
         }
         log.info("[Workbench-Agent] Extension pre-positioning complete");
     }

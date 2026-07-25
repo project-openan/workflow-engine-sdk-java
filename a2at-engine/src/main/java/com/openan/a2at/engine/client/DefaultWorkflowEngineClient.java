@@ -174,7 +174,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
      */
     @Override
     public CompletableFuture<SendMessageResult> sendExtensionMessage(
-            String agentName, String instruction, String naturalLanguageInput, String extensionUri) {
+            String agentName, String instruction, String naturalLanguageInput, A2ATExtension extension) {
         AgentCard agentCard = cardMap.get(agentName);
         if (agentCard == null) {
             log.error("[EngineClient] Agent not found: {}", agentName);
@@ -188,16 +188,11 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             log.info("[EngineClient] SDK prompt generation unavailable for {}, using input as metadata", agentName);
         }
         log.info("[EngineClient] sendExtensionMessage to {}: extension={}, metadataValue={} chars",
-                agentName, extensionUri.substring(extensionUri.lastIndexOf('/') + 1), metadataValue.length());
+                agentName, extension.displayName(), metadataValue.length());
         log.debug("[EngineClient] Generated metadata value for {}: [{}]", agentName, metadataValue);
-        Map<String, Object> metadata = Map.of(extensionUri, metadataValue);
-        emit(EventType.AGENT_REQUEST, Map.of(
-                "agent", agentName,
-                "request", instruction,
-                "metadata", metadata));
+        Map<String, Object> metadata = Map.of(extension.uri(), metadataValue);
         return doSendViaA2ARuntime(agentCard, agentName, instruction, this.contextId, metadata)
                 .thenApply(result -> {
-                    emit(EventType.AGENT_RESPONSE, Map.of("agent", agentName, "response", result.getText()));
                     log.info("[EngineClient] Extension response from {}: state={}", agentName, result.getTaskState());
                     return result;
                 });
