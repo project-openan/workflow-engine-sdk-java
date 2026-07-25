@@ -11,7 +11,7 @@ Three layers, same as the Python version:
 
 | Layer | Entry Point | What It Handles |
 |-------|------------|-----------------|
-| 2 (high) | `ExecutePsop.execute()` | Event stream, lifecycle, on_finish hook |
+| 2 (high) | `ExecutePsop.Builder` | Event stream, lifecycle, onFinish hook |
 | 1 (mid) | `WorkflowExecutor` | DAG traversal, context assembly, ControlPoint dispatch |
 | 0 (low) | `WorkflowEngineClient` | A2A send, auth, extensions, SSL, SSE normalization |
 
@@ -26,8 +26,8 @@ All Python SDK modules have Java equivalents:
 | `client/ssl_context.py` | `client/SslContextFactory` | Outbound TLS context with CA trust store |
 | `client/credential_service.py` | `client/AgentCredentialService` | Bearer token login + TTL cache |
 | `client/auth_manager.py` | `client/AgentAuthManager` | Interceptor builder from AgentCard securitySchemes |
-| `client/extension_interceptor.py` | `client/ExtensionInterceptor` | A2A-Extensions HTTP header injection |
-| `client/extension_handlers.py` | `client/ExtensionRegistry` + 4 handler classes | Task-T, Negotiation-T, Authorization-T, Notification-T |
+| `client/extension_interceptor.py` | `client/ExtensionInterceptor` | A2A-Extensions HTTP header injection (metadata-aware) |
+| `client/extension_handlers.py` | `client/ExtensionRegistry` + handler classes | Task-T, Negotiation-T |
 | `client/sse_normalization.py` | `client/SseNormalization` | Non-standard SSE response coercion |
 | `control/control_points.py` | `control/ControlPoint` + `EventCallback` | User decision interface |
 | `core/executor.py` | `core/WorkflowExecutor` | DAG traversal + step execution |
@@ -41,6 +41,12 @@ All Python SDK modules have Java equivalents:
 - `net.openan.a2at.sdk:a2a-t-client` -- A2A-T extensions (A2ATClient, Task-T, Negotiation-T)
 - Jackson, SLF4J, Lombok
 
+## Documentation
+
+- [Integration Guide](docs/INTEGRATION_GUIDE.md) -- Setup, configuration, secondary development
+- [API Reference](docs/API_REFERENCE.md) -- Public interface and class documentation
+- [Developer Guide](DEVELOPER_GUIDE.md) -- Internal architecture and contribution guide
+
 ## Quick Start
 
 ```java
@@ -52,39 +58,35 @@ import com.openan.a2at.engine.runner.*;
 import com.openan.a2at.engine.registry.*;
 import java.util.concurrent.*;
 
-// 1. Get AgentCards from registry
-RegistryClient registry = new RegistryClient("https://127.0.0.1:5000", false);
-List<Map<String, Object>> agentCards = registry.fetchAgentCards();
+// 1. Define or load a workflow (PSOP)
+Workflow workflow = LoadPsop.load("https://127.0.0.1:5001", "psop-id", null, false);
 
-// 2. Load workflow
-Workflow workflow = LoadPsop.load("https://127.0.0.1:5001", "psop-id", "token", false);
+// 2. Load AgentCards from registry or JSON files
+RegistryClient registry = new RegistryClient("https://127.0.0.1:5001", false);
+List<Map<String, Object>> cardMaps = registry.fetchAgentCards();
 
-// 3. Implement ControlPoint (only on_task + on_route required)
-ControlPoint cp = new ControlPoint() {
+// 3. Implement ControlPoint (only onTask + onRoute required)
+ControlPoint cp = new DefaultControlPoint() {
     @Override
     public CompletableFuture<TaskResponse> onTask(TaskRequest request, WorkflowEngineClient client) {
         return client.sendMessage(request.getAgentName(), request.getMessage())
-                .thenApply(result -> TaskResponse.builder().success(true).output(result.getText()).build());
-    }
-    @Override
-    public CompletableFuture<RouteDecision> onRoute(String step, Map<String, Object> results, List<JumpCondition> conditions) {
-        return CompletableFuture.completedFuture(RouteDecision.builder().nextStep(conditions.get(0).getStep()).build());
+                .thenApply(r -> TaskResponse.builder().success(true).output(r.getText()).build());
     }
 };
 
-// 4. Execute with full config (SSL, auth, A2A-T)
-ExecutePsop.execute(
-    workflow, agentCards, cp, null,
-    "Diagnose fault", "zh",
-    ".env",                              // a2atEnvPath (for Task-T prompt generation)
-    "etc/conf/agent_credentials.json",   // credentialsConfigPath
-    false,                               // sslVerify
-    null,                                // caCertsPath
-    null,                                // a2aClientRuntime (null = raw HTTP fallback)
-    new EventCallback(),
-    (result, events) -> { System.out.println("Done: " + result.isSuccess()); },
-    null
-).join();
+// 4. Execute via Builder
+ExecutionResult result = ExecutePsop.builder()
+    .psop(workflow)
+    .agentCards(agentCards)
+    .controlPoint(cp)
+    .runtimeIntent("Diagnose fault")
+    .lang("zh")
+    .a2atEnvPath(".env")
+    .credentialsConfigPath("creds.json")
+    .sslVerify(false)
+    .onFinish((r, history) -> System.out.println("Done: " + r.isSuccess()))
+    .execute()
+    .get(10, TimeUnit.MINUTES);
 ```
 
 ## Package Structure
@@ -93,22 +95,20 @@ ExecutePsop.execute(
 src/main/java/com/openan/a2at/engine/
 |-- model/          # Workflow, Task, JumpCondition, StepType, etc.
 |-- control/        # ControlPoint, EventType, EventCallback
-|-- core/           # WorkflowExecutor, ContextBuilder
+|-- core/           # WorkflowExecutor, ContextBuilder (package-private)
 |-- client/         # DefaultWorkflowEngineClient + WorkflowEngineClient interface
-|   |-- AgentCardNormalizer     # OpenAPI -> structured security scheme
-|   |-- SslContextFactory       # Outbound TLS context
+|   |-- AgentAuthManager        # Interceptor builder from securitySchemes
 |   |-- AgentCredentialService  # Bearer token login + cache
-|   |-- AgentAuthManager         # Interceptor builder from securitySchemes
-|   |-- CustomAuthInterceptor   # Non-Bearer header support
-|   |-- ExtensionInterceptor    # A2A-Extensions header injection
-|   |-- ExtensionRegistry       # Task-T / Negotiation-T / Auth-T / Notification-T
-|   |-- ExtensionHandler        # Extension handler interface
-|   |-- TaskTHandler            # Task-T prompt generation
-|   |-- NegotiationTHandler     # Negotiation-T receive/continue
-|   |-- AuthorizationTHandler   # Authorization-T user decision
-|   |-- NotificationTHandler    # Notification-T push handling
-|   |-- SseNormalization        # Non-standard SSE response coercion
-|   `-- WorkflowEngineClientConfig  # SSL + auth + A2A-T config builder
+|   |-- AuthProvider            # Custom auth provider interface
+|   |-- ExtensionInterceptor    # A2A-Extensions header injection (metadata-aware)
+|   |-- ExtensionRegistry       # Task-T / Negotiation-T handler registry
+|   |-- ExtensionHandler        # Extension handler interface (for custom extensions)
+|   |-- TaskTHandler            # Task-T prompt generation (via a2a-t-sdk)
+|   |-- NegotiationTHandler     # Negotiation-T receive/auto-loop
+|   |-- ProtocolLogger          # Protocol-level request/response logging
+|   |-- EnvFileLoader           # .env file to system properties bridge
+|   |-- SslContextFactory       # Outbound TLS context (trust-all for dev)
+|   `-- WorkflowEngineClientConfig  # Builder config: SSL + auth + A2A-T
 |-- runner/         # ExecutePsop (high-level runner)
 `-- registry/       # RegistryClient, LoadPsop
 ```
