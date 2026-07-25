@@ -118,7 +118,7 @@ public interface WorkflowEngineClient {
 
 ### WorkflowEngineClientConfig
 
-`DefaultWorkflowEngineClient` 的 Builder 配置。
+工作流引擎客户端的 Builder 配置。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
@@ -174,8 +174,7 @@ public interface ExtensionHandler {
 }
 ```
 
-内置处理器：`TaskTHandler`（关键字：`"Task-T"`）、`NegotiationTHandler`（关键字：`"Negotiation-T"`）。
-
+内置：Task-T 和 Negotiation-T 自动处理。可通过配置的 customHandlers 注册自定义处理器。
 ### A2AJavaClientRuntime
 
 A2A SDK 消息传输运行时接口。实现此类可自定义 HTTP 传输行为。
@@ -191,7 +190,7 @@ public interface A2AJavaClientRuntime {
 }
 ```
 
-默认实现：`DefaultA2AJavaClientRuntime`（包私有）。
+引擎提供默认实现。仅在需要自定义 HTTP 传输时实现此接口。
 
 ---
 
@@ -458,7 +457,7 @@ Map<String, Object> registerAgentCard(Map<String, Object> agentCard)
 
 ## 线程安全
 
-- `DefaultWorkflowEngineClient` 线程安全。内部 `cardMap`、`tokenCache`、`extensionRegistry` 使用并发集合。
+- 引擎客户端线程安全，内部使用并发集合。
 - `ControlPoint` 实现若在多工作流并发执行中使用，需自行保证线程安全。
 - `EventCallback.onEvent` 从多个线程调用（主线程 + SSE 工作线程），需要时使用同步。
 

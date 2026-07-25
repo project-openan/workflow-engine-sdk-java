@@ -2,22 +2,12 @@
 
 ## 1. Overview
 
-The A2A-T Workflow Execution Engine (artifact: `a2at-engine`) is a Java SDK
-that orchestrates multi-agent workflows using the A2A protocol with A2A-T
-telecommunication extensions. It sits between your application and the
-underlying `a2a-java-sdk` + `a2a-t-sdk-java`, handling:
+The A2A-T Workflow Execution Engine is a Java SDK for orchestrating
+multi-agent workflows using the A2A protocol with A2A-T telecom extensions.
 
-- A2A message send/receive via SSE streaming
-- Task-T structured prompt generation (LLM + template, via a2a-t-sdk)
-- Negotiation-T automatic negotiation loop
-- Authorization-T pre-positioning (whitelist strategy)
-- Notification-T pre-positioning (result subscription)
-- AgentCard resolution, auth token management, HTTPS/TLS
-- PSOP workflow execution with step routing and context assembly
-
-The engine is designed for **secondary development**: you implement
-business decisions via `ControlPoint`, and the engine handles all protocol
-mechanics.
+The engine handles all protocol mechanics automatically (message transport,
+SSE streaming, Task-T prompt generation, Negotiation-T auto-loop,
+authentication, TLS). You focus on business decisions only.
 
 ## 2. Prerequisites
 
@@ -25,10 +15,6 @@ mechanics.
 |---|---|
 | JDK | 17+ |
 | Maven | 3.6+ |
-| a2a-java-sdk | 1.0.0.Beta1 |
-| a2a-t-sdk-java | 1.0.0 |
-| Jackson | 2.20.1 |
-| SLF4J + Log4j2 | 2.0.17 / 2.24.3 |
 
 ## 3. Maven Dependency
 
@@ -40,19 +26,14 @@ mechanics.
 </dependency>
 ```
 
-If you build from source:
-
-```bash
-mvn -o clean install -DskipTests
-```
-
 ## 4. Quick Start
 
-### 4.1 Define a Workflow (PSOP)
+Four steps: define workflow -> load AgentCard -> implement ControlPoint -> execute.
+
+### 4.1 Define a Workflow
 
 ```java
 Workflow workflow = Workflow.builder()
-    .id("my-workflow")
     .name("Fault Diagnosis")
     .steps(List.of(
         WorkflowStep.builder()
@@ -100,12 +81,13 @@ AgentCard card = mapper.readValue(
     new File("agentcard/my_agent.json"), AgentCard.class);
 
 // Option B: From Registry Center
-RegistryClient registry = new RegistryClient(
-    "https://127.0.0.1:5001", false);
+RegistryClient registry = new RegistryClient("https://127.0.0.1:5001", false);
 List<Map<String, Object>> cards = registry.fetchAgentCards();
 ```
 
 ### 4.3 Implement ControlPoint
+
+Extend `DefaultControlPoint` and override the methods you need:
 
 ```java
 public class MyControlPoint extends DefaultControlPoint {
@@ -124,7 +106,6 @@ public class MyControlPoint extends DefaultControlPoint {
     public CompletableFuture<RouteDecision> onRoute(
             String stepName, Map<String, Object> results,
             List<JumpCondition> conditions) {
-        // Your routing logic
         return CompletableFuture.completedFuture(
             RouteDecision.builder()
                 .nextStep(conditions.get(0).getStep())
@@ -135,45 +116,53 @@ public class MyControlPoint extends DefaultControlPoint {
     public CompletableFuture<String> onNegotiation(
             String agentName, String negotiationText,
             Map<String, Object> receiveResult) {
-        // Provide clarification text
         return CompletableFuture.completedFuture(
             "Please proceed with available information.");
     }
 }
 ```
 
+| Method | When Called | What You Do |
+|---|---|---|
+| `onTask` | Each workflow step dispatches a task | Call `engineClient.sendMessage()`, return result |
+| `onRoute` | After step completes, before next step | Pick the next step from candidates |
+| `onNegotiation` | Agent returns `INPUT_REQUIRED` | Return clarification text |
+| `onAuthorization` | Agent requests authorization (optional) | Return true/false |
+| `onNotification` | Agent pushes notification (optional) | Handle notification |
+
+`onAuthorization` and `onNotification` have default implementations
+(auto-approve / no-op). `onNegotiation` defaults to a generic clarification.
+Override only what you need.
+
 ### 4.4 Execute
 
 ```java
-CompletableFuture<ExecutionResult> future = ExecutePsop.builder()
+ExecutionResult result = ExecutePsop.builder()
     .psop(workflow)
     .agentCards(List.of(card1, card2))
     .controlPoint(new MyControlPoint())
     .runtimeIntent("SPN cross-city fault diagnosis")
     .lang("zh")
-    .a2atEnvPath(".env")           // A2A-T SDK config
+    .a2atEnvPath(".env")
     .credentialsConfigPath("credentials.json")
-    .sslVerify(false)              // false for self-signed certs
-    .onFinish((result, history) -> {
-        System.out.println("Success: " + result.isSuccess());
+    .sslVerify(false)
+    .onFinish((r, history) -> {
+        System.out.println("Result: " + r.isSuccess());
     })
-    .execute();
-
-ExecutionResult result = future.get(10, TimeUnit.MINUTES);
+    .execute()
+    .get(10, TimeUnit.MINUTES);
 ```
+
+Required: `psop`, `controlPoint`. All other config items have defaults.
 
 ## 5. Configuration
 
-### 5.1 .env File (A2A-T SDK)
+### 5.1 .env File
 
-The `.env` file configures the A2A-T SDK's LLM and prompt runtime. The
-engine loads it via `EnvFileLoader` and sets entries as system properties.
+Configures the LLM and prompt runtime:
 
 ```ini
-# Language
 A2AT_LANGUAGE=zh-CN
-
-# LLM (OpenAI-compatible providers)
 A2AT_LLM_PROVIDER=openai
 A2AT_LLM_MODEL=deepseek-v4-flash
 A2AT_LLM_API_KEY=sk-xxxxxxxxxxxxxxxx
@@ -181,14 +170,11 @@ A2AT_LLM_BASE_URL=https://api.deepseek.com
 A2AT_LLM_MAX_TOKENS=2000
 A2AT_LLM_TEMPERATURE=0
 A2AT_LLM_TIMEOUT_SECONDS=60
-
-# Prompt
-A2AT_PROMPT_SOURCE_TYPE=classpath
-A2AT_PROMPT_COMPLIANCE_ENABLED=false
-
-# Credential encryption key (32-byte hex)
 A2AT_CRED_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 ```
+
+When `.env` is not configured, Task-T prompt generation is unavailable.
+All other features work normally.
 
 ### 5.2 Credentials File
 
@@ -213,34 +199,31 @@ For agents requiring authentication, provide a JSON credentials file:
 }
 ```
 
-- Encrypted passwords use `enc:<iv>:<ciphertext>` format (AES-GCM)
-- The key is read from `A2AT_CRED_KEY` (env var or system property)
+- Encrypted passwords use `enc:<iv>:<ciphertext>` format, key from `A2AT_CRED_KEY`
 - Plaintext values (no `enc:` prefix) are also accepted
-- Tokens are cached with TTL and refreshed automatically
+- Tokens are cached and refreshed automatically
 
-### 5.3 Custom Auth Provider
+### 5.3 Custom Authentication
 
-When AgentCard has no securitySchemes or uses a non-standard auth mechanism:
+When AgentCard has no securitySchemes or uses a non-standard auth mechanism,
+implement `AuthProvider`:
 
 ```java
 WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
     .authProvider((agentName, agentCard, headers) -> {
-        String token = mySsoClient.getToken(agentName);
-        headers.put("Authorization", "Bearer " + token);
-        headers.put("X-Custom-Header", "custom-value");
+        headers.put("Authorization", "Bearer " + mySsoClient.getToken(agentName));
     })
     .sslVerify(false)
     .a2atEnvPath(".env")
     .build();
 ```
 
-The `AuthProvider` is called for every message send. If both a credentials
-file and `AuthProvider` are configured, both run (custom provider first,
-credentials-based auth second).
+Called for every message send. If both a credentials file and `AuthProvider`
+are configured, both take effect.
 
 ## 6. AgentCard Definition
 
-AgentCards declare extensions via the `capabilities.extensions` array:
+AgentCards declare extensions via `capabilities.extensions`:
 
 ```json
 {
@@ -271,10 +254,7 @@ AgentCards declare extensions via the `capabilities.extensions` array:
     ]
   },
   "securitySchemes": {
-    "bearerAuth": {
-      "type": "http",
-      "scheme": "bearer"
-    }
+    "bearerAuth": { "type": "http", "scheme": "bearer" }
   },
   "securityRequirements": [
     { "schemes": { "bearerAuth": [] } }
@@ -289,38 +269,29 @@ AgentCards declare extensions via the `capabilities.extensions` array:
 }
 ```
 
-Extension URIs must match the a2a-t-sdk definitions exactly.
+Extension URIs must match the A2A-T definitions exactly.
 
-## 7. A2A-T Extension Integration
+## 7. A2A-T Extensions
 
-The engine handles four A2A-T extensions:
+The engine handles four A2A-T extensions automatically. You do not need
+to deal with protocol details:
 
-### Task-T
+### Task-T (automatic)
 
-**Automatic.** Before sending a message to an agent whose AgentCard declares
-Task-T, the engine calls `a2atClient.generateTaskPrompt()` to produce a
-structured prompt. The prompt text is placed in `message.metadata` under the
-Task-T URI key, and the `A2A-Extensions` header advertises `Task-T/v1`.
+When sending a message to an agent, the engine generates a structured task
+prompt and places it in the message metadata. In `onTask`, you just call
+`sendMessage()` -- prompt generation is transparent.
 
-No user code required.
+### Negotiation-T (automatic)
 
-### Negotiation-T
+When an agent returns `INPUT_REQUIRED`, the engine extracts the negotiation
+text, calls your `onNegotiation()` for a clarification, and sends it back.
+Auto-loops up to `maxNegotiationRounds` (default 3).
 
-**Automatic.** When an agent responds with `INPUT_REQUIRED` state, the
-engine extracts the negotiation text from the response metadata and calls
-`ControlPoint.onNegotiation()` for the user's clarification. The
-clarification is sent back as a follow-up message with the Negotiation-T
-metadata. This auto-loops up to `maxNegotiationRounds` (default 3).
+### Authorization-T (pre-positioning)
 
-Override `onNegotiation()` in your `ControlPoint` to provide
-business-specific clarifications.
-
-### Authorization-T
-
-**Pre-positioning.** Before the workflow starts, the workbench agent
-sends a whitelist authorization strategy to each SPN agent via
-`sendExtensionMessage()`. The SPN agent stores it and compares
-subsequent operations against the whitelist.
+Before the workflow starts, send a whitelist authorization strategy to
+SPN agents:
 
 ```java
 engineClient.sendExtensionMessage(
@@ -331,12 +302,12 @@ engineClient.sendExtensionMessage(
 );
 ```
 
-### Notification-T
+The SPN agent stores the strategy and compares subsequent operations against
+the whitelist. Operations within the whitelist are executed; others are rejected.
 
-**Pre-positioning.** Before the workflow starts, the workbench agent
-subscribes to result notifications from each SPN agent via
-`sendExtensionMessage()`. The SPN agent reports recovery results back
-through the notification channel.
+### Notification-T (pre-positioning)
+
+Before the workflow starts, subscribe to recovery result notifications:
 
 ```java
 engineClient.sendExtensionMessage(
@@ -347,53 +318,75 @@ engineClient.sendExtensionMessage(
 );
 ```
 
-## 8. HTTPS/TLS Configuration
+The SPN agent reports recovery results through the notification channel.
+
+## 8. HTTPS Configuration
 
 ```java
-// Disable verification (dev/test with self-signed certs)
-WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
-    .sslVerify(false)
-    .build();
+// Dev: self-signed certs, skip verification
+.sslVerify(false)
 
-// Enable verification with custom CA certs
-WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
-    .sslVerify(true)
-    .caCertsPath("/path/to/ca-certs.pem")
-    .build();
+// Production: enable verification + custom CA certs
+.sslVerify(true).caCertsPath("/path/to/ca-certs.pem")
 ```
-
-When `sslVerify=false`, a trust-all SSL context is used. This is suitable
-for development only.
 
 ## 9. Logging
 
-The engine uses SLF4J with a dedicated `PROTOCOL` logger for protocol-level
-message dumps. Configure in `log4j2.properties`:
+The engine has a dedicated `PROTOCOL` logger that outputs full protocol-level
+request/response messages (headers + body). Configure in `log4j2.properties`:
 
 ```properties
-# Protocol-level request/response dumps
 logger.PROTOCOL.name = PROTOCOL
 logger.PROTOCOL.level = info
 logger.PROTOCOL.additivity = false
 logger.PROTOCOL.appenderRef = console
-
-# Engine client
-logger.engine.name = com.openan.a2at.engine.client
-logger.engine.level = debug
-
-# Protocol logger appender
-appender.console.type = Console
-appender.console.name = console
-appender.console.layout.type = PatternLayout
-appender.console.layout.pattern = %d{HH:mm:ss.SSS} %-5level [%t] %logger{20} - %msg{nolookups}%n
 ```
 
-Set `logger.PROTOCOL.level = debug` to see full request/response bodies
-including headers.
+Set to `debug` to see full message bodies.
 
-## 10. Custom Extension Handlers
+## 10. Event Callback
 
-To extend the engine with custom A2A-T extensions:
+Subscribe to execution events for real-time monitoring:
+
+```java
+EventCallback callback = new EventCallback() {
+    @Override
+    public void onEvent(String eventType, Map<String, Object> data) {
+        switch (eventType) {
+        case EventType.STEP_START -> System.out.println("Step started: " + data.get("step"));
+        case EventType.AGENT_STATUS_UPDATE -> System.out.println(
+            data.get("agent") + " state: " + data.get("state"));
+        case EventType.NEGOTIATION_REQUEST -> System.out.println(
+            "Negotiation from " + data.get("agent"));
+        case EventType.COMPLETE -> System.out.println("Workflow complete");
+        }
+    }
+};
+
+ExecutePsop.builder()
+    .eventCallback(callback)
+    // ...
+```
+
+Common event types: `STEP_START`, `STEP_COMPLETE`, `AGENT_REQUEST`,
+`AGENT_RESPONSE`, `NEGOTIATION_REQUEST`, `NEGOTIATION_RESOLVED`,
+`COMPLETE`, `ERROR`.
+
+## 11. Load Workflows from Orchestration Center
+
+```java
+// Search by intent
+List<WorkflowSearchResult> results = LoadPsop.search(
+    "https://127.0.0.1:5001", "SPN cross-city fault diagnosis", 5, null, false);
+
+// Load full workflow by ID
+Workflow workflow = LoadPsop.load(
+    "https://127.0.0.1:5001", results.get(0).getWorkflowId(), null, false);
+```
+
+## 12. Custom Extensions
+
+To add a new A2A-T extension, implement `ExtensionHandler`:
 
 ```java
 public class MyExtensionHandler implements ExtensionHandler {
@@ -407,9 +400,7 @@ public class MyExtensionHandler implements ExtensionHandler {
             AgentCard agentCard, String messageText,
             Map<String, Object> metadata,
             A2ATClient a2atClient, ControlPoint controlPoint) {
-        // Add custom metadata before sending
-        metadata.put("https://example.com/extensions/My-Extension/v1",
-            "custom value");
+        metadata.put("https://example.com/extensions/My-Extension/v1", "value");
         return CompletableFuture.completedFuture(metadata);
     }
 
@@ -418,7 +409,6 @@ public class MyExtensionHandler implements ExtensionHandler {
             AgentCard agentCard, SendMessageResult result,
             A2ATClient a2atClient, ControlPoint controlPoint,
             EventCallback eventCallback) {
-        // Process response metadata
         return CompletableFuture.completedFuture(result);
     }
 }
@@ -427,108 +417,23 @@ public class MyExtensionHandler implements ExtensionHandler {
 Register via config:
 
 ```java
-WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
+WorkflowEngineClientConfig.builder()
     .customHandlers(List.of(new MyExtensionHandler()))
     .build();
 ```
 
-## 11. Protocol Message Format
+## 13. Interface Reference
 
-The engine follows the A2A-T protocol. Request messages have:
-
-- `parts[].text`: Short natural-language message
-- `metadata[extension-uri]`: Structured extension content
-- `A2A-Extensions` header: Comma-separated list of active extension URIs
-- `Authorization` header: Bearer token (when auth is configured)
-
-Response messages (from agents) should place:
-
-- Short summary in `artifact.parts[].text`
-- Full extension content in `artifact.metadata[extension-uri]`
-- Negotiation text in `status.metadata[NEGOTIATION-T]`
-- SDK-internal negotiation context in `status.metadata[DATA-NEGOTIATION-T/v1]` (not an extension; carries negotiationType/round/negotiationId/status)
-
-## 12. Event Callback
-
-Subscribe to execution events for real-time monitoring:
-
-```java
-EventCallback callback = new EventCallback() {
-    @Override
-    public void onEvent(String eventType, Map<String, Object> data) {
-        switch (eventType) {
-        case EventType.STEP_START:
-            System.out.println("Step started: " + data.get("step"));
-            break;
-        case EventType.AGENT_STATUS_UPDATE:
-            System.out.println("Agent " + data.get("agent")
-                + " state: " + data.get("state"));
-            break;
-        case EventType.NEGOTIATION_REQUEST:
-            System.out.println("Negotiation from " + data.get("agent"));
-            break;
-        case EventType.COMPLETE:
-            System.out.println("Workflow complete");
-            break;
-        }
-    }
-};
-
-ExecutePsop.builder()
-    .eventCallback(callback)
-    // ...
-```
-
-Event types are defined in `EventType` constants.
-
-## 13. Workflow Loading from Orchestration Center
-
-Load PSOP workflows from a remote orchestration center:
-
-```java
-// Search by intent
-List<WorkflowSearchResult> results = LoadPsop.search(
-    "https://127.0.0.1:5001",
-    "SPN cross-city fault diagnosis",
-    5,      // topN
-    null,   // access token
-    false   // ssl verify
-);
-
-// Load full workflow by ID
-Workflow workflow = LoadPsop.load(
-    "https://127.0.0.1:5001",
-    results.get(0).getWorkflowId(),
-    null,   // access token
-    false   // ssl verify
-);
-```
-
-## 14. Architecture
-
-```
-com.openan.a2at.engine
-  +-- client          A2A message transport, auth, extensions
-  +-- control         User decision points (ControlPoint, events)
-  +-- core            Internal workflow execution (package-private)
-  +-- model           Data models (Workflow, Task, results)
-  +-- registry        PSOP loading + AgentCard registry
-  +-- runner          ExecutePsop (entry point)
-```
-
-**Public API surface** (user-facing):
-- `WorkflowEngineClient` / `WorkflowEngineClientConfig`
-- `ControlPoint` / `DefaultControlPoint`
-- `ExecutePsop.Builder`
-- `AuthProvider`
-- `ExtensionHandler`
-- `LoadPsop` / `RegistryClient`
-- `EventCallback` / `EventType`
-- Model classes (`Workflow`, `Task`, `ExecutionResult`, etc.)
-
-**Internal** (package-private, not for direct use):
-- `DefaultWorkflowEngineClient`, `DefaultA2AJavaClientRuntime`
-- `TaskTHandler`, `NegotiationTHandler`, `ExtensionInterceptor`
-- `AgentAuthManager`, `AgentCredentialService`, `CredentialCrypto`
-- `ContextBuilder`, `WorkflowExecutor`
-- `ProtocolLogger`, `SslContextFactory`, `EnvFileLoader`
+| Interface/Class | Purpose |
+|---|---|
+| `ExecutePsop.Builder` | Workflow execution entry point |
+| `ControlPoint` / `DefaultControlPoint` | Business decisions (onTask, onRoute, onNegotiation, etc.) |
+| `WorkflowEngineClient` | Send messages to agents (sendMessage, sendExtensionMessage) |
+| `WorkflowEngineClientConfig` | Configuration (SSL, auth, A2A-T, negotiation rounds, custom handlers) |
+| `AuthProvider` | Custom authentication |
+| `ExtensionHandler` | Custom extension handler |
+| `EventCallback` / `EventType` | Event callback |
+| `LoadPsop` / `RegistryClient` | Workflow loading / AgentCard fetching |
+| `Workflow` / `WorkflowStep` / `Task` / `JumpCondition` | Workflow definition |
+| `ExecutionResult` | Execution result |
+| `SendMessageResult` / `TaskResponse` | Message/task response |

@@ -120,7 +120,7 @@ generation and Negotiation-T auto-loop.
 
 ### WorkflowEngineClientConfig
 
-Builder-based configuration for `DefaultWorkflowEngineClient`.
+Builder-based configuration for the workflow engine client.
 
 | Property | Type | Default | Description |
 |---|---|---|---|
@@ -177,8 +177,8 @@ public interface ExtensionHandler {
 }
 ```
 
-Built-in handlers: `TaskTHandler` (keyword: `"Task-T"`),
-`NegotiationTHandler` (keyword: `"Negotiation-T"`).
+Built-in: Task-T and Negotiation-T are handled automatically.
+You can register custom handlers via customHandlers in the config.
 
 ### A2AJavaClientRuntime
 
@@ -196,7 +196,7 @@ public interface A2AJavaClientRuntime {
 }
 ```
 
-Default implementation: `DefaultA2AJavaClientRuntime` (package-private).
+A default implementation is provided. Implement this interface only if you need custom HTTP transport.
 
 ---
 
@@ -468,8 +468,7 @@ orchestration center API response.
 
 ## Thread Safety
 
-- `DefaultWorkflowEngineClient` is thread-safe. The internal `cardMap`,
-  `tokenCache`, and `extensionRegistry` use concurrent collections.
+- The engine client is thread-safe. Concurrent collections are used internally.
 - `ControlPoint` implementations must be thread-safe if used from
   multiple workflow executions concurrently.
 - `EventCallback.onEvent` is called from multiple threads (main + SSE
