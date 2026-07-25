@@ -36,6 +36,11 @@
             <version>${a2a.java.sdk.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.a2aproject.sdk</groupId>
+            <artifactId>a2a-java-sdk-client-transport-grpc</artifactId>
+            <version>${a2a.java.sdk.version}</version>
+        </dependency>
         <!-- A2A-T extension SDK (Java) -->
         <dependency>
             <groupId>net.openan.a2a-t.sdk</groupId>
@@ -103,3 +108,4 @@
         </plugins>
     </build>
 </project>
+

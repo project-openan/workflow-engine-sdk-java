@@ -29,6 +29,9 @@ import org.a2aproject.sdk.client.http.JdkA2AHttpClient;
 import org.a2aproject.sdk.client.transport.rest.RestTransport;
 import org.a2aproject.sdk.client.transport.jsonrpc.JSONRPCTransport;
 import org.a2aproject.sdk.client.transport.jsonrpc.JSONRPCTransportConfig;
+import org.a2aproject.sdk.client.transport.grpc.GrpcTransport;
+import org.a2aproject.sdk.client.transport.grpc.GrpcTransportConfig;
+import io.grpc.ManagedChannelBuilder;
 import org.a2aproject.sdk.client.transport.rest.RestTransportConfig;
 import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext;
 import org.a2aproject.sdk.spec.A2AClientException;
@@ -186,8 +189,11 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
 
     /**
      * Build the client with the transport matching the protocol binding.
-     * Both RestTransportConfig and JSONRPCTransportConfig accept A2AHttpClient,
-     * so the same SSL-configured HTTP client works for both.
+     *
+     * <p>HTTP+JSON and JSONRPC use A2AHttpClient for SSL configuration.
+     * GRPC uses GrpcTransportConfig with a custom Channel factory.
+     * When sslVerify=false, gRPC uses plaintext (HTTP/2 without TLS).
+     * For custom gRPC CA certs, provide a custom A2AJavaClientRuntime.
      */
     private Client buildClientWithTransport(AgentCard agentCard,
                                              String protocolBinding,
@@ -198,7 +204,10 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
                     .build();
         }
         if ("GRPC".equalsIgnoreCase(protocolBinding)) {
-            throw new A2AClientException("GRPC transport not supported by a2at-engine");
+            GrpcTransportConfig grpcConfig = new GrpcTransportConfig(url -> createGrpcChannel(url));
+            return Client.builder(agentCard)
+                    .withTransport(GrpcTransport.class, grpcConfig)
+                    .build();
         }
         return Client.builder(agentCard)
                 .withTransport(RestTransport.class, new RestTransportConfig(httpClient))
@@ -263,6 +272,22 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
     // ------------------------------------------------------------------
     // Internal helpers
     // ------------------------------------------------------------------
+
+    /**
+     * Create a gRPC channel with SSL settings matching the engine config.
+     *
+     * <p>When sslVerify=false, uses plaintext (HTTP/2 without TLS).
+     * When sslVerify=true, uses the default TLS trust store.
+     * For custom CA certs with gRPC, add grpc-netty-shaded to classpath
+     * and override this method via a custom A2AJavaClientRuntime.
+     */
+    private io.grpc.Channel createGrpcChannel(String url) {
+        ManagedChannelBuilder<?> builder = ManagedChannelBuilder.forTarget(url);
+        if (!sslVerify) {
+            builder.usePlaintext();
+        }
+        return builder.build();
+    }
 
     private A2AHttpClient createHttpClient() {
         if (this.sslVerify) {

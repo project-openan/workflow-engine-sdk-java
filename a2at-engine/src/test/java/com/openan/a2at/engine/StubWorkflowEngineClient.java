@@ -19,6 +19,7 @@
 
 package com.openan.a2at.engine;
 
+import com.openan.a2at.engine.client.A2ATExtension;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
@@ -95,6 +96,20 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
             eventCallback.onEvent("agent_response", Map.of("agent", agentName, "response", text));
         }
         return CompletableFuture.completedFuture(result);
+    }
+
+    @Override
+    public CompletableFuture<SendMessageResult> sendExtensionMessage(
+            String agentName, String instruction,
+            String naturalLanguageInput, A2ATExtension extension) {
+        Map<String, Object> meta = new HashMap<>();
+        meta.put(extension.uri(), naturalLanguageInput);
+        sent.add(new SentMessage(agentName, instruction, null, meta));
+        return CompletableFuture.completedFuture(SendMessageResult.builder()
+                .text("stub-extension-response")
+                .taskState("COMPLETED")
+                .metadata(meta)
+                .build());
     }
 
     @Override
