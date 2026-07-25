@@ -19,6 +19,8 @@
 
 package com.openan.a2at.engine.examples.agents;
 
+import com.openan.a2at.engine.client.A2ATExtension;
+import net.openan.a2at.sdk.negotiation.runtime.NegotiationHandler;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -36,12 +38,9 @@ final class NegotiationUtils {
     static final String NEGOTIATION_REQUEST_MARKER = "[NEGOTIATION_REQUEST]";
     static final String NEGOTIATION_CONTEXT_MARKER = "[NEGOTIATION_CONTEXT]";
     static final String NEGOTIATION_CONCERN_KEY = "negotiationConcern";
-    static final String NEGOTIATION_CONTEXT_KEY =
-            "https://projects.tmforum.org/a2aproject/telecommunication/extensions/DATA-NEGOTIATION-T/v1";
-    static final String NEGOTIATION_TEXT_KEY =
-            "https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T";
-    static final String TASK_PROMPT_KEY =
-            "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Task-T/v1";
+    static final String NEGOTIATION_CONTEXT_KEY = NegotiationHandler.NEGOTIATION_CONTEXT_KEY;
+    static final String NEGOTIATION_TEXT_KEY = A2ATExtension.NEGOTIATION_T.uri();
+    static final String TASK_PROMPT_KEY = A2ATExtension.TASK_T.uri();
 
     private NegotiationUtils() {}
     static boolean isFollowUpTask(String text) {
