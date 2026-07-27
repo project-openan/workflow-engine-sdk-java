@@ -60,16 +60,15 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
 
     private volatile A2ATClient a2atClient;
 
-    // Pre-positioned extension payloads stored on first receipt, used later
-    // during diagnosis to self-trigger recovery and report results.
-    private volatile String authorizationPolicy;
-    private volatile String notificationSubscription;
+    // Pre-positioned extensions (Authorization-T / Notification-T) are handled
+    // by a dedicated handler, keeping this class focused on Negotiation-T.
+    private final PrePositionedExtensionHandler prePositionedHandler = new PrePositionedExtensionHandler();
 
     /** The pre-positioned Authorization-T whitelist policy text, or null. */
-    protected final String getAuthorizationPolicy() { return authorizationPolicy; }
+    protected final String getAuthorizationPolicy() { return prePositionedHandler.getAuthorizationPolicy(); }
 
     /** The pre-positioned Notification-T subscription text, or null. */
-    protected final String getNotificationSubscription() { return notificationSubscription; }
+    protected final String getNotificationSubscription() { return prePositionedHandler.getNotificationSubscription(); }
 
     /** Resolve the A2A-T .env path; null disables A2ATClient (negotiation still works with fallback context). */
     protected abstract String resolveEnvPath();
@@ -104,14 +103,15 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
         log.info("[{}] Received task: taskId={}, text={} chars, followUp={}, prePositioned={}",
                 getClass().getSimpleName(), taskId, input.length(),
                 NegotiationUtils.isFollowUpTask(input),
-                detectPrePositionedExtension(ctx) != null);
+                PrePositionedExtensionHandler.detect(ctx) != null);
         emitter.submit(buildStatusMessage(contextId, taskId, "Task received"));
         emitter.startWork(buildStatusMessage(contextId, taskId, "Processing"));
 
         try {
-            String prePositionedExt = detectPrePositionedExtension(ctx);
+            String prePositionedExt = PrePositionedExtensionHandler.detect(ctx);
             if (prePositionedExt != null) {
-                handlePrePositionedExtension(ctx, emitter, prePositionedExt);
+                prePositionedHandler.handle(ctx, emitter, prePositionedExt,
+                        getClass().getSimpleName());
             } else if (NegotiationUtils.isFollowUpTask(input)) {
                 handleFollowUp(ctx, emitter, input);
             } else {
@@ -123,61 +123,30 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
         }
     }
 
-    /**
-     * Detect whether the incoming message carries an Authorization-T or
-     * Notification-T extension in its metadata (pre-positioning message).
-     * Returns the extension keyword ("Authorization-T" or "Notification-T"),
-     * or null if this is a normal task message.
-     */
-    private static String detectPrePositionedExtension(RequestContext ctx) {
-        Message msg = ctx.getMessage();
-        if (msg == null || msg.metadata() == null) {
-            return null;
-        }
-        for (String key : msg.metadata().keySet()) {
-            if (key.contains("Authorization-T")) {
-                return "Authorization-T";
-            }
-            if (key.contains("Notification-T")) {
-                return "Notification-T";
-            }
-        }
-        return null;
-    }
 
-    /**
-     * Handle a pre-positioned Authorization-T or Notification-T message:
-     * acknowledge receipt and complete immediately (no negotiation, no business).
-     */
-    private void handlePrePositionedExtension(
-            RequestContext ctx, AgentEmitter emitter, String extKeyword) {
-        String taskId = ctx.getTaskId();
-        String contextId = ctx.getContextId();
-        // Store the policy/subscription text for later use during diagnosis
-        String payloadText = ctx.getMessage().metadata().entrySet().stream()
-                .filter(e -> e.getKey().contains(extKeyword))
-                .map(Map.Entry::getValue)
-                .findFirst()
-                .map(v -> v instanceof String s ? s : String.valueOf(v))
-                .orElse("");
-        if (extKeyword.contains("Authorization")) {
-            authorizationPolicy = payloadText;
-        } else if (extKeyword.contains("Notification")) {
-            notificationSubscription = payloadText;
-        }
-        log.info("[{}] Pre-positioned {} received, payload length={}",
-                getClass().getSimpleName(), extKeyword, payloadText.length());
-        String ackText = extKeyword + " pre-positioning acknowledged";
-        List<Part<?>> parts = List.of(new TextPart(ackText));
-        emitter.addArtifact(parts, "result", getClass().getSimpleName() + " ack", Map.of(), false, true);
-        emitStatus(emitter, TaskState.TASK_STATE_COMPLETED, contextId, taskId,
-                extKeyword + " pre-positioned successfully", Map.of());
-        emitter.complete(buildStatusMessage(contextId, taskId, "Completed"));
-        log.info("[{}] {} pre-positioning completed", getClass().getSimpleName(), extKeyword);
-    }
 
     /** New task: start negotiation and request input. Business runs on the follow-up. */
     private void handleNewTask(RequestContext ctx, AgentEmitter emitter, String input) {
+        if (needsNegotiation(input)) {
+            requestNegotiation(ctx, emitter, input);
+        } else {
+            log.info("[{}] Parameters sufficient, skipping negotiation", getClass().getSimpleName());
+            runBusinessAndComplete(ctx, emitter, input);
+        }
+    }
+
+    /** Follow-up: clean markers, run business, complete with extension metadata. */
+    private void handleFollowUp(RequestContext ctx, AgentEmitter emitter, String input) {
+        String taskId = ctx.getTaskId();
+        String contextId = ctx.getContextId();
+        String cleanInput = NegotiationUtils.cleanupResolutionMarker(input);
+        log.info("[{}] Follow-up received, re-executing business", getClass().getSimpleName());
+        runBusinessAndComplete(ctx, emitter, cleanInput);
+    }
+
+    /** Send INPUT_REQUIRED to start a Negotiation-T round. */
+    @SuppressWarnings("unchecked")
+    private void requestNegotiation(RequestContext ctx, AgentEmitter emitter, String input) {
         String taskId = ctx.getTaskId();
         String contextId = ctx.getContextId();
         Map<String, Object> neg = startNegotiation(input, taskId, contextId);
@@ -187,30 +156,24 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
                 ? (String) neg.get(NegotiationUtils.NEGOTIATION_TEXT_KEY) : defaultNegotiationText();
         String concern = defaultNegotiationConcern();
         Map<String, Object> metadata = NegotiationUtils.negotiationResponseMetadata(contextData, negText, concern);
-        // Carry the negotiation context as a task-status event so the client-side
-        // NegotiationTHandler / autoNegotiate can parse it from task metadata.
         emitStatus(emitter, TaskState.TASK_STATE_INPUT_REQUIRED, contextId, taskId,
                 "[NEGOTIATION_REQUEST] " + getClass().getSimpleName()
                         + " needs clarification before completing this task.", metadata);
         log.info("[{}] Requested negotiation (INPUT_REQUIRED)", getClass().getSimpleName());
     }
 
-    /** Follow-up: clean markers, run business, complete with extension metadata. */
-    private void handleFollowUp(RequestContext ctx, AgentEmitter emitter, String input) {
+    /** Run business logic, emit artifact, and complete the task. */
+    private void runBusinessAndComplete(RequestContext ctx, AgentEmitter emitter, String input) {
         String taskId = ctx.getTaskId();
         String contextId = ctx.getContextId();
-        String cleanInput = NegotiationUtils.cleanupResolutionMarker(input);
-        log.info("[{}] Follow-up received, re-executing business", getClass().getSimpleName());
-        String response = executeBusiness(ctx, emitter, cleanInput);
+        String response = executeBusiness(ctx, emitter, input);
         Map<String, Object> metadata = buildResponseMetadata(ctx, response);
-        // Per A2A-T protocol: parts.text is a short human-readable summary,
-        // the full extension content goes into artifact metadata.
         List<Part<?>> parts = List.of(new TextPart(buildResultSummary()));
         emitter.addArtifact(parts, "result", buildArtifactName(), metadata, false, true);
         emitStatus(emitter, TaskState.TASK_STATE_COMPLETED, contextId, taskId,
                 "Completed", metadata);
         emitter.complete(buildStatusMessage(contextId, taskId, "Completed"));
-        log.info("[{}] Task completed after negotiation", getClass().getSimpleName());
+        log.info("[{}] Task completed", getClass().getSimpleName());
     }
 
     /** Start a fulfillment negotiation via A2ATClient, or return a fallback payload. */
@@ -267,6 +230,16 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
     }
 
     // ---- subclass extension points ----
+
+    /**
+     * Whether the incoming task parameters are incomplete/wrong and require
+     * a Negotiation-T round before proceeding. Default: false (parameters
+     * are sufficient, skip negotiation and run business directly).
+     * Override to return true when the agent needs clarification.
+     */
+    protected boolean needsNegotiation(String input) {
+        return false;
+    }
 
     /** Run the agent's actual business logic; return the response text. May emit intermediate events. */
     protected abstract String executeBusiness(RequestContext ctx, AgentEmitter emitter, String input);

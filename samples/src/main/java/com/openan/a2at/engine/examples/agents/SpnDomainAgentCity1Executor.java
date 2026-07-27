@@ -55,6 +55,11 @@ public class SpnDomainAgentCity1Executor extends NegotiationBaseAgentExecutor {
             "粤东OMC端口光模块已更换，端口恢复Up，专线业务恢复正常。";
 
     @Override
+    protected boolean needsNegotiation(String input) {
+        return true;
+    }
+
+    @Override
     protected String resolveEnvPath() {
         return StartAgentsServer.resolveEnvPath();
     }
