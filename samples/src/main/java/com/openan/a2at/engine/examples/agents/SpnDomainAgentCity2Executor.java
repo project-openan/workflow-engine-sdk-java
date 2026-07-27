@@ -56,27 +56,12 @@ public class SpnDomainAgentCity2Executor extends NegotiationBaseAgentExecutor {
         return StartAgentsServer.resolveEnvPath();
     }
 
-    @Override
-    protected String executeBusiness(RequestContext ctx, AgentEmitter emitter, String input) {
-        String taskId = ctx.getTaskId();
-        String contextId = ctx.getContextId();
-        // Diagnosis branch (Guangzhou side is normal, no fault)
-        emitter.updateStatus(TaskState.TASK_STATE_WORKING,
-                BaseAgentExecutor.buildStatusMessage(contextId, taskId, "正在查询粤西OMC端口状态..."));
-        sleepBriefly();
-        emitter.addArtifact(
-                List.of(new TextPart("端口状态：port-3 = UP\n光功率：-17dBm（正常范围）")),
-                "port-status", "端口状态查询", Map.of(), false, false);
-        sleepBriefly();
-        emitter.updateStatus(TaskState.TASK_STATE_WORKING,
-                BaseAgentExecutor.buildStatusMessage(contextId, taskId, "粤西侧诊断中间结果：端口正常，光功率正常，无异常告警"));
-        sleepBriefly();
-        // No fault on Guangzhou side, no recovery needed
+   @Override
+   protected String executeBusiness(RequestContext ctx, AgentEmitter emitter, String input) {
         String result = llmDiagnosisResult(input, NORMAL_DIAGNOSIS_RESULT);
         log.info("[SPN-Domain-Agent-City2] Diagnosis complete (Yuexi), no fault, no recovery needed");
         return result;
     }
-
     @Override
     protected String defaultNegotiationText() {
         return "粤西OMC诊断需要确认客户专线故障是否涉及粤西侧端口，请补充。";

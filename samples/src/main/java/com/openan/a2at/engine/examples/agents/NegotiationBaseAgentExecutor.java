@@ -103,10 +103,7 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
         log.info("[{}] Received task: taskId={}, text={} chars, followUp={}, prePositioned={}",
                 getClass().getSimpleName(), taskId, input.length(),
                 NegotiationUtils.isFollowUpTask(input),
-                PrePositionedExtensionHandler.detect(ctx) != null);
-        emitter.submit(buildStatusMessage(contextId, taskId, "Task received"));
-        emitter.startWork(buildStatusMessage(contextId, taskId, "Processing"));
-
+               PrePositionedExtensionHandler.detect(ctx) != null);
         try {
             String prePositionedExt = PrePositionedExtensionHandler.detect(ctx);
             if (prePositionedExt != null) {
@@ -166,10 +163,10 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
     private void runBusinessAndComplete(RequestContext ctx, AgentEmitter emitter, String input) {
         String taskId = ctx.getTaskId();
         String contextId = ctx.getContextId();
-        String response = executeBusiness(ctx, emitter, input);
-        Map<String, Object> metadata = buildResponseMetadata(ctx, response);
-        List<Part<?>> parts = List.of(new TextPart(buildResultSummary()));
-        emitter.addArtifact(parts, "result", buildArtifactName(), metadata, false, true);
+       String response = executeBusiness(ctx, emitter, input);
+       Map<String, Object> metadata = buildResponseMetadata(ctx, response);
+        List<Part<?>> parts = List.of(new TextPart(response));
+       emitter.addArtifact(parts, "result", buildArtifactName(), metadata, false, true);
         emitStatus(emitter, TaskState.TASK_STATE_COMPLETED, contextId, taskId,
                 "Completed", metadata);
         emitter.complete(buildStatusMessage(contextId, taskId, "Completed"));

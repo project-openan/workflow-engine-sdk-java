@@ -36,6 +36,16 @@ import java.util.concurrent.CompletableFuture;
 public class DefaultControlPoint implements ControlPoint {
     private static final Logger log = LoggerFactory.getLogger(DefaultControlPoint.class);
 
+    private final NegotiationStrategy negotiationStrategy;
+
+    public DefaultControlPoint() {
+        this.negotiationStrategy = null;
+    }
+
+    public DefaultControlPoint(NegotiationStrategy negotiationStrategy) {
+        this.negotiationStrategy = negotiationStrategy;
+    }
+
     @Override
     public CompletableFuture<TaskResponse> onTask(
             TaskRequest request, WorkflowEngineClient engineClient) {
@@ -94,11 +104,14 @@ public class DefaultControlPoint implements ControlPoint {
     }
 
     @Override
-    public CompletableFuture<String> onNegotiation(
-            String agentName, String negotiationText,
-            Map<String, Object> receiveResult) {
+   public CompletableFuture<String> onNegotiation(
+           String agentName, String negotiationText,
+           Map<String, Object> receiveResult) {
+        if (negotiationStrategy != null) {
+            return negotiationStrategy.resolve(agentName, negotiationText, receiveResult);
+        }
         log.info("[DefaultCP] onNegotiation: agent={}, concern={}", agentName, negotiationText);
         return CompletableFuture.completedFuture(
                 "Please proceed with the original task using available information.");
-    }
+   }
 }

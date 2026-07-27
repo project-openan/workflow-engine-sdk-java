@@ -49,13 +49,20 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
     private static final Logger log = LoggerFactory.getLogger(WorkbenchControlPoint.class);
 
     private final String a2atEnvPath;
+    private final NegotiationStrategy negotiationStrategy;
 
     public WorkbenchControlPoint() {
-        this(null);
+        this(null, null);
     }
 
     public WorkbenchControlPoint(String a2atEnvPath) {
+        this(a2atEnvPath, null);
+    }
+
+    public WorkbenchControlPoint(String a2atEnvPath, NegotiationStrategy negotiationStrategy) {
         this.a2atEnvPath = a2atEnvPath != null ? a2atEnvPath : StartAgentsServer.resolveEnvPath();
+        this.negotiationStrategy = negotiationStrategy != null ? negotiationStrategy
+                : new NegotiationStrategy(this.a2atEnvPath);
     }
 
     @Override
@@ -63,8 +70,8 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
             TaskRequest request, WorkflowEngineClient engineClient) {
         String step = request.getStepName();
         String agentName = request.getAgentName();
-        String enrichedMessage = enrichMessageForStep(request.getMessage(), step);
-        return engineClient.sendMessage(agentName, enrichedMessage)
+        String targetedMessage = buildTargetedTaskMessage(step);
+        return engineClient.sendMessage(agentName, targetedMessage)
                 .thenApply(r -> {
                     boolean success = r.getText() != null && !r.getText().isEmpty();
                     log.info("[onTask] Response from {}: {} chars, success={}",
@@ -107,15 +114,45 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
         return "汇总分析完成。两地市均未见异常。";
     }
 
-    private static String enrichMessageForStep(String message, String step) {
+    /**
+     * Build a targeted task message containing ONLY the parameters relevant
+     * to the target agent's city. The upstream context (which mixes both
+     * cities' info) is NOT forwarded -- each sub-agent receives a clean,
+     * self-contained task description with only its own scope.
+     */
+    private static String buildTargetedTaskMessage(String step) {
         return switch (step) {
-            case "diagnosis_city1" -> message + "\n\n## 城市差异化参数\n"
-                    + "客户A粤东-粤西间SPN专线中断，粤东OMC告警端口Down，光功率-28dBm低于阈值。"
-                    + "端口所属单板line-card-03，端口号port-7。";
-            case "diagnosis_city2" -> message + "\n\n## 城市差异化参数\n"
-                    + "客户A粤东-粤西间SPN专线中断，粤西OMC侧需排查端口状态和光功率是否正常。";
-default -> message;
+            case "diagnosis_city1" -> buildCity1Task();
+            case "diagnosis_city2" -> buildCity2Task();
+            default -> "\u8bf7\u6267\u884cSPN\u4e13\u7ebf\u6545\u969c\u8bca\u65ad\u4efb\u52a1\u3002";
         };
+    }
+
+    private static String buildCity1Task() {
+        return """
+## 任务
+SPN专线故障诊断 - 粤东OMC侧
+
+## 故障参数
+- 端口状态：port-7 = DOWN
+- 光功率：-28dBm（阈值-20dBm）
+- 所属单板：line-card-03
+- 端口号：port-7
+
+请针对粤东OMC侧端口故障进行诊断。请用中文回复。""".stripIndent();
+    }
+
+    private static String buildCity2Task() {
+        return """
+## 任务
+SPN专线故障诊断 - 粤西OMC侧
+
+## 排查要求
+- 排查粤西OMC端口状态是否正常
+- 确认光功率是否在正常范围
+- 确认是否存在异常告警
+
+请针对粤西OMC侧进行排查。请用中文回复。""".stripIndent();
     }
 
     @Override
@@ -132,12 +169,7 @@ default -> message;
     @Override
     public CompletableFuture<String> onNegotiation(
             String agentName, String negotiationText, Map<String, Object> receiveResult) {
-        log.info("[onNegotiation] agent={}: {}", agentName, negotiationText);
-        String fallback = "根据工作台上下文，客户A粤东-粤西间SPN专线中断，"
-                + "粤东OMC告警端口Down，光功率-28dBm。";
-        String sys = "你是SPN跨城专线故障工作台的协商澄清专家。根据协商请求，补充客户A粤东-粤西间SPN专线中断的上下文（粤东OMC告警端口Down、光功率-28dBm）。中文。";
-        String clarification = LlmHelper.text(a2atEnvPath, sys, negotiationText, fallback);
-        return CompletableFuture.completedFuture(clarification);
+        return negotiationStrategy.resolve(agentName, negotiationText, receiveResult);
     }
 
 }

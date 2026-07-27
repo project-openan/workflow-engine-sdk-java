@@ -181,12 +181,19 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             log.error("[EngineClient] Agent not found: {}", agentName);
             return CompletableFuture.failedFuture(new RuntimeException("Agent not found: " + agentName));
         }
-        // Generate the metadata value via the A2A-T SDK (LLM + prompt template).
-        String metadataValue = generatePromptText(naturalLanguageInput);
+       // Generate the metadata value via the A2A-T SDK (LLM + prompt template).
+        // Only Task-T benefits from SDK prompt generation (scenario recognition
+        // + LLM template rendering). Authorization-T and Notification-T are
+        // pre-positioning control messages, not task scenarios -- using
+        // generateTaskPrompt on them always fails with scenario_not_matched.
+        // Each A2A-T extension type has its own prompt generation method.
+        // When the SDK does not yet support a given extension's prompt
+        // generation, the method returns null and we fall back to raw input.
+        String metadataValue = generateExtensionPrompt(extension, naturalLanguageInput);
         if (metadataValue == null || metadataValue.isEmpty()) {
-            // Fallback: use the natural-language input directly
             metadataValue = naturalLanguageInput;
-            log.info("[EngineClient] SDK prompt generation unavailable for {}, using input as metadata", agentName);
+            log.info("[EngineClient] SDK prompt generation unavailable for {} ({}), using input as metadata",
+                    agentName, extension.displayName());
         }
         log.info("[EngineClient] sendExtensionMessage to {}: extension={}, metadataValue={} chars",
                 agentName, extension.displayName(), metadataValue.length());
@@ -200,12 +207,38 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     }
 
     /**
-     * Generate structured prompt text from natural-language input via the
-     * A2A-T SDK's {@code generateTaskPrompt} API (LLM + scenario recognition
-     * + template rendering). Returns null if the SDK is unavailable or
-     * generation fails.
+     * Dispatch to the SDK's extension-specific prompt generation.
+     * <ul>
+     *   <li>Task-T: {@code generateTaskPrompt} (scenario recognition + LLM template)</li>
+     *   <li>Negotiation-T: {@code generateNegotiationPrompt} (reserved; SDK not yet implemented)</li>
+     *   <li>Authorization-T: {@code generateAuthorizationPrompt} (reserved)</li>
+     *   <li>Notification-T: {@code generateNotificationPrompt} (reserved)</li>
+     * </ul>
+     * Each method returns null when the SDK cannot generate, triggering the
+     * natural-language fallback in {@code sendExtensionMessage}.
      */
-    private String generatePromptText(String naturalLanguageInput) {
+    private String generateExtensionPrompt(A2ATExtension extension, String naturalLanguageInput) {
+        if (extension == A2ATExtension.TASK_T) {
+            return generateTaskPromptText(naturalLanguageInput);
+        }
+        if (extension == A2ATExtension.NEGOTIATION_T) {
+            return generateNegotiationPrompt(naturalLanguageInput);
+        }
+        if (extension == A2ATExtension.AUTHORIZATION_T) {
+            return generateAuthorizationPrompt(naturalLanguageInput);
+        }
+        if (extension == A2ATExtension.NOTIFICATION_T) {
+            return generateNotificationPrompt(naturalLanguageInput);
+        }
+        return null;
+    }
+
+    /**
+     * Generate structured Task-T prompt text via the A2A-T SDK's
+     * {@code generateTaskPrompt} API (LLM + scenario recognition + template
+     * rendering). Returns null if the SDK is unavailable or generation fails.
+     */
+    private String generateTaskPromptText(String naturalLanguageInput) {
         if (a2atClient == null) {
             return null;
         }
@@ -215,13 +248,54 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 return result.promptText();
             }
             PromptGenerationFailure f = result.failure();
-            log.warn("[EngineClient] SDK prompt generation failed: code={}, stage={}, message={}",
+            log.warn("[EngineClient] SDK Task-T prompt generation failed: code={}, stage={}, message={}",
                     f != null ? f.code() : "unknown",
                     f != null ? f.stage() : "unknown",
                     f != null ? f.message() : "unknown");
         } catch (Exception e) {
-            log.warn("[EngineClient] SDK prompt generation error: {}", e.getMessage());
+            log.warn("[EngineClient] SDK Task-T prompt generation error: {}", e.getMessage());
         }
+        return null;
+    }
+
+    /**
+     * Generate Negotiation-T prompt text. The A2A-T SDK has negotiation
+     * prompt templates (fulfillment / clarification / feasibility / information)
+     * but does not yet expose a dedicated generateNegotiationPrompt API.
+     * When the SDK adds it, this method will call it. Until then, returns null.
+     */
+    private String generateNegotiationPrompt(String naturalLanguageInput) {
+        if (a2atClient == null) {
+            return null;
+        }
+        // TODO: call a2atClient.generateNegotiationPrompt(naturalLanguageInput)
+        // when the A2A-T SDK exposes it.
+        return null;
+    }
+
+    /**
+     * Generate Authorization-T prompt text. Reserved for when the A2A-T SDK
+     * adds authorization scenario recognition + prompt templates. Returns null.
+     */
+    private String generateAuthorizationPrompt(String naturalLanguageInput) {
+        if (a2atClient == null) {
+            return null;
+        }
+        // TODO: call a2atClient.generateAuthorizationPrompt(...)
+        // when the A2A-T SDK exposes it.
+        return null;
+    }
+
+    /**
+     * Generate Notification-T prompt text. Reserved for when the A2A-T SDK
+     * adds notification scenario recognition + prompt templates. Returns null.
+     */
+    private String generateNotificationPrompt(String naturalLanguageInput) {
+        if (a2atClient == null) {
+            return null;
+        }
+        // TODO: call a2atClient.generateNotificationPrompt(...)
+        // when the A2A-T SDK exposes it.
         return null;
     }
 
