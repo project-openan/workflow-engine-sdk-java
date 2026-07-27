@@ -86,7 +86,7 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
         log.info("[onSelfTask] Self-loop step={}, agent={} (local merge, no A2A-T)", step, request.getAgentName());
         String message = request.getMessage();
         String fallback = analyzeFaultLocation(message);
-        String sys = "你是SPN跨城故障协同诊断汇总专家。根据两地市OMC诊断结果，输出故障定位结论和抢通触发方式。简洁专业，中文。";
+        String sys = "你是SPN跨城故障协同诊断汇总专家。根据两地市OMC诊断结果，输出故障定位结论。简洁专业，中文。";
         String result = LlmHelper.text(a2atEnvPath, sys, message, fallback);
         log.info("[onSelfTask] Merge result ({} chars): {}", result.length(), result);
         return CompletableFuture.completedFuture(
@@ -94,17 +94,15 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
     }
 
     private static String analyzeFaultLocation(String messageText) {
-        boolean hasShanghaiFault = messageText.contains("上海")
+        boolean hasYuedongFault = messageText.contains("粤东")
                 && (messageText.contains("故障") || messageText.contains("Down"));
-        boolean hasGuangzhouFault = messageText.contains("广州")
+        boolean hasYuexiFault = messageText.contains("粤西")
                 && (messageText.contains("故障") || messageText.contains("Down"));
-        if (hasShanghaiFault) {
-            return "汇总分析完成。故障定位：上海地市OMC，端口Down，光功率-28dBm低于阈值。"
-                    + "需更换光模块抢通。SPN诊断完成后自查白名单授权策略，匹配则自主抢通，"
-                    + "通过Notification-T上报结果。";
+        if (hasYuedongFault) {
+            return "汇总分析完成。故障定位：粤东地市OMC，端口Down，光功率-28dBm低于阈值。";
         }
-        if (hasGuangzhouFault) {
-            return "汇总分析完成。故障定位：广州地市OMC，需排查并抢通。";
+        if (hasYuexiFault) {
+            return "汇总分析完成。故障定位：粤西地市OMC，需排查。";
         }
         return "汇总分析完成。两地市均未见异常。";
     }
@@ -112,10 +110,10 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
     private static String enrichMessageForStep(String message, String step) {
         return switch (step) {
             case "diagnosis_city1" -> message + "\n\n## 城市差异化参数\n"
-                    + "客户A上海-广州间SPN专线中断，上海OMC告警端口Down，光功率-28dBm低于阈值。"
+                    + "客户A粤东-粤西间SPN专线中断，粤东OMC告警端口Down，光功率-28dBm低于阈值。"
                     + "端口所属单板line-card-03，端口号port-7。";
             case "diagnosis_city2" -> message + "\n\n## 城市差异化参数\n"
-                    + "客户A上海-广州间SPN专线中断，广州OMC侧需排查端口状态和光功率是否正常。";
+                    + "客户A粤东-粤西间SPN专线中断，粤西OMC侧需排查端口状态和光功率是否正常。";
 default -> message;
         };
     }
@@ -135,9 +133,9 @@ default -> message;
     public CompletableFuture<String> onNegotiation(
             String agentName, String negotiationText, Map<String, Object> receiveResult) {
         log.info("[onNegotiation] agent={}: {}", agentName, negotiationText);
-        String fallback = "根据工作台上下文，客户A上海-广州间SPN专线中断，"
-                + "上海OMC告警端口Down，光功率-28dBm。";
-        String sys = "你是SPN跨城专线抢通工作台的协商澄清专家。根据协商请求，补充客户A上海-广州间SPN专线中断的上下文（上海OMC告警端口Down、光功率-28dBm）。中文。";
+        String fallback = "根据工作台上下文，客户A粤东-粤西间SPN专线中断，"
+                + "粤东OMC告警端口Down，光功率-28dBm。";
+        String sys = "你是SPN跨城专线故障工作台的协商澄清专家。根据协商请求，补充客户A粤东-粤西间SPN专线中断的上下文（粤东OMC告警端口Down、光功率-28dBm）。中文。";
         String clarification = LlmHelper.text(a2atEnvPath, sys, negotiationText, fallback);
         return CompletableFuture.completedFuture(clarification);
     }

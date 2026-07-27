@@ -23,7 +23,7 @@ import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import org.a2aproject.sdk.spec.AgentCard;
 import com.openan.a2at.engine.client.AgentCardJacksonModule;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
-import com.openan.a2at.engine.examples.agents.SpnDomainAgentExecutor;
+import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity1Executor;
 import com.openan.a2at.engine.examples.server.EmbeddedA2AServer;
 import com.openan.a2at.engine.model.SendMessageResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -71,7 +71,7 @@ class EmbeddedA2AServerTest {
                 "skills", List.of(Map.of("id", "test", "name", "test", "description", "test", "tags", List.of())),
                 "supportedInterfaces", List.of(Map.of("protocolBinding", "HTTP+JSON", "protocolVersion", "1.0", "url", "https://127.0.0.1:" + port, "tenant", ""))
         );
-        server = new EmbeddedA2AServer("127.0.0.1", port, card, new SpnDomainAgentExecutor());
+        server = new EmbeddedA2AServer("127.0.0.1", port, card, new SpnDomainAgentCity1Executor());
         server.start();
         Thread.sleep(500);
         client = new DefaultWorkflowEngineClient(
@@ -108,8 +108,8 @@ class EmbeddedA2AServerTest {
         // A2A-T extension content is in metadata (Task-T/v1), not in parts.text
         String taskMeta = extractExtensionValue(result, "Task-T");
         assertNotNull(taskMeta, "Task-T metadata should be present in response");
-        assertTrue(taskMeta.contains("\u4e0a\u6d77"),
-                "Diagnosis metadata should mention Shanghai, got: " + taskMeta);
+        assertTrue(taskMeta.contains("\u7ca4\u4e1c"),
+                "Diagnosis metadata should mention Yuedong, got: " + taskMeta);
     }
 
     private static String extractExtensionValue(SendMessageResult result, String extKeyword) {

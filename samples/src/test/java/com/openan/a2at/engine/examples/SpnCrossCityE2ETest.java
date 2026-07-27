@@ -7,7 +7,7 @@ import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity2Executor;
-import com.openan.a2at.engine.examples.agents.SpnDomainAgentExecutor;
+import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity1Executor;
 import com.openan.a2at.engine.examples.agents.WorkbenchControlPoint;
 import com.openan.a2at.engine.examples.server.EmbeddedA2AServer;
 import com.openan.a2at.engine.model.ExecutionResult;
@@ -75,10 +75,10 @@ class SpnCrossCityE2ETest {
         System.setProperty("a2at.llm.disabled", "true");
         port1 = 28200 + (int) (Math.random() * 500);
         port2 = port1 + 1;
-        AgentCard c1 = cardFor("SPN Domain Agent", port1);
+        AgentCard c1 = cardFor("SPN Domain Agent City1", port1);
         AgentCard c2 = cardFor("SPN Domain Agent City2", port2);
         EmbeddedA2AServer s1 = new EmbeddedA2AServer("127.0.0.1", port1,
-                mapper.convertValue(c1, Map.class), new SpnDomainAgentExecutor());
+                mapper.convertValue(c1, Map.class), new SpnDomainAgentCity1Executor());
         EmbeddedA2AServer s2 = new EmbeddedA2AServer("127.0.0.1", port2,
                 mapper.convertValue(c2, Map.class), new SpnDomainAgentCity2Executor());
         s1.start();
@@ -99,7 +99,7 @@ class SpnCrossCityE2ETest {
     }
 
     private Workflow crossCityWorkflow() {
-        Task t1 = Task.builder().agent("SPN Domain Agent")
+        Task t1 = Task.builder().agent("SPN Domain Agent City1")
                 .description("SPN专线故障诊断").build();
         Task t2 = Task.builder().agent("SPN Domain Agent City2")
                 .description("SPN专线故障诊断").build();
@@ -126,9 +126,9 @@ class SpnCrossCityE2ETest {
     @Test
     void fullBusinessPathNegotiationDiagnosisRecoveryAndSelfLoopMerge() {
         // Pre-position Authorization-T + Notification-T to both SPN agents
-        client.sendAuthorization("SPN Domain Agent", "下发授权放行策略",
+        client.sendAuthorization("SPN Domain Agent City1", "下发授权放行策略",
                 "任务类型新增授权，操作名称业务抢通").join();
-        client.sendNotification("SPN Domain Agent", "订阅业务抢通结果通知",
+        client.sendNotification("SPN Domain Agent City1", "订阅业务抢通结果通知",
                 "通知主题为service-recovery-execution-result").join();
         client.sendAuthorization("SPN Domain Agent City2", "下发授权放行策略",
                 "任务类型新增授权，操作名称业务抢通").join();
@@ -176,6 +176,6 @@ class SpnCrossCityE2ETest {
         Map<String, Object> mergeOut = result.getStepOutputs().get("merge_analysis");
         assertNotNull(mergeOut, "merge_analysis output must exist");
         String mergeText = String.valueOf(mergeOut.values().iterator().next());
-        assertTrue(mergeText.contains("上海"), "Merge must locate fault in Shanghai: " + mergeText);
+        assertTrue(mergeText.contains("粤东"), "Merge must locate fault in Yuedong: " + mergeText);
     }
 }

@@ -1,6 +1,6 @@
 {
   "name": "SPN Domain Agent City2",
-  "description": "SPN Domain Agent for City2 OMC - Guangzhou, private-line fault diagnosis with Bearer auth",
+  "description": "SPN Domain Agent for City2 - Yuexi OMC, private-line fault diagnosis with Bearer auth",
   "provider": {
     "organization": "Huawei",
     "url": "https://www.huawei.com"

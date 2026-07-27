@@ -20,7 +20,7 @@
 package com.openan.a2at.engine.examples;
 
 import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity2Executor;
-import com.openan.a2at.engine.examples.agents.SpnDomainAgentExecutor;
+import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity1Executor;
 import com.openan.a2at.engine.examples.agents.TransportWorkbenchAgentExecutor;
 import com.openan.a2at.engine.examples.server.EmbeddedA2AServer;
 import com.openan.a2at.engine.registry.RegistryClient;
@@ -82,7 +82,7 @@ public class StartAgentsServer implements Runnable {
         String envPath = resolveEnvPath();
         log.info("A2AT env file: {}", envPath != null ? envPath : "(not found, A2A-T extensions disabled)");
         List<AgentEntry> agents = List.of(
-                loadAgent("agentcard/spn_domain_agent_city1.json", new SpnDomainAgentExecutor()),
+                loadAgent("agentcard/spn_domain_agent_city1.json", new SpnDomainAgentCity1Executor()),
                 loadAgent("agentcard/spn_domain_agent_city2.json", new SpnDomainAgentCity2Executor()),
                 loadAgent("agentcard/transport_workbench_agent.json",
                         new TransportWorkbenchAgentExecutor(REGISTRY_URL, ORCH_URL, credPath, sslVerify, envPath))
