@@ -206,6 +206,9 @@ public interface ControlPoint {
     CompletableFuture<TaskResponse> onTask(
         TaskRequest request, WorkflowEngineClient engineClient);
 
+    // 自环节点：本地处理，不发 A2A-T 消息给自己。
+    default CompletableFuture<TaskResponse> onSelfTask(TaskRequest request);
+
     // 条件分支决策。只决定下一步去哪个 step。
     CompletableFuture<RouteDecision> onRoute(
         String stepName, Map<String, Object> results,
@@ -228,7 +231,8 @@ public interface ControlPoint {
 
 | 方法 | 触发时机 | 返回值 |
 |---|---|---|
-| `onTask` | 每个工作流步骤分派任务时 | `TaskResponse`（成功 + 输出） |
+| `onTask` | 步骤向其他智能体分派任务时 | `TaskResponse`（成功 + 输出） |
+| `onSelfTask` | `SELF_LOOP` 步骤本地执行（不走 A2A-T） | `TaskResponse`（成功 + 输出） |
 | `onRoute` | 步骤完成后、下一步前 | `RouteDecision`（nextStep） |
 | `onAuthorization` | 智能体请求授权时 | `Boolean`（true=通过） |
 | `onNotification` | 智能体推送通知时 | `Void` |
@@ -238,6 +242,7 @@ public interface ControlPoint {
 
 默认实现，提供合理默认值：
 - `onTask`：调用 `sendMessage()`，返回 success/output
+- `onSelfTask`：原样回传任务消息（本地逻辑请覆盖实现）
 - `onRoute`：选第一个非终止分支
 - `onAuthorization`：自动通过
 - `onNotification`：记录日志并返回
@@ -359,6 +364,7 @@ Map<String, Object> registerAgentCard(Map<String, Object> agentCard)
 |---|---|
 | `ALL_SUCCESS` | 所有子任务必须成功 |
 | `ANY_SUCCESS` | 任一子任务成功即可 |
+| `SELF_LOOP` | 工作流执行智能体通过 `onSelfTask` 本地处理，不发 A2A-T 消息。成功语义同 `ALL_SUCCESS`。 |
 
 ### Task
 

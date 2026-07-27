@@ -39,7 +39,7 @@ Add to your `pom.xml`:
 | Layer | Entry Point | What It Handles | What You Provide |
 |-------|------------|-----------------|-----------------|
 | 2 (high) | `ExecutePsop.builder()` | Event collection, lifecycle, onFinish | ControlPoint + AgentCards + config |
-| 1 (mid) | `WorkflowExecutor` | DAG traversal, context, ControlPoint dispatch | ControlPoint + EngineClient + Workflow |
+| 1 (mid) | `WorkflowExecutor` | DAG traversal, context, dispatch (onTask/onSelfTask) | ControlPoint + EngineClient + Workflow |
 | 0 (low) | `WorkflowEngineClient` | A2A send, response extraction | AgentCards + A2AJavaClientRuntime |
 
 ## 3. Implement ControlPoint
@@ -106,8 +106,8 @@ negotiation).
 |-------|-------|------|----------|
 | `start` | runner | Workflow begins | `workflow`, `steps` |
 | `step_start` | executor | Step begins | `step` |
-| `task_request` | executor | A subtask is dispatched to `onTask` | `step`, `agent`, `task` |
-| `task_response` | executor | `onTask` returned a `TaskResponse` | `step`, `agent`, `task`, `output` |
+| `task_request` | executor | A subtask is dispatched to `onTask`/`onSelfTask` | `step`, `agent`, `task` |
+| `task_response` | executor | `onTask`/`onSelfTask` returned a `TaskResponse` | `step`, `agent`, `task`, `output` |
 | `route_decision` | executor | Branch chosen | `step`, `next`, `reason` |
 | `step_complete` | executor | Step finished | `step`, `results` |
 | `agent_request` | engine client | Message sent to agent | `agent`, `request`, `metadata` |
@@ -170,8 +170,8 @@ is emitted and the loop retries).
 
 | Field | Where | Meaning |
 |-------|-------|---------|
-| `steps[].stepType` | `WorkflowStep` | `AllSuccess` (default): every subtask must succeed; `AnySuccess`: the step succeeds as soon as one subtask succeeds. |
-| `steps[].subtasks[]` | `Task` | Each has `agent`, `skill`, `description`. One `onTask` call per subtask. |
+| `steps[].stepType` | `WorkflowStep` | `AllSuccess` (default): every subtask must succeed; `AnySuccess`: any subtask success suffices; `SelfLoop`: the workflow agent handles the step locally via `onSelfTask` (no A2A-T message to the named agent). |
+| `steps[].subtasks[]` | `Task` | Each has `agent`, `skill`, `description`. One `onTask` (or `onSelfTask` for SelfLoop) call per subtask. |
 | `steps[].next[]` | `List<JumpCondition>` | Branch targets. `step` = next step name; `condition` = rule text. |
 | `steps[].layer` | `WorkflowStep` | `layer == 0` starts the DAG (context = runtime intent only). Higher layers get upstream results. |
 | `steps[].contextFrom` | `WorkflowStep` | Optional step names whose outputs fold into context. `"*"` = all ancestors. |
@@ -301,7 +301,7 @@ running A2A call. For SSE, drop the subscriber and let the future complete.
 ## 11. Checklist
 
 1. Add Maven dependencies
-2. Implement `ControlPoint` (onTask + onRoute)
+2. Implement `ControlPoint` (onTask + onSelfTask + onRoute)
 3. Get AgentCards (from registry or JSON files)
 4. Load Workflow (via `LoadPsop` or build your own)
 5. Configure `.env` and credentials file

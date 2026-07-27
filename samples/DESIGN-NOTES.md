@@ -115,8 +115,9 @@ static {
 编排中心的 `psop_spn_cross_city_diagnosis.json` 已经正确定义：
 - `merge_analysis` 节点分配给 `"Transport Workbench Agent"`，skill 为 `cross-city-fault-diagnosis`
 - `layer=1`，`context_from=["diagnosis_city1", "diagnosis_city2"]`
-- 工作台 Agent 收到子任务（消息含 `## Current Task`）时走 `handleSubTask` 本地处理 merge
-- 工作台 Agent 收到顶层任务时走 `handleTopLevelTask`：搜索 PSOP → 加载工作流 → 执行
+- `merge_analysis` 是 `SelfLoop` 类型：工作台 Agent 通过 `WorkbenchControlPoint.onSelfTask` 本地汇总，不走 A2A-T 给自己发消息
+- 只有 `diagnosis_city1`/`diagnosis_city2` 走 A2A-T 给 SPN Domain Agent
+- 工作台 Agent 收到顶层任务时走 `handleTopLevelTask`：搜索 PSOP → 加载工作流 → 执行（merge_analysis 由引擎自环节点回调处理）
 
 ## 十、验证清单
 

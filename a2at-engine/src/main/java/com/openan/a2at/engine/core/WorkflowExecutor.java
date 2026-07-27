@@ -236,47 +236,61 @@ public class WorkflowExecutor {
     private CompletableFuture<StepResult> executeSubtasks(WorkflowStep step) {
         String contextMessage = contextBuilder.buildContext(step, stepOutputs);
         List<CompletableFuture<StepResult>> futures = new ArrayList<>();
-
         for (int i = 0; i < step.getSubtasks().size(); i++) {
             final int subtaskIndex = i;
             final var task = step.getSubtasks().get(i);
-            String taskMessage = contextBuilder.buildTaskMessage(task.getDescription(), contextMessage, lang);
-            var request = TaskRequest.builder()
-                    .agentName(task.getAgent())
-                    .skill(task.getSkill())
-                    .message(taskMessage)
-                    .description(task.getDescription())
-                    .context(contextMessage)
-                    .stepName(step.getName())
-                    .subtaskIndex(subtaskIndex)
-                    .build();
-            emit(EventType.TASK_REQUEST, Map.of("step", step.getName(), "agent", task.getAgent(), "task", task.getDescription()));
-            log.info("[Executor] Dispatching task: step={}, agent={}, subtask_index={}, desc={}",
-                    step.getName(), task.getAgent(), subtaskIndex, task.getDescription());
-            log.debug("[Executor] Task message to {}: [{}]", task.getAgent(), taskMessage);
-            futures.add(controlPoint.onTask(request, engineClient)
+            var request = buildTaskRequest(step, task, subtaskIndex, contextMessage);
+            emit(EventType.TASK_REQUEST, Map.of("step", step.getName(),
+                    "agent", task.getAgent(), "task", task.getDescription()));
+            futures.add(dispatchTask(step, request)
                     .thenApply(r -> processTaskResponse(step, task, subtaskIndex, r))
                     .exceptionally(e -> processTaskError(step, task, subtaskIndex, e)));
         }
-
         if (step.getStepType() == StepType.ANY_SUCCESS) {
-            // ANY_SUCCESS: wait until the first subtask succeeds, then cancel the rest.
-            // Mirrors Python's asyncio.as_completed loop that returns on first success.
             return anySuccess(futures);
         }
         return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .thenApply(v -> {
-                    Map<String, Object> results = new HashMap<>();
-                    boolean anyFailed = false;
-                    for (var f : futures) {
-                        var r = f.join();
-                        results.put(r.taskDesc(), r.output());
-                        if (!r.success()) {
-                            anyFailed = true;
-                        }
-                    }
-                    return new StepResult(null, null, !anyFailed, results);
-                });
+                .thenApply(v -> collectAllSuccess(futures));
+    }
+
+    private TaskRequest buildTaskRequest(WorkflowStep step, Task task,
+            int subtaskIndex, String contextMessage) {
+        String taskMessage = contextBuilder.buildTaskMessage(
+                task.getDescription(), contextMessage, lang);
+        log.info("[Executor] Dispatching task: step={}, agent={}, subtask_index={}, desc={}",
+                step.getName(), task.getAgent(), subtaskIndex, task.getDescription());
+        log.debug("[Executor] Task message to {}: [{}]", task.getAgent(), taskMessage);
+        return TaskRequest.builder()
+                .agentName(task.getAgent())
+                .skill(task.getSkill())
+                .message(taskMessage)
+                .description(task.getDescription())
+                .context(contextMessage)
+                .stepName(step.getName())
+                .subtaskIndex(subtaskIndex)
+                .build();
+    }
+
+    private CompletableFuture<TaskResponse> dispatchTask(WorkflowStep step, TaskRequest request) {
+        if (step.getStepType() == StepType.SELF_LOOP) {
+            log.info("[Executor] Self-loop task: step={}, agent={} (local, no A2A-T)",
+                    step.getName(), request.getAgentName());
+            return controlPoint.onSelfTask(request);
+        }
+        return controlPoint.onTask(request, engineClient);
+    }
+
+    private StepResult collectAllSuccess(List<CompletableFuture<StepResult>> futures) {
+        Map<String, Object> results = new HashMap<>();
+        boolean anyFailed = false;
+        for (var f : futures) {
+            var r = f.join();
+            results.put(r.taskDesc(), r.output());
+            if (!r.success()) {
+                anyFailed = true;
+            }
+        }
+        return new StepResult(null, null, !anyFailed, results);
     }
 
     private StepResult processTaskResponse(WorkflowStep step, Task task,

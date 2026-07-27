@@ -60,10 +60,8 @@ public class SpnCrossCityDiagnosisDemo {
     private static final long AGENT_STARTUP_WAIT_SECONDS = 3;
 
     public static void main(String[] args) throws Exception {
-//        java.security.Security.insertProviderAt(new com.sun.crypto.provider.SunJCE(), 1);
         log.info("=== SPN Cross-City Fault Diagnosis Demo ===");
 
-        // Step 1: Start all agents in background
         log.info("=== Step 1: Start all A2A agents ===");
         StartAgentsServer agentsServer = new StartAgentsServer();
         Thread agentThread = new Thread(agentsServer, "agents-server");
@@ -72,7 +70,6 @@ public class SpnCrossCityDiagnosisDemo {
         log.info("Waiting for agents to start...");
         TimeUnit.SECONDS.sleep(AGENT_STARTUP_WAIT_SECONDS);
 
-        // Step 2: Send Task-T to Workbench Agent via WorkflowEngineClient
         log.info("=== Step 2: Send Task-T to Workbench Agent ===");
         String taskText = "SPN跨城专线故障诊断与抢通："
                 + "客户A上海-广州间SPN专线中断，"
@@ -88,7 +85,6 @@ public class SpnCrossCityDiagnosisDemo {
             log.warn("Response was null");
         }
 
-        // Step 3: Shutdown
         log.info("=== Demo complete, shutting down ===");
         agentsServer.stop();
         // Force exit: JDK HttpClient and SDK internal thread pools may leave
@@ -104,12 +100,10 @@ public class SpnCrossCityDiagnosisDemo {
      * Task-T prompt generation, and negotiation auto-loop.
      */
     private static String sendTaskToWorkbench(String taskText) throws Exception {
-        // Load the Workbench Agent's AgentCard from classpath
         String cardPath = SpnCrossCityDiagnosisDemo.class.getClassLoader()
                 .getResource(AGENT_CARD_RESOURCE).getPath();
         AgentCard agentCard = mapper.readValue(new java.io.File(cardPath), AgentCard.class);
 
-        // Create engine client with only the Workbench Agent's card
         DefaultWorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(
                 List.of(agentCard), null,
                 WorkflowEngineClientConfig.builder()
@@ -117,7 +111,6 @@ public class SpnCrossCityDiagnosisDemo {
                         .a2atEnvPath(StartAgentsServer.resolveEnvPath())
                         .build());
 
-        // Set up EventCallback to receive intermediate state data in real time
         engineClient.setEventCallback(new EventCallback() {
             @Override
             public void onEvent(String type, Map<String, Object> data) {

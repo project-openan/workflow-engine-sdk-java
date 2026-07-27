@@ -43,7 +43,24 @@ public interface ControlPoint {
     * Authorization-T confirmation injection, Notification-T subscription.
      * Just call sendMessage - the SDK handles the rest.
     */
-   CompletableFuture<TaskResponse> onTask(TaskRequest request, com.openan.a2at.engine.client.WorkflowEngineClient engineClient);
+    CompletableFuture<TaskResponse> onTask(TaskRequest request, com.openan.a2at.engine.client.WorkflowEngineClient engineClient);
+
+    /**
+     * Handle a self-loop task locally. Called when a workflow step is marked
+     * SELF_LOOP: the agent executing the workflow processes the task itself,
+     * WITHOUT sending an A2A-T message to itself. Only steps that dispatch to
+     * OTHER agents go through {@link #onTask} and the A2A-T protocol.
+     *
+     * <p>No {@code engineClient} is passed on purpose: self-loop tasks must not
+     * send A2A-T messages. Implement this to handle local aggregation, merge,
+     * or any business logic the workflow-executing agent owns.
+     *
+     * <p>Default: echoes the task message back as the output.
+     */
+    default CompletableFuture<TaskResponse> onSelfTask(TaskRequest request) {
+        return CompletableFuture.completedFuture(
+                TaskResponse.builder().success(true).output(request.getMessage()).build());
+    }
 
     /**
      * Conditional branch decision. Only decide which step to go to.

@@ -50,6 +50,7 @@ Workflow workflow = Workflow.builder()
             .build(),
         WorkflowStep.builder()
             .name("merge")
+            .stepType(StepType.SELF_LOOP)   // 自环节点：工作台本地汇总，不发 A2A-T 给自己
             .subtasks(List.of(
                 Task.builder()
                     .agent("Transport Workbench Agent")
@@ -100,6 +101,15 @@ public class MyControlPoint extends DefaultControlPoint {
     }
 
     @Override
+    public CompletableFuture<TaskResponse> onSelfTask(TaskRequest request) {
+        // SELF_LOOP 步骤在这里本地处理，不需要 engineClient，不发 A2A-T 消息。
+        // request.getMessage() 已包含上游步骤的执行结果上下文。
+        String summary = summarizeLocally(request.getMessage());
+        return CompletableFuture.completedFuture(
+            TaskResponse.builder().success(true).output(summary).build());
+    }
+
+    @Override
     public CompletableFuture<RouteDecision> onRoute(
             String stepName, Map<String, Object> results,
             List<JumpCondition> conditions) {
@@ -120,13 +130,16 @@ public class MyControlPoint extends DefaultControlPoint {
 
 | 方法 | 何时调用 | 你需要做什么 |
 |---|---|---|
-| `onTask` | 每个工作流步骤分派任务时 | 调用 `engineClient.sendMessage()` 发送消息，返回执行结果 |
+| `onTask` | 步骤向其他智能体分派任务时 | 调用 `engineClient.sendMessage()` 发送消息，返回执行结果 |
+| `onSelfTask` | `SELF_LOOP` 步骤本地执行时 | 本地处理并返回结果（不发 A2A-T 消息） |
 | `onRoute` | 步骤完成后、决定下一步前 | 从候选分支中选择下一步 |
 | `onNegotiation` | 智能体返回 `INPUT_REQUIRED` 时 | 返回补充说明文本 |
 | `onAuthorization` | 智能体请求授权时（可选） | 返回 true/false |
 | `onNotification` | 智能体推送通知时（可选） | 处理通知内容 |
 
 `onAuthorization` 和 `onNotification` 有默认实现（自动通过 / 空操作），`onNegotiation` 默认返回通用文本。只需覆盖你关心的方法。
+
+**自环节点（SelfLoop）**：当一个步骤是工作流执行智能体自身的任务（例如汇总多个智能体的诊断结果），把 `stepType` 设为 `SELF_LOOP`。引擎会调用 `onSelfTask` 本地处理，而不是通过 A2A-T 协议给智能体自己发消息。`onSelfTask` 不接收 `engineClient` 参数——从契约上保证自环任务不会误发 A2A-T。只有发给其他智能体的步骤才走 `onTask` + A2A-T 协议。
 
 ### 4.4 执行
 
@@ -408,7 +421,7 @@ WorkflowEngineClientConfig.builder()
 | 接口/类 | 用途 |
 |---|---|
 | `ExecutePsop.Builder` | 工作流执行入口 |
-| `ControlPoint` / `DefaultControlPoint` | 业务决策实现（onTask、onRoute、onNegotiation 等） |
+| `ControlPoint` / `DefaultControlPoint` | 业务决策实现（onTask、onSelfTask、onRoute、onNegotiation 等） |
 | `WorkflowEngineClient` | 发送消息给智能体（sendMessage、sendExtensionMessage） |
 | `WorkflowEngineClientConfig` | 配置（SSL、认证、A2A-T、协商轮数、自定义 Handler） |
 | `AuthProvider` | 自定义认证 |

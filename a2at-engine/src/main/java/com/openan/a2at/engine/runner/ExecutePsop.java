@@ -127,9 +127,6 @@ public class ExecutePsop {
 
     public static Builder builder() { return new Builder(); }
 
-    // ------------------------------------------------------------------
-    // Extracted sub-methods
-    // ------------------------------------------------------------------
 
     @SuppressWarnings("unchecked")
     private static EventCallback createCollectingCallback(
@@ -273,9 +270,6 @@ public class ExecutePsop {
         return data.toString();
     }
 
-    // ------------------------------------------------------------------
-    // Builder
-    // ------------------------------------------------------------------
 
     public static final class Builder {
         private Workflow psop;

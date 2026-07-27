@@ -276,7 +276,7 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
         return new LinkedHashMap<>();
     }
 
-    /** Short human-readable summary for the artifact parts. Default: "业务处理结果" */
+    /** Short human-readable summary for the artifact parts. */
     protected String buildResultSummary() {
         return "业务处理结果";
     }

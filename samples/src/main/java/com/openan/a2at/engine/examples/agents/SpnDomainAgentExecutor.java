@@ -88,7 +88,7 @@ public class SpnDomainAgentExecutor extends NegotiationBaseAgentExecutor {
 
     /**
      * After diagnosis, check the pre-positioned Authorization-T whitelist policy.
-     * If the repair action (“光模块更换” / optical module replacement) is in the
+     * If the repair action (optical module replacement) is in the
      * whitelist, self-execute recovery and report the result via the
      * Notification-T channel (artifact metadata). If not in whitelist, report
      * refusal via the same channel.

@@ -350,4 +350,51 @@ class WorkflowExecutorTest {
         assertTrue(result.isSuccess());
         assertEquals(0, stub.getSentCount());
     }
+
+    @Test
+    void selfLoopStepCallsOnSelfTaskNotOnTask() {
+        // A SELF_LOOP step must dispatch via onSelfTask (local callback),
+        // NOT onTask (A2A-T). The stub client records sends, so onSelfTask
+        // producing a result without a send proves no A2A-T message went out.
+        Task merge = Task.builder().agent("Workbench").description("merge results").build();
+        WorkflowStep remote = WorkflowStep.builder().name("diag").layer(0)
+                .subtasks(List.of(task("SPN", "diagnose")))
+                .next(List.of(jump("merge", "")))
+                .build();
+        WorkflowStep selfStep = WorkflowStep.builder().name("merge").layer(1)
+                .stepType(StepType.SELF_LOOP)
+                .subtasks(List.of(merge))
+                .next(List.of())
+                .build();
+        Workflow wf = Workflow.builder().name("self-loop").steps(List.of(remote, selfStep)).build();
+        StubWorkflowEngineClient stub = new StubWorkflowEngineClient("SPN");
+        List<String> selfTaskMsgs = Collections.synchronizedList(new ArrayList<>());
+        ControlPoint cp = new ControlPoint() {
+            @Override
+            public CompletableFuture<TaskResponse> onTask(TaskRequest req, WorkflowEngineClient ec) {
+                return ec.sendMessage(req.getAgentName(), req.getMessage())
+                        .thenApply(r -> TaskResponse.builder().success(true).output(r.getText()).build());
+            }
+            @Override
+            public CompletableFuture<TaskResponse> onSelfTask(TaskRequest req) {
+                selfTaskMsgs.add(req.getMessage());
+                return CompletableFuture.completedFuture(
+                        TaskResponse.builder().success(true).output("merged").build());
+            }
+            @Override
+            public CompletableFuture<RouteDecision> onRoute(String s, Map<String, Object> r, List<JumpCondition> c) {
+                return CompletableFuture.completedFuture(RouteDecision.builder()
+                        .nextStep(c.get(0).getStep()).reason("first").build());
+            }
+        };
+        WorkflowExecutor exec = new WorkflowExecutor(wf, cp, stub, recordingCallback(), "intent", "zh");
+        ExecutionResult result = exec.run().join();
+        assertTrue(result.isSuccess());
+        // Only the remote diagnosis step sends via A2A-T; the merge step is local.
+        assertEquals(1, stub.getSentCount());
+        assertEquals("SPN", stub.getSentMessages().get(0).agentName);
+        assertEquals(1, selfTaskMsgs.size());
+        assertTrue(events.contains(EventType.TASK_REQUEST));
+        assertTrue(events.contains(EventType.TASK_RESPONSE));
+    }
 }

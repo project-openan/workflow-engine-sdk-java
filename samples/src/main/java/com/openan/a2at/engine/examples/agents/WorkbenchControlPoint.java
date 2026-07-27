@@ -80,6 +80,35 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
                 });
     }
 
+    @Override
+    public CompletableFuture<TaskResponse> onSelfTask(TaskRequest request) {
+        String step = request.getStepName();
+        log.info("[onSelfTask] Self-loop step={}, agent={} (local merge, no A2A-T)", step, request.getAgentName());
+        String message = request.getMessage();
+        String fallback = analyzeFaultLocation(message);
+        String sys = "你是SPN跨城故障协同诊断汇总专家。根据两地市OMC诊断结果，输出故障定位结论和抢通触发方式。简洁专业，中文。";
+        String result = LlmHelper.text(a2atEnvPath, sys, message, fallback);
+        log.info("[onSelfTask] Merge result ({} chars): {}", result.length(), result);
+        return CompletableFuture.completedFuture(
+                TaskResponse.builder().success(true).output(result).build());
+    }
+
+    private static String analyzeFaultLocation(String messageText) {
+        boolean hasShanghaiFault = messageText.contains("上海")
+                && (messageText.contains("故障") || messageText.contains("Down"));
+        boolean hasGuangzhouFault = messageText.contains("广州")
+                && (messageText.contains("故障") || messageText.contains("Down"));
+        if (hasShanghaiFault) {
+            return "汇总分析完成。故障定位：上海地市OMC，端口Down，光功率-28dBm低于阈值。"
+                    + "需更换光模块抢通。SPN诊断完成后自查白名单授权策略，匹配则自主抢通，"
+                    + "通过Notification-T上报结果。";
+        }
+        if (hasGuangzhouFault) {
+            return "汇总分析完成。故障定位：广州地市OMC，需排查并抢通。";
+        }
+        return "汇总分析完成。两地市均未见异常。";
+    }
+
     private static String enrichMessageForStep(String message, String step) {
         return switch (step) {
             case "diagnosis_city1" -> message + "\n\n## 城市差异化参数\n"
@@ -93,22 +122,13 @@ default -> message;
 
     @Override
     public CompletableFuture<RouteDecision> onRoute(
-            String stepName, Map<String, Object> results, List<JumpCondition> conditions) {
-        if (!"merge_analysis".equals(stepName)) {
-            return super.onRoute(stepName, results, conditions);
-        }
-        // Recovery is not a workflow step. SPN agents self-trigger recovery
-        // based on pre-positioned Authorization-T whitelist policy, and report
-        // results via Notification-T channel. The workflow ends here.
-        String city1 = String.valueOf(results.getOrDefault("diagnosis_city1", ""));
-        String city2 = String.valueOf(results.getOrDefault("diagnosis_city2", ""));
-        String reason = LlmHelper.text(a2atEnvPath,
-                "你是SPN跨城故障定位分析专家。用一句话说明故障所在城市和抢通触发方式。中文。",
-                "上海诊断：" + city1 + "\n广州诊断：" + city2 + "\nSPN诊断完成后自查白名单授权策略，匹配则自主抢通，通过Notification-T上报结果。请给一句话总结。",
-                "fault analysis");
-        log.info("[onRoute] {} -> endNode ({})", stepName, reason);
-        return CompletableFuture.completedFuture(
-                RouteDecision.builder().nextStep("endNode").reason(reason).build());
+            String stepName, Map<String, Object> results,
+            List<JumpCondition> conditions) {
+        // merge_analysis has an unconditional next -> endNode, so the executor
+        // never calls onRoute for it. Recovery is self-triggered by SPN agents
+        // via the pre-positioned Authorization-T whitelist and reported through
+        // the Notification-T channel. Just delegate to the default routing.
+        return super.onRoute(stepName, results, conditions);
     }
 
     @Override

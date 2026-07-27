@@ -55,6 +55,14 @@ public class DefaultControlPoint implements ControlPoint {
     }
 
     @Override
+    public CompletableFuture<TaskResponse> onSelfTask(TaskRequest request) {
+        log.info("[DefaultCP] onSelfTask: step={}, agent={} (local, no A2A-T)",
+                request.getStepName(), request.getAgentName());
+        return CompletableFuture.completedFuture(
+                TaskResponse.builder().success(true).output(request.getMessage()).build());
+    }
+
+    @Override
     public CompletableFuture<RouteDecision> onRoute(
             String stepName, Map<String, Object> results,
             List<JumpCondition> conditions) {

@@ -212,6 +212,9 @@ public interface ControlPoint {
     CompletableFuture<TaskResponse> onTask(
         TaskRequest request, WorkflowEngineClient engineClient);
 
+    // Self-loop step: handled locally, no A2A-T message to self.
+    default CompletableFuture<TaskResponse> onSelfTask(TaskRequest request);
+
     // Conditional branch decision. Only decide which step to go to.
     CompletableFuture<RouteDecision> onRoute(
         String stepName, Map<String, Object> results,
@@ -234,7 +237,8 @@ public interface ControlPoint {
 
 | Method | When Called | Return |
 |---|---|---|
-| `onTask` | Each workflow step dispatches a task | `TaskResponse` (success + output) |
+| `onTask` | A step dispatches a task to another agent | `TaskResponse` (success + output) |
+| `onSelfTask` | A `SELF_LOOP` step runs locally (no A2A-T) | `TaskResponse` (success + output) |
 | `onRoute` | After step completes, before next step | `RouteDecision` (nextStep) |
 | `onAuthorization` | When agent requests authorization | `Boolean` (true=approve) |
 | `onNotification` | When agent sends notification | `Void` |
@@ -244,6 +248,7 @@ public interface ControlPoint {
 
 Default implementation with sensible defaults:
 - `onTask`: calls `sendMessage()`, returns success/output
+- `onSelfTask`: echoes the task message back (override for local logic)
 - `onRoute`: picks first non-terminal branch
 - `onAuthorization`: auto-approves
 - `onNotification`: logs and returns
@@ -369,6 +374,7 @@ orchestration center API response.
 |---|---|
 | `ALL_SUCCESS` | All subtasks must succeed |
 | `ANY_SUCCESS` | Any subtask success is sufficient |
+| `SELF_LOOP` | The workflow agent handles the task locally via `onSelfTask`; no A2A-T message is sent. Success follows `ALL_SUCCESS`. |
 
 ### Task
 

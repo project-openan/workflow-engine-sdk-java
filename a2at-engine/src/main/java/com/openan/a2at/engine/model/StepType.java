@@ -21,7 +21,8 @@ package com.openan.a2at.engine.model;
 
 public enum StepType {
     ALL_SUCCESS("AllSuccess"),
-    ANY_SUCCESS("AnySuccess");
+    ANY_SUCCESS("AnySuccess"),
+    SELF_LOOP("SelfLoop");
 
     private final String value;
     StepType(String value) {

@@ -60,8 +60,6 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
     private static final ObjectMapper mapper = new ObjectMapper()
             .registerModule(new AgentCardJacksonModule());
 
-    private static final String SUBTASK_MARKER = "## Current Task";
-    private static final String MERGE_KEYWORD = "汇总";
     private static final String FALLBACK_PSOP_ID = "psop_spn_cross_city_diagnosis";
     private static final List<String> AGENT_CARD_RESOURCES = List.of(
             "agentcard/spn_domain_agent_city1.json",
@@ -94,13 +92,10 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
 
     @Override
     protected String executeBusiness(RequestContext ctx, AgentEmitter emitter, String input) {
-        String taskId = ctx.getTaskId();
-        String contextId = ctx.getContextId();
         try {
-            String responseText = input.contains(SUBTASK_MARKER)
-                    ? handleSubTask(input)
-                    : handleTopLevelTask(input);
-            return responseText;
+            // merge_analysis is a SELF_LOOP step handled locally by the
+            // WorkbenchControlPoint; it never arrives here via A2A-T.
+            return handleTopLevelTask(input);
         } catch (Exception e) {
             log.error("[Workbench-Agent] Business failed: {}", e.getMessage(), e);
             return "Workbench execution failed: " + e.getMessage();
@@ -133,10 +128,6 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
     protected String buildArtifactName() {
         return "cross-city-diagnosis-summary";
     }
-
-    // ------------------------------------------------------------------
-    // Top-level task: search PSOP, load workflow, execute
-    // ------------------------------------------------------------------
 
     private String handleTopLevelTask(String messageText) throws Exception {
         log.info("[Workbench-Agent] Top-level task, searching PSOP...");
@@ -253,41 +244,6 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
         sb.append("Recovery self-triggered by SPN agents via whitelist policy");
         return sb.toString();
     }
-
-    // ------------------------------------------------------------------
-    // Sub-task: merge_analysis (Workbench Agent processes its own step)
-    // ------------------------------------------------------------------
-
-    private String handleSubTask(String messageText) {
-        log.info("[Workbench-Agent] Sub-task received (from workflow executor)");
-        if (!messageText.contains(MERGE_KEYWORD)) {
-            return "Sub-task processed: " + messageText;
-        }
-        return analyzeFaultLocation(messageText);
-    }
-
-    private static String analyzeFaultLocation(String messageText) {
-        String mergeResult = "汇总分析完成。";
-        boolean hasShanghaiFault = messageText.contains("上海")
-                && (messageText.contains("故障") || messageText.contains("Down"));
-        boolean hasGuangzhouFault = messageText.contains("广州")
-                && (messageText.contains("故障") || messageText.contains("Down"));
-
-        if (hasShanghaiFault) {
-            mergeResult += "故障定位：上海地市OMC，端口Down，"
-                    + "光功率-28dBm低于阈值。需更换光模块抢通。";
-        } else if (hasGuangzhouFault) {
-            mergeResult += "故障定位：广州地市OMC。需排查并抢通。";
-        } else {
-            mergeResult += "两地市均未见异常。";
-        }
-        log.info("[Workbench-Agent] Merge result: {}", mergeResult);
-        return mergeResult;
-    }
-
-    // ------------------------------------------------------------------
-    // Event callback
-    // ------------------------------------------------------------------
 
     private EventCallback createEventCallback() {
         return new EventCallback() {

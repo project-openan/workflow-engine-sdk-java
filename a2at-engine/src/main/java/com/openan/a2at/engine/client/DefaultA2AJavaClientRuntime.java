@@ -269,10 +269,6 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
         log.info("[A2ARuntime] Closed");
     }
 
-    // ------------------------------------------------------------------
-    // Internal helpers
-    // ------------------------------------------------------------------
-
     /**
      * Create a gRPC channel with SSL settings matching the engine config.
      *
@@ -326,10 +322,6 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
                 || state == TaskState.TASK_STATE_INPUT_REQUIRED
                 || state == TaskState.TASK_STATE_AUTH_REQUIRED;
     }
-
-    // ------------------------------------------------------------------
-    // Diagnostic logging helpers
-    // ------------------------------------------------------------------
 
     private static void logEvent(String agentName, ClientEvent event) {
         if (event instanceof TaskEvent te) {

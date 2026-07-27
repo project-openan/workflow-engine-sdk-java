@@ -53,6 +53,7 @@ Workflow workflow = Workflow.builder()
             .build(),
         WorkflowStep.builder()
             .name("merge")
+            .stepType(StepType.SELF_LOOP)   // self-loop: workbench merges locally, no A2A-T to self
             .subtasks(List.of(
                 Task.builder()
                     .agent("Transport Workbench Agent")
@@ -103,6 +104,15 @@ public class MyControlPoint extends DefaultControlPoint {
     }
 
     @Override
+    public CompletableFuture<TaskResponse> onSelfTask(TaskRequest request) {
+        // SELF_LOOP step: handled locally, no engineClient, no A2A-T message.
+        // request.getMessage() already carries upstream step results as context.
+        String summary = summarizeLocally(request.getMessage());
+        return CompletableFuture.completedFuture(
+            TaskResponse.builder().success(true).output(summary).build());
+    }
+
+    @Override
     public CompletableFuture<RouteDecision> onRoute(
             String stepName, Map<String, Object> results,
             List<JumpCondition> conditions) {
@@ -124,7 +134,8 @@ public class MyControlPoint extends DefaultControlPoint {
 
 | Method | When Called | What You Do |
 |---|---|---|
-| `onTask` | Each workflow step dispatches a task | Call `engineClient.sendMessage()`, return result |
+| `onTask` | A step dispatches a task to another agent | Call `engineClient.sendMessage()`, return result |
+| `onSelfTask` | A `SELF_LOOP` step runs locally | Handle locally, return result (no A2A-T message) |
 | `onRoute` | After step completes, before next step | Pick the next step from candidates |
 | `onNegotiation` | Agent returns `INPUT_REQUIRED` | Return clarification text |
 | `onAuthorization` | Agent requests authorization (optional) | Return true/false |
@@ -133,6 +144,8 @@ public class MyControlPoint extends DefaultControlPoint {
 `onAuthorization` and `onNotification` have default implementations
 (auto-approve / no-op). `onNegotiation` defaults to a generic clarification.
 Override only what you need.
+
+**Self-loop steps (SelfLoop)**: When a step is the workflow-executing agent's own task (e.g. merging multiple agents' diagnostic results), set `stepType` to `SELF_LOOP`. The engine calls `onSelfTask` locally instead of sending an A2A-T message to the agent itself. `onSelfTask` takes no `engineClient` parameter — this enforces at the API level that self-loop tasks never send A2A-T. Only steps targeting other agents go through `onTask` + A2A-T.
 
 ### 4.4 Execute
 
@@ -427,7 +440,7 @@ WorkflowEngineClientConfig.builder()
 | Interface/Class | Purpose |
 |---|---|
 | `ExecutePsop.Builder` | Workflow execution entry point |
-| `ControlPoint` / `DefaultControlPoint` | Business decisions (onTask, onRoute, onNegotiation, etc.) |
+| `ControlPoint` / `DefaultControlPoint` | Business decisions (onTask, onSelfTask, onRoute, onNegotiation, etc.) |
 | `WorkflowEngineClient` | Send messages to agents (sendMessage, sendExtensionMessage) |
 | `WorkflowEngineClientConfig` | Configuration (SSL, auth, A2A-T, negotiation rounds, custom handlers) |
 | `AuthProvider` | Custom authentication |
