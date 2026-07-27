@@ -19,21 +19,24 @@
 
 package com.openan.a2at.engine.examples.agents;
 
+import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
+import com.openan.a2at.engine.client.WorkflowEngineClient;
+import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.ExecutionResult;
 import com.openan.a2at.engine.model.Workflow;
 import com.openan.a2at.engine.model.WorkflowSearchResult;
-import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
-import com.openan.a2at.engine.client.WorkflowEngineClient;
-import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
-import org.a2aproject.sdk.spec.AgentCard;
 import com.openan.a2at.engine.client.AgentCardJacksonModule;
 import com.openan.a2at.engine.registry.LoadPsop;
 import com.openan.a2at.engine.runner.ExecutePsop;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.a2aproject.sdk.server.agentexecution.RequestContext;
 import org.a2aproject.sdk.server.tasks.AgentEmitter;
+import org.a2aproject.sdk.spec.A2AError;
+import org.a2aproject.sdk.spec.AgentCard;
+import org.a2aproject.sdk.spec.Part;
+import org.a2aproject.sdk.spec.TextPart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,16 +49,20 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Transport Workbench Agent - the orchestrator.
  *
- * <p>Server-side negotiation-capable (extends {@link NegotiationBaseAgentExecutor}):
- * a top-level task first triggers a Negotiation-T round (INPUT_REQUIRED); on the
- * follow-up it searches the orchestration center for a matching PSOP, loads and
- * executes the workflow (dispatching sub-tasks to OMC agents), and returns the
- * merged result. Sub-tasks (merge_analysis) are handled inline.
+ * <p>Receives a Task-T from the upper layer and directly executes (no
+ * negotiation with the upper layer). Internally it:
+ * <ol>
+ *   <li>Pre-positions Authorization-T + Notification-T to SPN agents</li>
+ *   <li>Searches and loads the matching PSOP workflow</li>
+ *   <li>Runs the workflow (parallel Task-T diagnosis to SPN agents, with
+ *       Negotiation-T between workbench and SPN agents)</li>
+ *   <li>Returns the merged diagnosis result</li>
+ * </ol>
  *
- * <p>Agent cards are loaded from classpath JSON (correct Java URLs), avoiding
- * stale registry entries from the Python version.
+ * <p>Negotiation-T happens ONLY between the workbench and SPN Domain Agents,
+ * not between the upper layer and the workbench.
  */
-public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecutor {
+public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
     private static final Logger log = LoggerFactory.getLogger(TransportWorkbenchAgentExecutor.class);
     private static final ObjectMapper mapper = new ObjectMapper()
             .registerModule(new AgentCardJacksonModule());
@@ -86,59 +93,43 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
     }
 
     @Override
-    protected String resolveEnvPath() {
-        return a2atEnvPath;
-    }
-
-    @Override
-    protected String executeBusiness(RequestContext ctx, AgentEmitter emitter, String input) {
+    public void execute(RequestContext ctx, AgentEmitter emitter) throws A2AError {
+        String taskId = ctx.getTaskId();
+        String contextId = ctx.getContextId();
+        String input = extractText(ctx.getMessage());
+        log.info("[Workbench] Received task: taskId={}, text={} chars", taskId, input.length());
+        emitter.submit(buildStatusMessage(contextId, taskId, "Task received"));
+        emitter.startWork(buildStatusMessage(contextId, taskId, "Processing"));
         try {
-            // merge_analysis is a SELF_LOOP step handled locally by the
-            // WorkbenchControlPoint; it never arrives here via A2A-T.
-            return handleTopLevelTask(input);
+            String result = handleTopLevelTask(input);
+            Map<String, Object> metadata = new LinkedHashMap<>();
+            metadata.put(NegotiationUtils.TASK_PROMPT_KEY, result);
+            List<Part<?>> parts = List.of(new TextPart("跨城故障协同诊断汇总结果"));
+            emitter.addArtifact(parts, "result", "cross-city-diagnosis-summary", metadata, false, true);
+            emitter.complete(buildStatusMessage(contextId, taskId, "Completed"));
+            log.info("[Workbench] Task completed");
         } catch (Exception e) {
-            log.error("[Workbench-Agent] Business failed: {}", e.getMessage(), e);
-            return "Workbench execution failed: " + e.getMessage();
+            log.error("[Workbench] Failed: {}", e.getMessage(), e);
+            emitter.fail(buildStatusMessage(contextId, taskId, "Failed: " + e.getMessage()));
         }
     }
 
     @Override
-    protected String defaultNegotiationText() {
-        return "工作台需确认跨城故障处置范围与授权后再执行协同诊断，请补充。";
-    }
-
-    @Override
-    protected String defaultNegotiationConcern() {
-        return "workbench needs scope confirmation before orchestration";
-    }
-
-    @Override
-    protected Map<String, Object> buildResponseMetadata(RequestContext ctx, String response) {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put(NegotiationUtils.TASK_PROMPT_KEY, response);
-        return metadata;
-    }
-
-    @Override
-    protected String buildResultSummary() {
-        return "跨城故障协同诊断汇总结果";
-    }
-
-    @Override
-    protected String buildArtifactName() {
-        return "cross-city-diagnosis-summary";
+    public void cancel(RequestContext ctx, AgentEmitter emitter) throws A2AError {
+        emitter.cancel();
     }
 
     private String handleTopLevelTask(String messageText) throws Exception {
-        log.info("[Workbench-Agent] Top-level task, searching PSOP...");
+        log.info("[Workbench] Step 1: Load agent cards");
         List<AgentCard> agentCards = loadAgentCardsFromConfig();
-        log.info("[Workbench-Agent] Loaded {} agent card(s) from config", agentCards.size());
+        log.info("[Workbench] Loaded {} agent card(s)", agentCards.size());
+
+        log.info("[Workbench] Step 2: Search PSOP workflow");
         String psopId = searchPsop(messageText);
         Workflow workflow = LoadPsop.load(orchUrl, psopId, null, sslVerify);
-        log.info("[Workbench-Agent] Workflow: {} ({} steps)", workflow.getName(), workflow.getSteps().size());
+        log.info("[Workbench] Workflow: {} ({} steps)", workflow.getName(), workflow.getSteps().size());
 
-        // Create engine client explicitly so we can pre-position extensions
-        // (Authorization-T + Notification-T) before starting the workflow.
+        log.info("[Workbench] Step 3: Create engine client");
         WorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(
                 agentCards, null,
                 WorkflowEngineClientConfig.builder()
@@ -147,12 +138,10 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
                         .credentialsConfigPath(credentialsPath)
                         .build());
 
-        // Pre-position Authorization-T and Notification-T to all SPN agents.
-        // These are one-shot operations: the workbench sends the authorization
-        // policy and notification subscription upfront. The act of sending
-        // the Authorization-T message means the policies are default-approved
-        // (whitelist authorization, no customer takeover needed).
+        log.info("[Workbench] Step 4: Pre-position Authorization-T + Notification-T");
         prePositionExtensions(engineClient, agentCards);
+
+        log.info("[Workbench] Step 5: Execute workflow (parallel diagnosis + merge)");
         WorkbenchControlPoint controlPoint = new WorkbenchControlPoint(a2atEnvPath);
         ExecutionResult result = ExecutePsop.builder()
                 .psop(workflow)
@@ -171,30 +160,28 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
                 })
                 .execute()
                 .join();
-        return buildResultText(result, controlPoint);
+        return buildResultText(result);
     }
 
     private static void prePositionExtensions(WorkflowEngineClient engineClient,
                                                List<AgentCard> agentCards) {
-        
-        
-        // Natural-language input for the A2A-T SDK prompt generation (LLM + template).
-        // For Notification-T the SDK has a "subscribe_incident" scenario that renders
-        // the subscription template. For Authorization-T the SDK has no scenario yet,
-        // so generation will fall back to using the input text as-is.
-        String authInput = "任务类型新增授权，操作名称业务抢通，操作类型光模块更换，操作对象SPN专线业务，授权策略OMC自动执行，触发执行条件业务投诉诊断确认故障，预期输出返回是否设置成功";
-        String notifInput = "通知主题为service-recovery-execution-result，订阅条件为业务抢通方案执行结果，上报通知数据格式为TextPart";
+        String authInput = "任务类型新增授权，操作名称业务抢通，操作类型光模块更换，"
+                + "操作对象SPN专线业务，授权策略OMC自动执行，"
+                + "触发执行条件业务投诉诊断确认故障，预期输出返回是否设置成功";
+        String notifInput = "通知主题为service-recovery-execution-result，"
+                + "订阅条件为业务抢通方案执行结果，"
+                + "上报通知数据格式为TextPart";
         for (AgentCard card : agentCards) {
             String name = card.name();
             if (name.contains("Workbench")) {
                 continue;
             }
-            log.info("[Workbench-Agent] Pre-positioning Authorization-T to {}", name);
+            log.info("[Workbench] Pre-positioning Authorization-T to {}", name);
             engineClient.sendAuthorization(name, "下发授权放行策略", authInput).join();
-            log.info("[Workbench-Agent] Pre-positioning Notification-T to {}", name);
+            log.info("[Workbench] Pre-positioning Notification-T to {}", name);
             engineClient.sendNotification(name, "订阅业务抢通结果通知", notifInput).join();
         }
-        log.info("[Workbench-Agent] Extension pre-positioning complete");
+        log.info("[Workbench] Extension pre-positioning complete");
     }
 
     private static List<AgentCard> loadAgentCardsFromConfig() {
@@ -218,16 +205,16 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
             List<WorkflowSearchResult> results = LoadPsop.search(orchUrl, messageText, 3, null, sslVerify);
             if (!results.isEmpty()) {
                 String psopId = results.get(0).getWorkflowId();
-                log.info("[Workbench-Agent] Found PSOP: {} (score={})", psopId, results.get(0).getScore());
+                log.info("[Workbench] Found PSOP: {} (score={})", psopId, results.get(0).getScore());
                 return psopId;
             }
         } catch (Exception e) {
-            log.warn("[Workbench-Agent] PSOP search failed, using fallback: {}", e.getMessage());
+            log.warn("[Workbench] PSOP search failed, using fallback: {}", e.getMessage());
         }
         return FALLBACK_PSOP_ID;
     }
 
-    private static String buildResultText(ExecutionResult result, WorkbenchControlPoint controlPoint) {
+    private static String buildResultText(ExecutionResult result) {
         StringBuilder sb = new StringBuilder();
         sb.append("Workflow execution ").append(result.isSuccess() ? "succeeded" : "failed").append(".\n");
         if (result.getHistory() != null) {
@@ -240,8 +227,6 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
         if (result.getError() != null) {
             sb.append("Error: ").append(result.getError());
         }
-        sb.append("\nPre-positioned Authorization-T whitelist + Notification-T subscription");
-        sb.append("Recovery self-triggered by SPN agents via whitelist policy");
         return sb.toString();
     }
 
@@ -256,8 +241,8 @@ public class TransportWorkbenchAgentExecutor extends NegotiationBaseAgentExecuto
                     case EventType.TASK_RESPONSE -> log.info("  [TASK_RESPONSE] agent={}", data.get("agent"));
                     case EventType.AGENT_STATUS_UPDATE -> log.info("  [STATUS_UPDATE] agent={}, state={}, final={}",
                             data.get("agent"), data.get("state"), data.get("is_final"));
-                    case EventType.AGENT_ARTIFACT_UPDATE -> log.info("  [ARTIFACT_UPDATE] agent={}, artifact={}, chunks={}",
-                            data.get("agent"), data.get("artifact_name"), data.get("last_chunk"));
+                    case EventType.AGENT_ARTIFACT_UPDATE -> log.info("  [ARTIFACT_UPDATE] agent={}, artifact={}",
+                            data.get("agent"), data.get("artifact_name"));
                     case EventType.AGENT_MESSAGE_EVENT -> log.info("  [MESSAGE] agent={}, {} chars",
                             data.get("agent"),
                             data.get("text") != null ? ((String) data.get("text")).length() : 0);

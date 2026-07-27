@@ -110,32 +110,32 @@ public class SpnCrossCityDiagnosisDemo {
                         .a2atEnvPath(StartAgentsServer.resolveEnvPath())
                         .build());
 
-        engineClient.setEventCallback(new EventCallback() {
-            @Override
-            public void onEvent(String type, Map<String, Object> data) {
-                switch (type) {
-                    case EventType.AGENT_STATUS_UPDATE ->
-                        log.info("  >> [STATUS] agent={}, state={}, final={}",
-                                data.get("agent"), data.get("state"), data.get("is_final"));
-                    case EventType.AGENT_ARTIFACT_UPDATE ->
-                        log.info("  >> [ARTIFACT] agent={}, name={}, text={}",
-                                data.get("agent"), data.get("artifact_name"),
-                                data.get("text"));
-                    case EventType.AGENT_MESSAGE_EVENT ->
-                        log.info("  >> [MESSAGE] agent={}, text={}",
-                                data.get("agent"), data.get("text"));
-                    case EventType.AGENT_REQUEST ->
-                        log.info("  >> [REQUEST] agent={}, {} chars",
-                                data.get("agent"),
-                                data.get("request") != null ? String.valueOf(data.get("request")).length() : 0);
-                    case EventType.AGENT_RESPONSE ->
-                        log.info("  >> [RESPONSE] agent={}, response={}",
-                                data.get("agent"),
-                                data.get("response") != null ? data.get("response") : "(empty)");
-                    default -> { /* other event types not shown in this demo */ }
-                }
-            }
-        });
+//        engineClient.setEventCallback(new EventCallback() {
+//            @Override
+//            public void onEvent(String type, Map<String, Object> data) {
+//                switch (type) {
+//                    case EventType.AGENT_STATUS_UPDATE ->
+//                        log.info("  >> [STATUS] agent={}, state={}, final={}",
+//                                data.get("agent"), data.get("state"), data.get("is_final"));
+//                    case EventType.AGENT_ARTIFACT_UPDATE ->
+//                        log.info("  >> [ARTIFACT] agent={}, name={}, text={}",
+//                                data.get("agent"), data.get("artifact_name"),
+//                                data.get("text"));
+//                    case EventType.AGENT_MESSAGE_EVENT ->
+//                        log.info("  >> [MESSAGE] agent={}, text={}",
+//                                data.get("agent"), data.get("text"));
+//                    case EventType.AGENT_REQUEST ->
+//                        log.info("  >> [REQUEST] agent={}, {} chars",
+//                                data.get("agent"),
+//                                data.get("request") != null ? String.valueOf(data.get("request")).length() : 0);
+//                    case EventType.AGENT_RESPONSE ->
+//                        log.info("  >> [RESPONSE] agent={}, response={}",
+//                                data.get("agent"),
+//                                data.get("response") != null ? data.get("response") : "(empty)");
+//                    default -> { /* other event types not shown in this demo */ }
+//                }
+//            }
+//        });
 
         // sendMessage handles A2A-T protocol internally
         SendMessageResult result = engineClient.sendMessage(WB_AGENT_NAME, taskText).join();
