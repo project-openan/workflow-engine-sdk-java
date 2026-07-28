@@ -117,7 +117,10 @@ class ExtensionRegistryTest {
             public java.util.concurrent.CompletableFuture<com.openan.a2at.engine.model.SendMessageResult> afterReceive(
                     org.a2aproject.sdk.spec.AgentCard agentCard,
                     com.openan.a2at.engine.model.SendMessageResult result,
-                    net.openan.a2at.sdk.client.A2ATClient a2atClient, com.openan.a2at.engine.control.ControlPoint controlPoint, com.openan.a2at.engine.control.EventCallback eventCallback) {
+                    net.openan.a2at.sdk.client.A2ATClient a2atClient,
+                    com.openan.a2at.engine.control.ControlPoint controlPoint,
+                    com.openan.a2at.engine.control.ExtensionCallback extensionCallback,
+                    com.openan.a2at.engine.control.EventCallback eventCallback) {
                 return java.util.concurrent.CompletableFuture.completedFuture(result);
             }
         };

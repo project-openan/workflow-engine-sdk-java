@@ -23,6 +23,7 @@ import com.openan.a2at.engine.client.A2ATExtension;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
+import com.openan.a2at.engine.control.ExtensionCallback;
 import com.openan.a2at.engine.model.SendMessageResult;
 
 import java.util.ArrayList;
@@ -55,6 +56,7 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
     private final List<SentMessage> sent = Collections.synchronizedList(new ArrayList<>());
     private EventCallback eventCallback = new EventCallback();
     private ControlPoint controlPoint;
+    private ExtensionCallback extensionCallback;
     private final Map<String, String> cannedResponses = new HashMap<>();
     private String defaultResponse = "stub-response";
     private String defaultTaskState = "COMPLETED";
@@ -118,6 +120,11 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
     }
 
     @Override
+    public void setExtensionCallback(ExtensionCallback extensionCallback) {
+        this.extensionCallback = extensionCallback;
+    }
+
+    @Override
     public void setEventCallback(EventCallback callback) {
         this.eventCallback = callback != null ? callback : new EventCallback();
     }
@@ -139,4 +146,3 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
         return sent.size();
     }
 }
-

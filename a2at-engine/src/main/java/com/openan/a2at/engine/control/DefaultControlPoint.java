@@ -30,8 +30,8 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Default ControlPoint with single-responsibility methods.
- * SDK internally handles: Negotiation-T auto-loop, Authorization-T
- * confirmation injection, Notification-T subscription.
+* SDK internally handles: Negotiation-T auto-loop, Authorization-T
+* confirmation injection, Notification-T subscription.
  */
 public class DefaultControlPoint implements ControlPoint {
     private static final Logger log = LoggerFactory.getLogger(DefaultControlPoint.class);
@@ -87,20 +87,6 @@ public class DefaultControlPoint implements ControlPoint {
         log.info("[DefaultCP] onRoute: {} -> {}", stepName, nextStep);
         return CompletableFuture.completedFuture(
                 RouteDecision.builder().nextStep(nextStep).reason("default: first non-terminal branch").build());
-    }
-
-    @Override
-    public CompletableFuture<Boolean> onAuthorization(
-            String agentName, Map<String, Object> authRequest) {
-        log.info("[DefaultCP] onAuthorization: agent={}, auto-approving", agentName);
-        return CompletableFuture.completedFuture(true);
-    }
-
-    @Override
-    public CompletableFuture<Void> onNotification(
-            String agentName, Map<String, Object> notification) {
-        log.info("[DefaultCP] onNotification: agent={}, data={}", agentName, notification);
-        return CompletableFuture.completedFuture(null);
     }
 
     @Override

@@ -30,9 +30,9 @@ import java.util.concurrent.CompletableFuture;
 /**
  * User-facing decision interface.
  * Each method has a single responsibility.
- * SDK internally handles all A2A-T protocol mechanics (Task-T prompt generation,
- * Negotiation-T loop, Authorization-T injection, Notification-T subscription).
- * ControlPoint methods only make business decisions.
+* SDK internally handles all A2A-T protocol mechanics (Task-T prompt generation,
+* Negotiation-T loop, Authorization-T injection, Notification-T subscription).
+* ControlPoint methods only make business decisions.
  */
 public interface ControlPoint {
 
@@ -67,22 +67,6 @@ public interface ControlPoint {
      * Do NOT send messages here.
      */
     CompletableFuture<RouteDecision> onRoute(String stepName, Map<String, Object> results, List<JumpCondition> conditions);
-
-    /**
-     * Authorization approval decision. Return true/false.
-     * Do NOT send Authorization-T confirmation - SDK injects it automatically
-     * into the next sendMessage via beforeSend. Default: auto-approve.
-     */
-    default CompletableFuture<Boolean> onAuthorization(String agentName, Map<String, Object> authRequest) {
-        return CompletableFuture.completedFuture(true);
-    }
-
-    /**
-     * Handle a received Notification-T. Do NOT send messages here. Default: no-op.
-     */
-    default CompletableFuture<Void> onNotification(String agentName, Map<String, Object> notification) {
-        return CompletableFuture.completedFuture(null);
-    }
 
     /**
      * Provide supplementary data when an agent returns INPUT_REQUIRED

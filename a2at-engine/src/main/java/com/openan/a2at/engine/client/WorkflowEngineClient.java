@@ -98,6 +98,7 @@ public interface WorkflowEngineClient {
     }
 
     void setControlPoint(ControlPoint controlPoint);
+    void setExtensionCallback(com.openan.a2at.engine.control.ExtensionCallback extensionCallback);
     void setEventCallback(EventCallback callback);
     void close();
     java.util.List<String> getAgentNames();

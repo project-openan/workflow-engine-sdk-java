@@ -22,6 +22,7 @@ package com.openan.a2at.engine.client;
 import com.openan.a2at.engine.model.SendMessageResult;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
+import com.openan.a2at.engine.control.ExtensionCallback;
 import net.openan.a2at.sdk.client.A2ATClient;
 import org.a2aproject.sdk.spec.AgentCard;
 import org.slf4j.Logger;
@@ -65,6 +66,7 @@ class NegotiationTHandler implements ExtensionHandler {
             SendMessageResult result,
             A2ATClient a2atClient,
             ControlPoint controlPoint,
+            ExtensionCallback extensionCallback,
             EventCallback eventCallback
     ) {
         // Only process if ALL three conditions are met:

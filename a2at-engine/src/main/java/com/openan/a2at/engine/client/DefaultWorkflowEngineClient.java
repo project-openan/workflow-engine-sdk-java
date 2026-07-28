@@ -68,6 +68,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private final String contextId;
     private EventCallback eventCallback = new EventCallback();
     private ControlPoint controlPoint;
+    private com.openan.a2at.engine.control.ExtensionCallback extensionCallback;
     private final int maxNegotiationRounds;
     private final java.util.concurrent.ExecutorService asyncExecutor =
             java.util.concurrent.Executors.newCachedThreadPool(r -> {
@@ -135,6 +136,11 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     @Override
     public void setControlPoint(ControlPoint controlPoint) {
         this.controlPoint = controlPoint;
+    }
+
+    @Override
+    public void setExtensionCallback(com.openan.a2at.engine.control.ExtensionCallback extensionCallback) {
+        this.extensionCallback = extensionCallback;
     }
 
     @Override
@@ -331,7 +337,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 handlers.stream().map(ExtensionHandler::extensionKeyword).toList());
         CompletableFuture<SendMessageResult> future = CompletableFuture.completedFuture(result);
         for (ExtensionHandler handler : handlers) {
-            future = future.thenCompose(r -> handler.afterReceive(agentCard, r, a2atClient, controlPoint, eventCallback));
+            future = future.thenCompose(r -> handler.afterReceive(agentCard, r, a2atClient, controlPoint, extensionCallback, eventCallback));
         }
         return future;
     }

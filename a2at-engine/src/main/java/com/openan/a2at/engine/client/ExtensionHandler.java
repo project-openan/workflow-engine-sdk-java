@@ -22,6 +22,7 @@ package com.openan.a2at.engine.client;
 import com.openan.a2at.engine.model.SendMessageResult;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
+import com.openan.a2at.engine.control.ExtensionCallback;
 import org.a2aproject.sdk.spec.AgentCard;
 import net.openan.a2at.sdk.client.A2ATClient;
 
@@ -31,9 +32,15 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Extension handler for A2A-T extensions (SDK-internal).
  *
+* <p>Mirrors the Python SDK's {@code ExtensionHandler}. Built-in handlers:
+* Task-T, Negotiation-T, Authorization-T, Notification-T.
+* Handlers that involve user decisions delegate to ControlPoint methods.
  * <p>Mirrors the Python SDK's {@code ExtensionHandler}. Built-in handlers:
- * Task-T, Negotiation-T, Authorization-T, Notification-T.
- * Handlers that involve user decisions delegate to ControlPoint methods.
+ * Task-T, Negotiation-T. Authorization-T / Notification-T are
+ * pre-positioning operations (one-shot, via sendExtensionMessage), so they
+ * are not part of this in-workflow handler chain. Reactive hooks for
+ * agent-pushed Authorization-T / Notification-T data delegate to
+ * {@link ExtensionCallback}.
  */
 public interface ExtensionHandler {
 
@@ -69,6 +76,7 @@ public interface ExtensionHandler {
      * @param result         the received result
      * @param a2atClient     optional A2ATClient (may be null)
      * @param controlPoint   optional ControlPoint (may be null)
+     * @param extensionCallback optional ExtensionCallback (may be null)
      * @param eventCallback  optional event callback (may be null)
      * @return updated result
      */
@@ -77,6 +85,7 @@ public interface ExtensionHandler {
             SendMessageResult result,
             A2ATClient a2atClient,
             ControlPoint controlPoint,
+            ExtensionCallback extensionCallback,
             EventCallback eventCallback
     );
 }
