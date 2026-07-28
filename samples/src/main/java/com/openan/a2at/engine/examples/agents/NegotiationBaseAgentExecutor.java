@@ -127,6 +127,9 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
             } else {
                 handleNewTask(ctx, emitter, input);
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.info("[{}] Notification-T stream interrupted (shutdown)", getClass().getSimpleName());
         } catch (Exception e) {
             log.error("[{}] execute failed: {}", getClass().getSimpleName(), e.getMessage(), e);
             emitter.fail(buildStatusMessage(contextId, taskId, "Failed: " + e.getMessage()));
