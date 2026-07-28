@@ -38,6 +38,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Server-side negotiation base, mirroring the Python reference
@@ -64,11 +67,17 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
     // by a dedicated handler, keeping this class focused on Negotiation-T.
     private final PrePositionedExtensionHandler prePositionedHandler = new PrePositionedExtensionHandler();
 
+    private final BlockingQueue<String> notificationQueue = new LinkedBlockingQueue<>();
+
     /** The pre-positioned Authorization-T whitelist policy text, or null. */
     protected final String getAuthorizationPolicy() { return prePositionedHandler.getAuthorizationPolicy(); }
 
     /** The pre-positioned Notification-T subscription text, or null. */
     protected final String getNotificationSubscription() { return prePositionedHandler.getNotificationSubscription(); }
+
+    protected void pushNotificationResult(String result) {
+        notificationQueue.offer(result);
+    }
 
     /** Resolve the A2A-T .env path; null disables A2ATClient (negotiation still works with fallback context). */
     protected abstract String resolveEnvPath();
@@ -107,8 +116,12 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
         try {
             String prePositionedExt = PrePositionedExtensionHandler.detect(ctx);
             if (prePositionedExt != null) {
-                prePositionedHandler.handle(ctx, emitter, prePositionedExt,
-                        getClass().getSimpleName());
+                if (prePositionedExt.contains("Notification")) {
+                    handleNotificationSubscription(ctx, emitter);
+                } else {
+                    prePositionedHandler.handle(ctx, emitter, prePositionedExt,
+                            getClass().getSimpleName());
+                }
             } else if (NegotiationUtils.isFollowUpTask(input)) {
                 handleFollowUp(ctx, emitter, input);
             } else {
@@ -122,6 +135,37 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
 
 
 
+
+    /**
+     * Handle a Notification-T subscription: send "subscribed" ack, then block
+     * on a queue to keep the SSE stream open. Recovery results pushed via
+     * pushNotificationResult are forwarded through this stream with the
+     * Notification-T URI in artifact metadata. The stream stays open until
+     * the client disconnects or the agent is shut down.
+     */
+    private void handleNotificationSubscription(RequestContext ctx, AgentEmitter emitter)
+            throws InterruptedException {
+        String taskId = ctx.getTaskId();
+        String contextId = ctx.getContextId();
+        String agentTag = getClass().getSimpleName();
+        String notifUri = "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1";
+        log.info("[{}] Notification-T subscription received, keeping stream open", agentTag);
+        List<Part<?>> ackParts = List.of(new TextPart("Subscribed to recovery results"));
+        emitter.addArtifact(ackParts, "subscription", agentTag + " subscription", Map.of(), false, true);
+        emitStatus(emitter, TaskState.TASK_STATE_WORKING, contextId, taskId,
+                "Notification-T subscribed, waiting for recovery results", Map.of());
+        while (!Thread.currentThread().isInterrupted()) {
+            String result = notificationQueue.poll(30, TimeUnit.SECONDS);
+            if (result == null) {
+                continue;
+            }
+            log.info("[{}] Pushing recovery result via Notification-T stream", agentTag);
+            Map<String, Object> notifMeta = new LinkedHashMap<>();
+            notifMeta.put(notifUri, result);
+            List<Part<?>> resultParts = List.of(new TextPart(result));
+            emitter.addArtifact(resultParts, "recovery-result", "recovery-result", notifMeta, false, true);
+        }
+    }
     /** New task: start negotiation and request input. Business runs on the follow-up. */
     private void handleNewTask(RequestContext ctx, AgentEmitter emitter, String input) {
         if (needsNegotiation(input)) {

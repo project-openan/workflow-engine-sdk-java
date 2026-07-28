@@ -54,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCloseable {
@@ -199,6 +200,9 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 agentName, extension.displayName(), metadataValue.length());
         log.debug("[EngineClient] Generated metadata value for {}: [{}]", agentName, metadataValue);
         Map<String, Object> metadata = Map.of(extension.uri(), metadataValue);
+        if (extension == A2ATExtension.NOTIFICATION_T) {
+            return doSendNotificationStream(agentCard, agentName, instruction, this.contextId, metadata);
+        }
         return doSendViaA2ARuntime(agentCard, agentName, instruction, this.contextId, metadata)
                 .thenApply(result -> {
                     log.info("[EngineClient] Extension response from {}: state={}", agentName, result.getTaskState());
@@ -367,6 +371,63 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 throw new RuntimeException("Agent call failed: " + e.getMessage(), e);
             }
         });
+    }
+
+    /**
+     * Long-lived SSE stream for Notification-T subscription. Opens a daemon
+     * thread that keeps the SSE response stream open. The eventSink callback
+     * processes events in real-time (subscribed ack + later recovery results).
+     * The returned future completes on the first event (subscription confirmed).
+     */
+    protected CompletableFuture<SendMessageResult> doSendNotificationStream(
+            AgentCard agentCard, String agentName, String message,
+            String contextId, Map<String, Object> metadata) {
+        CompletableFuture<SendMessageResult> future = new CompletableFuture<>();
+        Thread streamThread = new Thread(() -> {
+            try {
+                MessageSendParams params = buildMessageSendParams(message, contextId, metadata);
+                ClientCallContext callContext = buildClientCallContext(agentCard, agentName, metadata);
+                String endpoint = agentCard.supportedInterfaces().isEmpty() ? "?"
+                        : agentCard.supportedInterfaces().get(0).url();
+                ProtocolLogger.logRequest(agentName, endpoint, params, callContext.getHeaders());
+                log.info("[EngineClient] Opening Notification-T long-lived stream to {}", agentName);
+                a2aClientRuntime.sendMessage(
+                        agentCard, params, callContext,
+                        event -> {
+                            log.info("[EngineClient] Notification-T event from {}: {}", agentName, event.getClass().getSimpleName());
+                            forwardIntermediateEvent(event, agentName);
+                            if (!future.isDone()) {
+                                future.complete(SendMessageResult.builder()
+                                        .text("Subscribed")
+                                        .taskState("TASK_STATE_WORKING")
+                                        .build());
+                            }
+                        },
+                        s -> log.info("[A2A] {}", s));
+                log.info("[EngineClient] Notification-T stream closed for {}", agentName);
+                if (!future.isDone()) {
+                    future.complete(SendMessageResult.builder()
+                            .text("Stream closed")
+                            .taskState("TASK_STATE_COMPLETED")
+                            .build());
+                }
+            } catch (Exception e) {
+                log.error("[EngineClient] Notification-T stream error for {}: {}", agentName, e.getMessage(), e);
+                if (!future.isDone()) {
+                    future.completeExceptionally(e);
+                }
+            }
+        }, "notif-stream-" + agentName);
+        streamThread.setDaemon(true);
+        streamThread.start();
+        return future.orTimeout(5, TimeUnit.SECONDS)
+                .exceptionally(e -> {
+                    log.warn("[EngineClient] Notification-T subscription: no event in 5s, assuming active (stream stays open)");
+                    return SendMessageResult.builder()
+                            .text("Subscribed (no-ack)")
+                            .taskState("TASK_STATE_WORKING")
+                            .build();
+                });
     }
 
     private MessageSendParams buildMessageSendParams(String message, String contextId, Map<String, Object> metadata) {
