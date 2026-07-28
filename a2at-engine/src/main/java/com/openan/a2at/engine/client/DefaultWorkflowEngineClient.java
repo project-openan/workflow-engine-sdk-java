@@ -418,7 +418,14 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                             .build());
                 }
             } catch (Exception e) {
-                log.error("[EngineClient] Notification-T stream error for {}: {}", agentName, e.getMessage(), e);
+                String msg = e.getMessage() != null ? e.getMessage() : "";
+                boolean connectionClosed = msg.contains("connection closed locally")
+                        || msg.contains("chunked transfer encoding, state: READING_LENGTH");
+                if (connectionClosed) {
+                    log.info("[EngineClient] Notification-T stream closed for {}", agentName);
+                } else {
+                    log.error("[EngineClient] Notification-T stream error for {}: {}", agentName, e.getMessage(), e);
+                }
                 if (!future.isDone()) {
                     future.completeExceptionally(e);
                 }

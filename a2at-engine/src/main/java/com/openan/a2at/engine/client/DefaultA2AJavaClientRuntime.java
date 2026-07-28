@@ -246,8 +246,15 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
         if (done.getCount() == 0) {
             log.debug("[A2ARuntime] Connection closed after terminal event for '{}': {}", agentName, error.getMessage());
         } else {
-            errorRef.set(error);
-            log.error("[A2ARuntime] Error callback for '{}': {}", agentName, error.getMessage(), error);
+            String msg = error.getMessage() != null ? error.getMessage() : "";
+            boolean connectionClosed = msg.contains("connection closed locally")
+                    || msg.contains("chunked transfer encoding, state: READING_LENGTH");
+            if (connectionClosed) {
+                log.debug("[A2ARuntime] Connection closed for '{}': {}", agentName, msg);
+            } else {
+                errorRef.set(error);
+                log.error("[A2ARuntime] Error callback for '{}': {}", agentName, error.getMessage(), error);
+            }
             done.countDown();
         }
     }
