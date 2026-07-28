@@ -22,6 +22,7 @@ package com.openan.a2at.engine.runner;
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
+import com.openan.a2at.engine.client.A2ATransport;
 import com.openan.a2at.engine.client.A2AJavaClientRuntime;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
@@ -190,13 +191,14 @@ public class ExecutePsop {
             boolean sslVerify, String caCertsPath,
             String credentialsConfigPath, String a2atEnvPath,
             EventCallback callback) {
-        WorkflowEngineClient client = new DefaultWorkflowEngineClient(agentCards, a2aClientRuntime,
+        A2ATransport transport = new A2ATransport(agentCards, a2aClientRuntime,
                 WorkflowEngineClientConfig.builder()
                         .sslVerify(sslVerify)
                         .caCertsPath(caCertsPath)
                         .credentialsConfigPath(credentialsConfigPath)
                         .a2atEnvPath(a2atEnvPath)
                         .build());
+        WorkflowEngineClient client = new DefaultWorkflowEngineClient(transport);
         client.setEventCallback(callback);
         return client;
     }

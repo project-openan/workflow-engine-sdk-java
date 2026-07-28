@@ -4,14 +4,14 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    Licensed under the Apache License, Version 2.0 (the "License"); you may
  *    not use this file except in compliance with the License. You may obtain
  *    a copy of the License at
  *
  *         http://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  *    License for the specific language governing permissions and limitations
  *    under the License.
@@ -22,116 +22,67 @@ package com.openan.a2at.engine.client;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventType;
-import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.model.SendMessageResult;
-import net.openan.a2at.sdk.client.A2ATClient;
-import net.openan.a2at.sdk.client.model.PromptGenerationResult;
-import net.openan.a2at.sdk.client.model.PromptGenerationFailure;
 import org.a2aproject.sdk.client.ClientEvent;
-import org.a2aproject.sdk.spec.AgentCard;
-import org.a2aproject.sdk.spec.SecurityScheme;
-import org.a2aproject.sdk.spec.SecurityRequirement;
 import org.a2aproject.sdk.client.MessageEvent;
-import org.a2aproject.sdk.client.TaskEvent;
 import org.a2aproject.sdk.client.TaskUpdateEvent;
-import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext;
-import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallInterceptor;
-import org.a2aproject.sdk.client.transport.spi.interceptors.PayloadAndHeaders;
 import org.a2aproject.sdk.spec.Artifact;
-import org.a2aproject.sdk.spec.Task;
 import org.a2aproject.sdk.spec.Message;
-import org.a2aproject.sdk.spec.MessageSendParams;
-import org.a2aproject.sdk.spec.Part;
-import org.a2aproject.sdk.spec.Task;
-import org.a2aproject.sdk.spec.TaskArtifactUpdateEvent;
+import org.a2aproject.sdk.spec.AgentCard;
 import org.a2aproject.sdk.spec.TaskStatusUpdateEvent;
-import org.a2aproject.sdk.spec.TextPart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Workflow-execution send facade built on a shared {@link A2ATransport}.
+ *
+ * <p>Single responsibility: the workflow execution send path. Owns the
+ * Task-T/Negotiation-T extension handler chain, the Negotiation-T
+ * auto-loop, the global EventCallback, and the ControlPoint/
+ * ExtensionCallback wiring. All wire-level work (client runtime, auth,
+ * SSE event extraction) delegates to the transport.
+ *
+ * <p>One-shot pre-positioning sends (Authorization-T / Notification-T)
+ * are a separate concern and live on {@link DefaultExtensionSender}.
+ */
 public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCloseable {
+
     private static final Logger log = LoggerFactory.getLogger(DefaultWorkflowEngineClient.class);
-    private final Map<String, AgentCard> cardMap = new ConcurrentHashMap<>();
-    private final A2AJavaClientRuntime a2aClientRuntime;
-    private final AgentAuthManager authManager;
-    private final AuthProvider authProvider;
+
+    private final A2ATransport transport;
     private final ExtensionRegistry extensionRegistry;
-    private final A2ATClient a2atClient;
-    private final String contextId;
+    private final int maxNegotiationRounds;
     private EventCallback eventCallback = new EventCallback();
     private ControlPoint controlPoint;
     private com.openan.a2at.engine.control.ExtensionCallback extensionCallback;
-    private final int maxNegotiationRounds;
-    private final java.util.concurrent.ExecutorService asyncExecutor =
-            java.util.concurrent.Executors.newCachedThreadPool(r -> {
-                Thread t = new Thread(r, "engine-send");
-                t.setDaemon(true);
-                return t;
-            });
 
-    public DefaultWorkflowEngineClient(List<AgentCard> agentCards, A2AJavaClientRuntime a2aClientRuntime,
-                                       WorkflowEngineClientConfig config) {
-        this.a2aClientRuntime = a2aClientRuntime != null ? a2aClientRuntime
-                : new DefaultA2AJavaClientRuntime(config.isSslVerify(), config.getCaCertsPath(), config.getSendTimeoutSeconds(), config.getPreferredProtocol());
-        this.contextId = UUID.randomUUID().toString();
-        if (config.getCredentialsConfigPath() != null) {
-            this.authManager = new AgentAuthManager(config.getCredentialsConfigPath());
-        } else if (config.getCredentialsConfig() != null) {
-            this.authManager = new AgentAuthManager(config.getCredentialsConfig());
-        } else {
-            this.authManager = new AgentAuthManager();
-        }
+    public DefaultWorkflowEngineClient(A2ATransport transport, int maxNegotiationRounds,
+                                       List<ExtensionHandler> customHandlers) {
+        this.transport = transport;
         this.extensionRegistry = new ExtensionRegistry();
-        if (config.getCustomHandlers() != null) {
-            for (ExtensionHandler h : config.getCustomHandlers()) {
+        if (customHandlers != null) {
+            for (ExtensionHandler h : customHandlers) {
                 extensionRegistry.register(h);
             }
         }
-        EnvFileLoader.loadToSystemProperties(
-                config.getA2atEnvPath() != null
-                        ? java.nio.file.Path.of(config.getA2atEnvPath())
-                        : null);
-        this.a2atClient = initA2atClient(config.getA2atEnvPath());
-        for (AgentCard card : agentCards) {
-            if (!card.name().isEmpty()) {
-                cardMap.put(card.name(), card);
-            }
-        }
-        this.maxNegotiationRounds = config.getMaxNegotiationRounds();
-        this.authProvider = config.getAuthProvider();
-        log.info("[EngineClient] Initialized with {} agent(s), ssl_verify={}, a2at={}, maxNeg={}",
-                cardMap.size(), config.isSslVerify(), a2atClient != null, maxNegotiationRounds);
+        this.maxNegotiationRounds = maxNegotiationRounds;
+        log.info("[EngineClient] Initialized over transport ({} agent(s)), maxNeg={}",
+                transport.getAgentNames().size(), maxNegotiationRounds);
     }
 
-    public DefaultWorkflowEngineClient(List<AgentCard> agentCards, A2AJavaClientRuntime a2aClientRuntime) {
-        this(agentCards, a2aClientRuntime,
-                WorkflowEngineClientConfig.builder().sslVerify(false).build());
+    public DefaultWorkflowEngineClient(A2ATransport transport) {
+        this(transport, 3, null);
     }
 
-    private A2ATClient initA2atClient(String a2atEnvPath) {
-        if (a2atEnvPath == null || a2atEnvPath.isEmpty()) {
-            return null;
-        }
-        try {
-            return new A2ATClient(java.nio.file.Path.of(a2atEnvPath));
-        } catch (Exception e) {
-            log.warn("Failed to init A2ATClient: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    @Override
-    public void setEventCallback(EventCallback callback) {
-        this.eventCallback = callback != null ? callback : new EventCallback();
-    }
+    // ------------------------------------------------------------------
+    // Wiring
+    // ------------------------------------------------------------------
 
     @Override
     public void setControlPoint(ControlPoint controlPoint) {
@@ -144,470 +95,60 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     }
 
     @Override
+    public void setEventCallback(EventCallback callback) {
+        this.eventCallback = callback != null ? callback : new EventCallback();
+    }
+
+    @Override
+    public void registerHandler(ExtensionHandler handler) {
+        extensionRegistry.register(handler);
+    }
+
+    @Override
     public List<String> getAgentNames() {
-        return new ArrayList<>(cardMap.keySet());
+        return transport.getAgentNames();
+    }
+
+    @Override
+    public void updateAgentCards(List<AgentCard> agentCards) {
+        transport.updateAgentCards(agentCards);
     }
 
     private void emit(String type, Map<String, Object> data) {
-        try {
-            eventCallback.onEvent(type, data);
-        } catch (Exception ignored) {
-        }
+        eventCallback.onEvent(type, data);
     }
-    // --- send_message ---
+
+    // ------------------------------------------------------------------
+    // Workflow send path
+    // ------------------------------------------------------------------
+
     @Override
     public CompletableFuture<SendMessageResult> sendMessage(
             String agentName, String message, String contextId, Map<String, Object> metadata) {
-        AgentCard agentCard = cardMap.get(agentName);
+        AgentCard agentCard = transport.getCard(agentName);
         if (agentCard == null) {
             log.error("[EngineClient] Agent not found: {}", agentName);
             return CompletableFuture.failedFuture(new RuntimeException("Agent not found: " + agentName));
         }
         log.info("[EngineClient] send_message to {}: {} chars", agentName, message.length());
-        log.debug("[EngineClient] message content to {}: [{}]", agentName, message);
         return runBeforeSendHandlers(agentCard, message, metadata)
                 .thenCompose(processedMetadata -> {
                     emit(EventType.AGENT_REQUEST, Map.of(
                             "agent", agentName,
                             "request", message,
                             "metadata", processedMetadata != null ? processedMetadata : Map.of()));
-                    String ctx = contextId != null ? contextId : this.contextId;
-                    return doSendViaA2ARuntime(agentCard, agentName, message, ctx, processedMetadata)
+                    String ctx = contextId != null ? contextId : transport.getContextId();
+                    return transport.send(agentCard, agentName, message, ctx, processedMetadata,
+                                    event -> forwardIntermediateEvent(event, agentName))
                             .thenCompose(result -> runAfterReceiveHandlers(agentCard, result))
                             .thenCompose(result -> autoNegotiate(agentCard, agentName, message, ctx, result, 1));
                 });
     }
 
-    /**
-     * One-shot extension message for pre-positioning (Authorization-T,
-     * Notification-T). The metadata value is generated by the A2A-T SDK
-     * (LLM + prompt template) from the natural-language input. If the SDK
-     * cannot generate (no matching scenario or unavailable), the input text
-     * is used as-is. Bypasses Task-T prompt generation and Negotiation-T
-     * auto-loop.
-     */
-    @Override
-    public CompletableFuture<SendMessageResult> sendExtensionMessage(
-            String agentName, String instruction, String naturalLanguageInput, A2ATExtension extension) {
-        AgentCard agentCard = cardMap.get(agentName);
-        if (agentCard == null) {
-            log.error("[EngineClient] Agent not found: {}", agentName);
-            return CompletableFuture.failedFuture(new RuntimeException("Agent not found: " + agentName));
-        }
-       // Generate the metadata value via the A2A-T SDK (LLM + prompt template).
-        // Only Task-T benefits from SDK prompt generation (scenario recognition
-        // + LLM template rendering). Authorization-T and Notification-T are
-        // pre-positioning control messages, not task scenarios -- using
-        // generateTaskPrompt on them always fails with scenario_not_matched.
-        // Each A2A-T extension type has its own prompt generation method.
-        // When the SDK does not yet support a given extension's prompt
-        // generation, the method returns null and we fall back to raw input.
-        String metadataValue = generateExtensionPrompt(extension, naturalLanguageInput);
-        if (metadataValue == null || metadataValue.isEmpty()) {
-            metadataValue = naturalLanguageInput;
-            log.info("[EngineClient] SDK prompt generation unavailable for {} ({}), using input as metadata",
-                    agentName, extension.displayName());
-        }
-        log.info("[EngineClient] sendExtensionMessage to {}: extension={}, metadataValue={} chars",
-                agentName, extension.displayName(), metadataValue.length());
-        log.debug("[EngineClient] Generated metadata value for {}: [{}]", agentName, metadataValue);
-        Map<String, Object> metadata = Map.of(extension.uri(), metadataValue);
-        if (extension == A2ATExtension.NOTIFICATION_T) {
-            return doSendNotificationStream(agentCard, agentName, instruction, this.contextId, metadata);
-        }
-        return doSendViaA2ARuntime(agentCard, agentName, instruction, this.contextId, metadata)
-                .thenApply(result -> {
-                    log.info("[EngineClient] Extension response from {}: state={}", agentName, result.getTaskState());
-                    return result;
-                });
-    }
+    // ------------------------------------------------------------------
+    // Auto-negotiation
+    // ------------------------------------------------------------------
 
-    /**
-     * Dispatch to the SDK's extension-specific prompt generation.
-     * <ul>
-     *   <li>Task-T: {@code generateTaskPrompt} (scenario recognition + LLM template)</li>
-     *   <li>Negotiation-T: {@code generateNegotiationPrompt} (reserved; SDK not yet implemented)</li>
-     *   <li>Authorization-T: {@code generateAuthorizationPrompt} (reserved)</li>
-     *   <li>Notification-T: {@code generateNotificationPrompt} (reserved)</li>
-     * </ul>
-     * Each method returns null when the SDK cannot generate, triggering the
-     * natural-language fallback in {@code sendExtensionMessage}.
-     */
-    private String generateExtensionPrompt(A2ATExtension extension, String naturalLanguageInput) {
-        if (extension == A2ATExtension.TASK_T) {
-            return generateTaskPromptText(naturalLanguageInput);
-        }
-        if (extension == A2ATExtension.NEGOTIATION_T) {
-            return generateNegotiationPrompt(naturalLanguageInput);
-        }
-        if (extension == A2ATExtension.AUTHORIZATION_T) {
-            return generateAuthorizationPrompt(naturalLanguageInput);
-        }
-        if (extension == A2ATExtension.NOTIFICATION_T) {
-            return generateNotificationPrompt(naturalLanguageInput);
-        }
-        return null;
-    }
-
-    /**
-     * Generate structured Task-T prompt text via the A2A-T SDK's
-     * {@code generateTaskPrompt} API (LLM + scenario recognition + template
-     * rendering). Returns null if the SDK is unavailable or generation fails.
-     */
-    private String generateTaskPromptText(String naturalLanguageInput) {
-        if (a2atClient == null) {
-            return null;
-        }
-        try {
-            PromptGenerationResult result = a2atClient.generateTaskPrompt(naturalLanguageInput);
-            if (result.success()) {
-                return result.promptText();
-            }
-            PromptGenerationFailure f = result.failure();
-            log.warn("[EngineClient] SDK Task-T prompt generation failed: code={}, stage={}, message={}",
-                    f != null ? f.code() : "unknown",
-                    f != null ? f.stage() : "unknown",
-                    f != null ? f.message() : "unknown");
-        } catch (Exception e) {
-            log.warn("[EngineClient] SDK Task-T prompt generation error: {}", e.getMessage());
-        }
-        return null;
-    }
-
-    /**
-     * Generate Negotiation-T prompt text. The A2A-T SDK has negotiation
-     * prompt templates (fulfillment / clarification / feasibility / information)
-     * but does not yet expose a dedicated generateNegotiationPrompt API.
-     * When the SDK adds it, this method will call it. Until then, returns null.
-     */
-    private String generateNegotiationPrompt(String naturalLanguageInput) {
-        if (a2atClient == null) {
-            return null;
-        }
-        // TODO: call a2atClient.generateNegotiationPrompt(naturalLanguageInput)
-        // when the A2A-T SDK exposes it.
-        return null;
-    }
-
-    /**
-     * Generate Authorization-T prompt text. Reserved for when the A2A-T SDK
-     * adds authorization scenario recognition + prompt templates. Returns null.
-     */
-    private String generateAuthorizationPrompt(String naturalLanguageInput) {
-        if (a2atClient == null) {
-            return null;
-        }
-        // TODO: call a2atClient.generateAuthorizationPrompt(...)
-        // when the A2A-T SDK exposes it.
-        return null;
-    }
-
-    /**
-     * Generate Notification-T prompt text. Reserved for when the A2A-T SDK
-     * adds notification scenario recognition + prompt templates. Returns null.
-     */
-    private String generateNotificationPrompt(String naturalLanguageInput) {
-        if (a2atClient == null) {
-            return null;
-        }
-        // TODO: call a2atClient.generateNotificationPrompt(...)
-        // when the A2A-T SDK exposes it.
-        return null;
-    }
-
-    private CompletableFuture<Map<String, Object>> runBeforeSendHandlers(
-            AgentCard agentCard, String message, Map<String, Object> presetMetadata) {
-        Map<String, Object> metadata = presetMetadata != null
-                ? new HashMap<>(presetMetadata) : new HashMap<>();
-        List<String> extUris = extractExtensionUris(agentCard);
-        List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
-        log.debug("[EngineClient] beforeSend handlers for '{}': {}", agentCard.name(),
-                handlers.stream().map(ExtensionHandler::extensionKeyword).toList());
-        CompletableFuture<Map<String, Object>> future = CompletableFuture.completedFuture(metadata);
-        for (ExtensionHandler handler : handlers) {
-            future = future.thenCompose(m -> handler.beforeSend(agentCard, message, m, a2atClient, controlPoint));
-        }
-        return future;
-    }
-
-    private CompletableFuture<SendMessageResult> runAfterReceiveHandlers(AgentCard agentCard, SendMessageResult result) {
-        List<String> extUris = extractExtensionUris(agentCard);
-        List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
-        log.debug("[EngineClient] afterReceive handlers for '{}': {}", agentCard.name(),
-                handlers.stream().map(ExtensionHandler::extensionKeyword).toList());
-        CompletableFuture<SendMessageResult> future = CompletableFuture.completedFuture(result);
-        for (ExtensionHandler handler : handlers) {
-            future = future.thenCompose(r -> handler.afterReceive(agentCard, r, a2atClient, controlPoint, extensionCallback, eventCallback));
-        }
-        return future;
-    }
-
-    private List<String> extractExtensionUris(AgentCard agentCard) {
-        List<String> uris = new ArrayList<>();
-        assert agentCard.capabilities().extensions() != null;
-        for (var ext : agentCard.capabilities().extensions()) {
-            String uri = ext.uri();
-            if (!uri.isEmpty()) uris.add(uri);
-        }
-        return uris;
-    }
-
-    // --- Core A2A send via SDK runtime ---
-    protected CompletableFuture<SendMessageResult> doSendViaA2ARuntime(
-            AgentCard agentCard, String agentName, String message,
-            String contextId, Map<String, Object> metadata) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-               MessageSendParams params = buildMessageSendParams(message, contextId, metadata);
-               ClientCallContext callContext = buildClientCallContext(agentCard, agentName, metadata);
-               String endpoint = agentCard.supportedInterfaces().isEmpty() ? "?"
-                       : agentCard.supportedInterfaces().get(0).url();
-               ProtocolLogger.logRequest(agentName, endpoint, params, callContext.getHeaders());
-               log.info("[EngineClient] Sending via A2A SDK to {}", agentName);
-                Iterable<ClientEvent> events = a2aClientRuntime.sendMessage(
-                        agentCard, params, callContext,
-                        event -> forwardIntermediateEvent(event, agentName),
-                        s -> log.info("[A2A] {}", s));
-                String responseText = extractResponseText(events);
-                String taskState = extractResponseTaskState(events);
-                Map<String, Object> respMetadata = extractResponseMetadata(events);
-                Task task = extractResponseTask(events);
-                log.info("[EngineClient] Response from {}: {} chars, state={}", agentName, responseText.length(), taskState);
-                log.debug("[EngineClient] Response text from {}: [{}]", agentName, responseText);
-                if (!respMetadata.isEmpty()) {
-                    log.info("[EngineClient] Response metadata keys for {}: {}", agentName, respMetadata.keySet());
-                }
-                return SendMessageResult.builder().text(responseText).task(task).metadata(respMetadata).taskState(taskState).build();
-            } catch (Exception e) {
-                log.error("[EngineClient] Failed to send message to {}: {}", agentName, e.getMessage(), e);
-                throw new RuntimeException("Agent call failed: " + e.getMessage(), e);
-            }
-        }, asyncExecutor);
-    }
-
-    /**
-     * Long-lived SSE stream for Notification-T subscription. Opens a daemon
-     * thread that keeps the SSE response stream open. The eventSink callback
-     * processes events in real-time (subscribed ack + later recovery results).
-     * The returned future completes on the first event (subscription confirmed).
-     */
-    protected CompletableFuture<SendMessageResult> doSendNotificationStream(
-            AgentCard agentCard, String agentName, String message,
-            String contextId, Map<String, Object> metadata) {
-        CompletableFuture<SendMessageResult> future = new CompletableFuture<>();
-        Thread streamThread = new Thread(() -> {
-            try {
-                MessageSendParams params = buildMessageSendParams(message, contextId, metadata);
-                ClientCallContext callContext = buildClientCallContext(agentCard, agentName, metadata);
-                String endpoint = agentCard.supportedInterfaces().isEmpty() ? "?"
-                        : agentCard.supportedInterfaces().get(0).url();
-                ProtocolLogger.logRequest(agentName, endpoint, params, callContext.getHeaders());
-                log.info("[EngineClient] Opening Notification-T long-lived stream to {}", agentName);
-                a2aClientRuntime.sendMessage(
-                        agentCard, params, callContext,
-                        event -> {
-                            log.info("[EngineClient] Notification-T event from {}: {}", agentName, event.getClass().getSimpleName());
-                            forwardIntermediateEvent(event, agentName);
-                            if (!future.isDone()) {
-                                future.complete(SendMessageResult.builder()
-                                        .text("Subscribed")
-                                        .taskState("TASK_STATE_WORKING")
-                                        .build());
-                            }
-                        },
-                        s -> log.info("[A2A] {}", s));
-                log.info("[EngineClient] Notification-T stream closed for {}", agentName);
-                if (!future.isDone()) {
-                    future.complete(SendMessageResult.builder()
-                            .text("Stream closed")
-                            .taskState("TASK_STATE_COMPLETED")
-                            .build());
-                }
-            } catch (Exception e) {
-                String msg = e.getMessage() != null ? e.getMessage() : "";
-                boolean connectionClosed = msg.contains("connection closed locally")
-                        || msg.contains("chunked transfer encoding, state: READING_LENGTH");
-                if (connectionClosed) {
-                    log.info("[EngineClient] Notification-T stream closed for {}", agentName);
-                } else {
-                    log.error("[EngineClient] Notification-T stream error for {}: {}", agentName, e.getMessage(), e);
-                }
-                if (!future.isDone()) {
-                    future.completeExceptionally(e);
-                }
-            }
-        }, "notif-t-" + agentName);
-        streamThread.setDaemon(true);
-        streamThread.start();
-        return future.orTimeout(5, TimeUnit.SECONDS)
-                .exceptionally(e -> {
-                    log.warn("[EngineClient] Notification-T subscription: no event in 5s, assuming active (stream stays open)");
-                    return SendMessageResult.builder()
-                            .text("Subscribed (no-ack)")
-                            .taskState("TASK_STATE_WORKING")
-                            .build();
-                });
-    }
-
-    private MessageSendParams buildMessageSendParams(String message, String contextId, Map<String, Object> metadata) {
-        Message msg = Message.builder()
-                .messageId(UUID.randomUUID().toString())
-                .contextId(contextId)
-                .role(Message.Role.ROLE_USER)
-                .parts(new TextPart(message))
-                .metadata(metadata != null ? metadata : Map.of())
-                .build();
-        return MessageSendParams.builder().message(msg).build();
-    }
-
-    private ClientCallContext buildClientCallContext(AgentCard agentCard, String agentName, Map<String, Object> messageMetadata) {
-        Map<String, String> headers = new HashMap<>();
-        if (authProvider != null) {
-            authProvider.applyAuth(agentName, agentCard, headers);
-        }
-        applyAuthHeaders(agentCard, agentName, headers);
-        List<ClientCallInterceptor> interceptors = authManager.buildInterceptors(agentCard, agentName);
-        for (ClientCallInterceptor interceptor : interceptors) {
-            if (interceptor instanceof ExtensionInterceptor extInterceptor) {
-                try {
-                    ClientCallContext interceptCtx = new ClientCallContext(new HashMap<>(), headers);
-                    PayloadAndHeaders ph = extInterceptor.intercept("message/send", messageMetadata, headers, null, interceptCtx);
-                    headers.putAll(ph.getHeaders());
-                } catch (Exception e) {
-                    log.warn("[EngineClient] Extension interceptor failed: {}", e.getMessage());
-                }
-            }
-        }
-        return new ClientCallContext(new HashMap<>(), headers);
-    }
-    // --- ClientEvent extraction ---
-    // --- intermediate event forwarding ---
-    private void forwardIntermediateEvent(ClientEvent event, String agentName) {
-        if (event instanceof TaskUpdateEvent tue) {
-           if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
-               String state = sue.status().state().name();
-               StringBuilder statusText = new StringBuilder();
-               extractTextFromMessage(sue.status().message(), statusText);
-               Map<String, Object> data = new HashMap<>();
-               data.put("agent", agentName);
-               data.put("state", state);
-               data.put("is_final", sue.isFinal());
-                if (!statusText.isEmpty()) data.put("text", statusText.toString());
-               if (sue.metadata() != null && !sue.metadata().isEmpty()) data.put("metadata", sue.metadata());
-               log.info("[EngineClient] Agent {} status update: {} (final={})", agentName, state, sue.isFinal());
-               if (!statusText.isEmpty()) {
-                   log.debug("[EngineClient] Agent {} status text: {}", agentName, statusText);
-               }
-               emit(EventType.AGENT_STATUS_UPDATE, data);
-            } else if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae) {
-                StringBuilder text = new StringBuilder();
-                extractTextFromArtifact(ae.artifact(), text);
-                Map<String, Object> data = new HashMap<>();
-                data.put("agent", agentName);
-                data.put("artifact_id", ae.artifact().artifactId());
-                data.put("artifact_name", ae.artifact().name());
-                data.put("append", ae.append());
-                data.put("last_chunk", ae.lastChunk());
-                if (!text.isEmpty()) data.put("text", text.toString());
-                if (ae.metadata() != null && !ae.metadata().isEmpty()) data.put("metadata", ae.metadata());
-                log.info("[EngineClient] Agent {} artifact update: {} ({})", agentName, ae.artifact().name(), ae.artifact().artifactId());
-                emit(EventType.AGENT_ARTIFACT_UPDATE, data);
-            }
-        } else if (event instanceof MessageEvent me) {
-            Message msg = me.getMessage();
-            StringBuilder text = new StringBuilder();
-            extractTextFromMessage(msg, text);
-            Map<String, Object> data = new HashMap<>();
-            data.put("agent", agentName);
-            data.put("role", msg.role().name());
-            if (!text.isEmpty()) data.put("text", text.toString());
-            if (msg.metadata() != null && !msg.metadata().isEmpty()) {
-                data.put("metadata", msg.metadata());
-            }
-            log.info("[EngineClient] Agent {} message event: {} chars", agentName, text.length());
-            if (!text.isEmpty()) {
-                log.debug("[EngineClient] Agent {} message text: {}", agentName, text);
-            }
-            emit(EventType.AGENT_MESSAGE_EVENT, data);
-        }
-    }
-
-    private static String extractResponseText(Iterable<ClientEvent> events) {
-        StringBuilder text = new StringBuilder();
-        for (ClientEvent event : events) {
-            if (event instanceof TaskEvent te) extractTextFromTask(te.getTask(), text);
-            else if (event instanceof TaskUpdateEvent tue) {
-                extractTextFromTask(tue.getTask(), text);
-                if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae) extractTextFromArtifact(ae.artifact(), text);
-            } else if (event instanceof MessageEvent me) extractTextFromMessage(me.getMessage(), text);
-        }
-        return text.toString();
-    }
-
-    private static void extractTextFromTask(Task task, StringBuilder sb) {
-        if (task.artifacts() != null) for (Artifact a : task.artifacts()) extractTextFromArtifact(a, sb);
-    }
-
-    private static void extractTextFromArtifact(Artifact artifact, StringBuilder sb) {
-        for (Part<?> part : artifact.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
-    }
-
-    private static void extractTextFromMessage(Message message, StringBuilder sb) {
-        // status().message() is legitimately null for terminal events emitted via complete()/fail()
-        if (message == null) return;
-        for (Part<?> part : message.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
-    }
-
-    private static String extractResponseTaskState(Iterable<ClientEvent> events) {
-        String state = "";
-        for (ClientEvent event : events) {
-            if (event instanceof TaskEvent te) state = te.getTask().status().state().name();
-            else if (event instanceof TaskUpdateEvent tue) {
-                if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) state = sue.status().state().name();
-            }
-        }
-        return state;
-    }
-
-    private static Map<String, Object> extractResponseMetadata(Iterable<ClientEvent> events) {
-        Map<String, Object> metadata = new HashMap<>();
-        for (ClientEvent event : events) {
-            if (event instanceof TaskEvent te) {
-                mergeTaskMetadata(te.getTask(), metadata);
-            } else if (event instanceof TaskUpdateEvent tue) {
-                mergeTaskMetadata(tue.getTask(), metadata);
-            }
-        }
-        return metadata;
-    }
-
-    /**
-     * Merge task-level metadata AND each artifact's metadata into the result map.
-     * Agents attach Authorization-T / Notification-T to artifact metadata, so
-     * without this merge those extension payloads never reach the extension handlers.
-     */
-    private static void mergeTaskMetadata(Task task, Map<String, Object> metadata) {
-        if (task == null) return;
-        Map<String, Object> m = task.metadata();
-        if (m != null && !m.isEmpty()) metadata.putAll(m);
-        if (task.artifacts() != null) {
-            for (Artifact a : task.artifacts()) {
-                Map<String, Object> am = a.metadata();
-                if (am != null && !am.isEmpty()) metadata.putAll(am);
-            }
-        }
-    }
-
-    private static Task extractResponseTask(Iterable<ClientEvent> events) {
-        Task lastTask = null;
-        for (ClientEvent event : events) {
-            if (event instanceof TaskEvent te) lastTask = te.getTask();
-            else if (event instanceof TaskUpdateEvent tue) lastTask = tue.getTask();
-        }
-        return lastTask;
-    }
-
-    // --- autoNegotiate ---
     private CompletableFuture<SendMessageResult> autoNegotiate(
             AgentCard agentCard, String agentName, String originalMessage,
             String contextId, SendMessageResult result, int round) {
@@ -618,7 +159,6 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         Map<String, Object> negMeta = result.getMetadata() != null ? result.getMetadata() : new HashMap<>();
         String negText = negMeta.getOrDefault("negotiation_message", "").toString();
         log.info("[Negotiation] Round {} for '{}': {}", round, agentName, negText);
-        log.debug("[Negotiation] Full metadata for '{}': {}", agentName, negMeta);
         emit(EventType.NEGOTIATION_REQUEST, Map.of("agent", agentName, "round", round, "concern", negText));
         CompletableFuture<String> clarFuture;
         if (controlPoint != null) {
@@ -635,15 +175,14 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             log.info("[Negotiation] Clarification for '{}' round {}: {}", agentName, round, clarification);
             emit(EventType.NEGOTIATION_RESOLVED, Map.of("agent", agentName, "round", round, "clarification", clarification));
             String followUp = "[NEGOTIATION_RESOLUTION]\nThe engine has reviewed your negotiation request and provides the following clarification:\n\n" + clarification + "\n\n---\nOriginal Task:\n" + originalMessage + "\n\nPlease re-execute the task based on the clarification above.";
-           // Carry the negotiation resolution as natural-language metadata
-            // under the Negotiation-T URI key, per A2A-T protocol.
-           Map<String, Object> followUpMeta = new HashMap<>();
-           followUpMeta.put("https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",
-                   "## 数据返回确认\n" + clarification + "\n");
+            Map<String, Object> followUpMeta = new HashMap<>();
+            followUpMeta.put("https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",
+                    "## 数据返回确认\n" + clarification + "\n");
             return runBeforeSendHandlers(agentCard, followUp, followUpMeta)
                     .thenCompose(meta -> {
-                        String ctx = contextId != null ? contextId : this.contextId;
-                        return doSendViaA2ARuntime(agentCard, agentName, followUp, ctx, meta)
+                        String ctx = contextId != null ? contextId : transport.getContextId();
+                        return transport.send(agentCard, agentName, followUp, ctx, meta,
+                                        event -> forwardIntermediateEvent(event, agentName))
                                 .thenCompose(r -> runAfterReceiveHandlers(agentCard, r))
                                 .thenCompose(r -> autoNegotiate(agentCard, agentName, originalMessage, contextId, r, round + 1));
                     });
@@ -653,55 +192,87 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private static boolean isNegotiationNeeded(SendMessageResult result) {
         return result.getTaskState() != null && result.getTaskState().contains("INPUT_REQUIRED");
     }
-    // --- auth headers ---
-    private void applyAuthHeaders(AgentCard agentCard, String agentName, Map<String, String> headerMap) {
-        AgentCredentialService credSvc = authManager.getService(agentName);
-        if (credSvc == null) return;
-        Map<String, Map<String, Object>> schemeConfigs = authManager.getConfig(agentName);
-        if (schemeConfigs == null) schemeConfigs = Map.of();
-        Map<String, SecurityScheme> secSchemes = agentCard.securitySchemes();
-        List<SecurityRequirement> secReqs = agentCard.securityRequirements();
-        if (secSchemes == null || secSchemes.isEmpty() || secReqs == null || secReqs.isEmpty()) return;
-        for (SecurityRequirement req : secReqs) {
-            Map<String, List<String>> schemes = req.schemes();
-            for (String schemeName : schemes.keySet()) {
-                Map<String, Object> schemeCfg = schemeConfigs.getOrDefault(schemeName, Map.of());
-                String credential = credSvc.getCredential(schemeName, null);
-                if (credential == null) continue;
-                String authHeader = (String) schemeCfg.get("auth_header");
-                if (authHeader != null && !authHeader.isEmpty()) {
-                    String prefix = (String) schemeCfg.getOrDefault("auth_header_prefix", "");
-                    headerMap.put(authHeader, prefix + credential);
-                    log.info("[Auth] Set header {} for agent {}", authHeader, agentName);
-                } else {
-                    headerMap.put("Authorization", "Bearer " + credential);
-                    log.info("[Auth] Set Bearer header for agent {}", agentName);
-                }
-                String acceptHeader = (String) schemeCfg.get("accept_header");
-                if (acceptHeader != null && !acceptHeader.isEmpty()) headerMap.put("Accept", acceptHeader);
-                break;
+
+    // ------------------------------------------------------------------
+    // Extension handler chain
+    // ------------------------------------------------------------------
+
+    private CompletableFuture<Map<String, Object>> runBeforeSendHandlers(
+            AgentCard agentCard, String message, Map<String, Object> presetMetadata) {
+        Map<String, Object> metadata = presetMetadata != null ? new HashMap<>(presetMetadata) : new HashMap<>();
+        List<String> extUris = A2ATransport.extractExtensionUris(agentCard);
+        List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
+        CompletableFuture<Map<String, Object>> future = CompletableFuture.completedFuture(metadata);
+        for (ExtensionHandler handler : handlers) {
+            future = future.thenCompose(m -> handler.beforeSend(agentCard, message, m, transport.getA2atClient(), controlPoint));
+        }
+        return future;
+    }
+
+    private CompletableFuture<SendMessageResult> runAfterReceiveHandlers(AgentCard agentCard, SendMessageResult result) {
+        List<String> extUris = A2ATransport.extractExtensionUris(agentCard);
+        List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
+        CompletableFuture<SendMessageResult> future = CompletableFuture.completedFuture(result);
+        for (ExtensionHandler handler : handlers) {
+            future = future.thenCompose(r -> handler.afterReceive(agentCard, r, transport.getA2atClient(), controlPoint, extensionCallback, eventCallback));
+        }
+        return future;
+    }
+
+    // ------------------------------------------------------------------
+    // Intermediate event forwarding
+    // ------------------------------------------------------------------
+
+    private void forwardIntermediateEvent(ClientEvent event, String agentName) {
+        if (event instanceof TaskUpdateEvent tue) {
+            if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
+                String state = sue.status().state().name();
+                StringBuilder statusText = new StringBuilder();
+                A2ATransport.extractTextFromMessage(sue.status().message(), statusText);
+                Map<String, Object> data = new HashMap<>();
+                data.put("agent", agentName);
+                data.put("state", state);
+                data.put("is_final", sue.isFinal());
+                if (!statusText.isEmpty()) data.put("text", statusText.toString());
+                if (sue.metadata() != null && !sue.metadata().isEmpty()) data.put("metadata", sue.metadata());
+                log.info("[EngineClient] Agent {} status update: {} (final={})", agentName, state, sue.isFinal());
+                emit(EventType.AGENT_STATUS_UPDATE, data);
+            } else if (tue.getUpdateEvent() instanceof org.a2aproject.sdk.spec.TaskArtifactUpdateEvent ae) {
+                StringBuilder text = new StringBuilder();
+                A2ATransport.extractTextFromArtifact(ae.artifact(), text);
+                Map<String, Object> data = new HashMap<>();
+                data.put("agent", agentName);
+                data.put("artifact_id", ae.artifact().artifactId());
+                data.put("artifact_name", ae.artifact().name());
+                data.put("append", ae.append());
+                data.put("last_chunk", ae.lastChunk());
+                if (!text.isEmpty()) data.put("text", text.toString());
+                if (ae.metadata() != null && !ae.metadata().isEmpty()) data.put("metadata", ae.metadata());
+                log.info("[EngineClient] Agent {} artifact update: {} ({})", agentName, ae.artifact().name(), ae.artifact().artifactId());
+                emit(EventType.AGENT_ARTIFACT_UPDATE, data);
             }
+        } else if (event instanceof MessageEvent me) {
+            Message msg = me.getMessage();
+            StringBuilder text = new StringBuilder();
+            A2ATransport.extractTextFromMessage(msg, text);
+            Map<String, Object> data = new HashMap<>();
+            data.put("agent", agentName);
+            data.put("role", msg.role().name());
+            if (!text.isEmpty()) data.put("text", text.toString());
+            if (msg.metadata() != null && !msg.metadata().isEmpty()) {
+                data.put("metadata", msg.metadata());
+            }
+            log.info("[EngineClient] Agent {} message event: {} chars", agentName, text.length());
+            emit(EventType.AGENT_MESSAGE_EVENT, data);
         }
     }
 
-    // --- utility ---
+    // ------------------------------------------------------------------
+    // Lifecycle
+    // ------------------------------------------------------------------
+
     @Override
     public void close() {
-        log.info("[EngineClient] Closing");
-        try { a2aClientRuntime.close(); } catch (Exception ignored) {}
-    }
-
-    @Override
-    public void updateAgentCards(List<AgentCard> agentCards) {
-        cardMap.clear();
-        for (AgentCard card : agentCards) {
-            if (!card.name().isEmpty()) cardMap.put(card.name(), card);
-        }
-        log.info("[EngineClient] Updated agent cards: {} agent(s)", cardMap.size());
-    }
-
-    @Override
-    public void registerHandler(ExtensionHandler handler) {
-        extensionRegistry.register(handler);
+        // Transport is owned by the caller; do not close it here.
     }
 }

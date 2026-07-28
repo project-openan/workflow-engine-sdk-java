@@ -20,6 +20,7 @@
 package com.openan.a2at.engine.examples.agents;
 
 import com.openan.a2at.engine.client.WorkflowEngineClient;
+import com.openan.a2at.engine.client.ExtensionSender;
 import org.a2aproject.sdk.spec.AgentCard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,16 +57,16 @@ public class ExtensionPrePositioner {
     /**
      * Pre-position Authorization-T + Notification-T to every non-workbench agent.
      */
-    public void prePosition(WorkflowEngineClient engineClient, List<AgentCard> agentCards) {
+    public void prePosition(ExtensionSender sender, List<AgentCard> agentCards) {
         for (AgentCard card : agentCards) {
             String name = card.name();
             if (name.contains("Workbench")) {
                 continue;
             }
             log.info("[PrePosition] Authorization-T to {}", name);
-            engineClient.sendAuthorization(name, "下发授权放行策略", authInput).join();
+            sender.sendAuthorization(name, "下发授权放行策略", authInput).join();
             log.info("[PrePosition] Notification-T to {}", name);
-            engineClient.sendNotification(name, "订阅业务抢通结果通知", notifInput).join();
+            sender.sendNotification(name, "订阅业务抢通结果通知", notifInput).join();
         }
         log.info("[PrePosition] Extension pre-positioning complete");
     }

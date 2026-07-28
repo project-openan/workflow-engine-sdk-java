@@ -23,6 +23,9 @@ import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.control.EventCallback;
+import com.openan.a2at.engine.client.A2ATransport;
+import com.openan.a2at.engine.client.DefaultExtensionSender;
+import com.openan.a2at.engine.client.ExtensionSender;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.ExecutionResult;
 import com.openan.a2at.engine.model.Workflow;
@@ -97,16 +100,18 @@ public class WorkbenchOrchestrator {
         log.info("[Orchestrator] Workflow: {} ({} steps)", workflow.getName(), workflow.getSteps().size());
 
         log.info("[Orchestrator] Step 3: Create engine client");
-        WorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(
+        A2ATransport transport = new A2ATransport(
                 agentCards, null,
                 WorkflowEngineClientConfig.builder()
                         .sslVerify(sslVerify)
                         .a2atEnvPath(a2atEnvPath)
                         .credentialsConfigPath(credentialsPath)
                         .build());
+        WorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(transport);
+        ExtensionSender extensionSender = new DefaultExtensionSender(transport);
 
         log.info("[Orchestrator] Step 4: Pre-position extensions");
-        new ExtensionPrePositioner().prePosition(engineClient, agentCards);
+        new ExtensionPrePositioner().prePosition(extensionSender, agentCards);
 
         log.info("[Orchestrator] Step 5: Execute workflow");
         WorkbenchControlPoint controlPoint = new WorkbenchControlPoint(a2atEnvPath, new NegotiationStrategy(a2atEnvPath));

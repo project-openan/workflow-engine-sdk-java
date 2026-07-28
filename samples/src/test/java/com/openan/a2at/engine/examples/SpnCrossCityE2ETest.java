@@ -2,6 +2,9 @@ package com.openan.a2at.engine.examples;
 
 import com.openan.a2at.engine.client.AgentCardJacksonModule;
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
+import com.openan.a2at.engine.client.DefaultExtensionSender;
+import com.openan.a2at.engine.client.A2ATransport;
+import com.openan.a2at.engine.client.ExtensionSender;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.control.EventCallback;
@@ -49,6 +52,7 @@ class SpnCrossCityE2ETest {
 
     private final List<EmbeddedA2AServer> servers = new ArrayList<>();
     private DefaultWorkflowEngineClient client;
+    private ExtensionSender sender;
     private int port1;
     private int port2;
 
@@ -86,8 +90,10 @@ class SpnCrossCityE2ETest {
         servers.add(s1);
         servers.add(s2);
         Thread.sleep(600);
-        client = new DefaultWorkflowEngineClient(List.of(c1, c2), null,
+        A2ATransport transport = new A2ATransport(List.of(c1, c2), null,
                 WorkflowEngineClientConfig.builder().sslVerify(false).build());
+        client = new DefaultWorkflowEngineClient(transport);
+        sender = new DefaultExtensionSender(transport);
     }
 
     @AfterEach
@@ -126,13 +132,13 @@ class SpnCrossCityE2ETest {
     @Test
     void fullBusinessPathNegotiationDiagnosisRecoveryAndSelfLoopMerge() {
         // Pre-position Authorization-T + Notification-T to both SPN agents
-        client.sendAuthorization("SPN Domain Agent City1", "下发授权放行策略",
+        sender.sendAuthorization("SPN Domain Agent City1", "下发授权放行策略",
                 "任务类型新增授权，操作名称业务抢通").join();
-        client.sendNotification("SPN Domain Agent City1", "订阅业务抢通结果通知",
+        sender.sendNotification("SPN Domain Agent City1", "订阅业务抢通结果通知",
                 "通知主题为service-recovery-execution-result").join();
-        client.sendAuthorization("SPN Domain Agent City2", "下发授权放行策略",
+        sender.sendAuthorization("SPN Domain Agent City2", "下发授权放行策略",
                 "任务类型新增授权，操作名称业务抢通").join();
-        client.sendNotification("SPN Domain Agent City2", "订阅业务抢通结果通知",
+        sender.sendNotification("SPN Domain Agent City2", "订阅业务抢通结果通知",
                 "通知主题为service-recovery-execution-result").join();
 
         Map<String, Object> allOutputs = new ConcurrentHashMap<>();

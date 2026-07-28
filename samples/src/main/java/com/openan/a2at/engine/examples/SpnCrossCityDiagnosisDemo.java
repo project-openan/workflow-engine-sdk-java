@@ -20,6 +20,7 @@
 package com.openan.a2at.engine.examples;
 
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
+import com.openan.a2at.engine.client.A2ATransport;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import org.a2aproject.sdk.spec.AgentCard;
 import com.openan.a2at.engine.client.AgentCardJacksonModule;
@@ -103,12 +104,13 @@ public class SpnCrossCityDiagnosisDemo {
                 .getResource(AGENT_CARD_RESOURCE).getPath();
         AgentCard agentCard = mapper.readValue(new java.io.File(cardPath), AgentCard.class);
 
-        DefaultWorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(
+        A2ATransport transport = new A2ATransport(
                 List.of(agentCard), null,
                 WorkflowEngineClientConfig.builder()
                         .sslVerify(false)
                         .a2atEnvPath(StartAgentsServer.resolveEnvPath())
                         .build());
+        DefaultWorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(transport);
 
         engineClient.setEventCallback(new EventCallback() {
             @Override

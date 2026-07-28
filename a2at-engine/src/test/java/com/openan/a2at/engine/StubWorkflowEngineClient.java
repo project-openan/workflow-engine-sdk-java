@@ -101,20 +101,6 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
     }
 
     @Override
-    public CompletableFuture<SendMessageResult> sendExtensionMessage(
-            String agentName, String instruction,
-            String naturalLanguageInput, A2ATExtension extension) {
-        Map<String, Object> meta = new HashMap<>();
-        meta.put(extension.uri(), naturalLanguageInput);
-        sent.add(new SentMessage(agentName, instruction, null, meta));
-        return CompletableFuture.completedFuture(SendMessageResult.builder()
-                .text("stub-extension-response")
-                .taskState("COMPLETED")
-                .metadata(meta)
-                .build());
-    }
-
-    @Override
     public void setControlPoint(ControlPoint controlPoint) {
         this.controlPoint = controlPoint;
     }
