@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-28
+
+First public release. The SDK ships a clean transport-facade architecture with
+single-responsibility decision interfaces and full A2A-T extension support.
+Feature parity with the Python SDK is maintained.
+
+### Added
+- `A2ATransport`: shared wire layer owning the A2A client runtime, auth
+  manager, agent-card map, and streaming event extraction
+- `ExtensionSender` / `DefaultExtensionSender`: one-shot pre-positioning
+  facade for Authorization-T and Notification-T (long-lived SSE subscription)
+- `ControlPoint` / `ExtensionCallback` split: flow decisions
+  (`onTask` / `onSelfTask` / `onRoute` / `onNegotiation`) and reactive
+  hooks (`onAuthorization` / `onNotification`) on separate interfaces
+- `NegotiationStrategy`: pluggable clarification strategy injected into
+  `DefaultControlPoint`
+- `SELF_LOOP` step type for local task handling without an A2A-T message
+- `ANY_SUCCESS` step policy with early cancellation of remaining subtasks
+- Parallel DAG step dispatch and context assembly (`ContextBuilder`)
+- `EventType` constants covering runner lifecycle, step/task execution,
+  agent traffic, and A2A-T extension events
+- `ExecutePsop.Builder`: fluent builder with event stream, lifecycle
+  bracket, and `onFinish` persistence hook
+- `A2ATExtension` enum encapsulating all extension URIs (no hardcoded strings)
+- `DefaultExtensionSender` prompt-generation dispatch (Task-T via the A2A-T
+  SDK; Authorization-T / Notification-T / Negotiation-T reserved for SDK
+  support)
+- [DESIGN.md](docs/DESIGN.md) architecture document
+
+### Changed
+- `DefaultWorkflowEngineClient` is now a facade over `A2ATransport`, owning
+  only the workflow send path (Task-T prompt generation, Negotiation-T
+  auto-loop, event callback, ControlPoint/ExtensionCallback wiring)
+- Pre-positioning sends moved from `WorkflowEngineClient` to `ExtensionSender`
+- `ExtensionRegistry` auto-registers only Task-T and Negotiation-T
+  (in-workflow handlers); Authorization-T / Notification-T are one-shot
+  pre-positioning operations
+
 ## [0.3.0] - 2026-07-25
 
 ### Added

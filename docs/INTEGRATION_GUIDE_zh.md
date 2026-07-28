@@ -289,33 +289,32 @@ AgentCard 通过 `capabilities.extensions` 声明扩展点：
 
 ### Authorization-T（前置下发）
 
-工作流开始前，向 SPN 智能体下发白名单授权策略：
+工作流开始前，向 SPN 智能体下发白名单授权策略。前置操作使用基于同一 transport 的 `ExtensionSender` 门面，而非工作流客户端：
 
 ```java
-engineClient.sendExtensionMessage(
+ExtensionSender sender = new DefaultExtensionSender(transport);
+sender.sendAuthorization(
     "SPN Domain Agent",
     "Authorization-T pre-positioning",
-    "任务类型：新增授权，操作：业务抢通，操作类型：光模块更换，...",
-    "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1"
+    "任务类型：新增授权，操作：业务抢通，操作类型：光模块更换，..."
 );
 ```
 
-SPN 智能体收到后存储策略，后续操作与白名单比对，在策略内直接执行，不在则拒绝。
+内部使用 `A2ATExtension.AUTHORIZATION_T`，勿硬编码 URI。SPN 智能体收到后存储策略，后续操作与白名单比对，在策略内直接执行，不在则拒绝。
 
 ### Notification-T（前置订阅）
 
 工作流开始前，向 SPN 智能体订阅抢通结果通知：
 
 ```java
-engineClient.sendExtensionMessage(
+sender.sendNotification(
     "SPN Domain Agent",
     "Notification-T subscription",
-    "通知主题：service-recovery-execution-result，...",
-    "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1"
+    "通知主题：service-recovery-execution-result，..."
 );
 ```
 
-SPN 智能体通过通知通道上报抢通结果。
+`A2ATExtension.NOTIFICATION_T` 打开长连接 SSE 流，后续抢通结果通过该响应流返回。SPN 智能体通过通知通道上报抢通结果。
 
 ## 8. HTTPS 配置
 
@@ -422,7 +421,9 @@ WorkflowEngineClientConfig.builder()
 |---|---|
 | `ExecutePsop.Builder` | 工作流执行入口 |
 | `ControlPoint` / `DefaultControlPoint` | 业务决策实现（onTask、onSelfTask、onRoute、onNegotiation 等） |
-| `WorkflowEngineClient` | 发送消息给智能体（sendMessage、sendExtensionMessage） |
+| `WorkflowEngineClient` / `DefaultWorkflowEngineClient` | 工作流发送（sendMessage、认证、扩展） |
+| `ExtensionSender` / `DefaultExtensionSender` | 一次性前置（sendAuthorization、sendNotification） |
+| `A2ATransport` | 共享通信层（httpx runtime、认证、SSE 消费） |
 | `WorkflowEngineClientConfig` | 配置（SSL、认证、A2A-T、协商轮数、自定义 Handler） |
 | `AuthProvider` | 自定义认证 |
 | `ExtensionHandler` | 自定义扩展 |

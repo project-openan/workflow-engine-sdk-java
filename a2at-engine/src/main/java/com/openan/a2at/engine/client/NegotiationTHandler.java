@@ -83,9 +83,9 @@ class NegotiationTHandler implements ExtensionHandler {
         Map<String, Object> metadata = result.getMetadata() != null
                 ? new HashMap<>(result.getMetadata()) : new HashMap<>();
         try {
-            // The negotiation context is nested under the DATA-NEGOTIATION-T key
-            // in the task metadata, not at the top level. Extract it before
-            // calling receiveNegotiation, which expects the context map directly.
+            // The negotiation context is nested under the DATA-NEGOTIATION-T key;
+            // extract it before calling receiveNegotiation, which expects the
+            // context map directly.
             Map<String, Object> contextMap = extractNegotiationContext(metadata);
             if (contextMap == null) {
                 contextMap = metadata;
@@ -103,23 +103,20 @@ class NegotiationTHandler implements ExtensionHandler {
                 }
             }
         } catch (Exception e) {
-            // The A2A-T SDK's DefaultA2ATClientBuilder does not register any
-            // negotiation type handlers by default, so receiveNegotiation()
-            // always throws "Unsupported negotiation type" until the SDK is
-            // fixed. This is a known SDK limitation, not an engine error —
-            // log at DEBUG and fall back to direct metadata extraction.
+            // When the SDK has no handler for the negotiation type, fall back
+            // to direct metadata extraction. Both paths populate the
+            // negotiation_message key consumed by the auto-loop.
             if (e.getMessage() != null && e.getMessage().contains("Unsupported negotiation type")) {
-                log.debug("[Negotiation-T] SDK receiveNegotiation unavailable for '{}' ({}), using fallback",
+                log.debug("[Negotiation-T] SDK receiveNegotiation has no handler for '{}' ({}); using direct extraction",
                         getAgentName(agentCard), e.getMessage());
             } else {
-                log.warn("[Negotiation-T] receiveNegotiation failed for '{}': {}, using fallback",
+                log.warn("[Negotiation-T] receiveNegotiation error for '{}': {}; using direct extraction",
                         getAgentName(agentCard), e.getMessage());
             }
-            // Fallback: extract negotiation text directly from metadata
             String fallbackText = extractNegotiationText(metadata);
             if (fallbackText != null && !fallbackText.isEmpty()) {
                 metadata.put("negotiation_message", fallbackText);
-                log.info("[Negotiation-T] Agent '{}' requested negotiation (fallback): {}",
+                log.info("[Negotiation-T] Agent '{}' requested negotiation (direct): {}",
                         getAgentName(agentCard), fallbackText);
             }
         }
@@ -155,8 +152,11 @@ class NegotiationTHandler implements ExtensionHandler {
     }
 
     private static boolean supportsNegotiation(AgentCard agentCard) {
-        assert agentCard.capabilities().extensions() != null;
-        for (var ext : agentCard.capabilities().extensions()) {
+        var extensions = agentCard.capabilities().extensions();
+        if (extensions == null) {
+            return false;
+        }
+        for (var ext : extensions) {
             String uri = ext.uri();
             if (uri.contains("NEGOTIATION-T")) {
                 return true;

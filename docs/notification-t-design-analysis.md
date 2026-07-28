@@ -1,5 +1,14 @@
 # Notification-T / Authorization-T Design Analysis
 
+> **Superseded.** This historical analysis has been folded into
+> [DESIGN.md](DESIGN.md), sections 4 (A2A-T Extension Model) and 7
+> (Interaction Sequences). The pre-positioning flow described below now
+> lives on `ExtensionSender` (see DESIGN.md, "Shared transport with two
+> facades"), not on `WorkflowEngineClient`. Kept for reference only.
+
+---
+# Notification-T / Authorization-T Design Analysis
+
 ## Current Implementation (as of 2026-07-27)
 
 ### Pre-positioning: Three Independent One-Shot A2A Calls

@@ -27,22 +27,24 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Communication client for sending A2A messages to remote agents.
+ * Workflow-execution send facade over a shared {@link A2ATransport}.
  *
-* <p>Two message types:
- * <p>Workflow execution path only. This facade owns the Task-T prompt
- * generation, Negotiation-T auto-loop, the global EventCallback, and the
- * ControlPoint wiring. All wire-level work delegates to a shared
- * {@link A2ATransport}.
+ * <p>Single responsibility: the workflow execution send path. This facade
+ * owns Task-T prompt generation, the Negotiation-T auto-loop, the global
+ * {@link EventCallback}, and the ControlPoint / ExtensionCallback wiring.
+ * All wire-level work (client runtime, auth, SSE event extraction) delegates
+ * to the transport.
  *
  * <p>One-shot pre-positioning (Authorization-T / Notification-T) is a
  * separate concern and lives on {@link ExtensionSender}; callers that only
  * need pre-positioning hold that lighter facade over the same transport.
+ *
  * <p>The single message type on this facade:
  * <ul>
- *   <li>{@link #sendMessage} - SSE streaming, used during workflow execution
- *       (from {@link ControlPoint#onTask}). Goes through Task-T prompt generation,
- *       Negotiation-T auto-loop, and the global {@link EventCallback}.</li>
+ *   <li>{@link #sendMessage} - streaming send used during workflow execution
+ *       (invoked from {@link ControlPoint#onTask}). Runs through Task-T prompt
+ *       generation, the Negotiation-T auto-loop, and the global
+ *       {@link EventCallback}.</li>
  * </ul>
  */
 public interface WorkflowEngineClient {

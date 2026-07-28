@@ -69,12 +69,8 @@ public interface WorkflowEngineClient {
     CompletableFuture<SendMessageResult> sendMessage(
         String agentName, String message);
 
-    // 一次性扩展消息（Authorization-T、Notification-T）
-    CompletableFuture<SendMessageResult> sendExtensionMessage(
-        String agentName, String instruction,
-        String naturalLanguageInput, String extensionUri);
-
     void setControlPoint(ControlPoint controlPoint);
+    void setExtensionCallback(ExtensionCallback extensionCallback);
     void setEventCallback(EventCallback callback);
     void close();
     List<String> getAgentNames();
@@ -82,6 +78,8 @@ public interface WorkflowEngineClient {
     void registerHandler(ExtensionHandler handler);
 }
 ```
+
+> 一次性预置（Authorization-T / Notification-T）位于 `ExtensionSender`，不在本接口。见下方 `ExtensionSender` 章节。
 
 #### sendMessage
 
@@ -105,16 +103,34 @@ public interface WorkflowEngineClient {
 2. 提取 metadata（task 级 + artifact 级合并）
 3. Negotiation-T 自动循环（如果 `INPUT_REQUIRED`）
 
-#### sendExtensionMessage
+### ExtensionSender
 
-用于前置操作（Authorization-T、Notification-T）。通过 A2A-T SDK（LLM + 模板）生成 metadata 值。跳过 Task-T 提示词生成和 Negotiation-T 自动循环。
+基于同一 `A2ATransport` 的一次性预置门面。在工作流开始前向 Agent 发送 Authorization-T / Notification-T（及任何一次性扩展）。跳过 Task-T 提示词生成和 Negotiation-T 自动循环，也不通过全局 `EventCallback` 发送事件（返回的 `CompletableFuture` 即为回调）。
+
+```java
+public interface ExtensionSender {
+    CompletableFuture<SendMessageResult> sendExtensionMessage(
+        String agentName, String instruction,
+        String naturalLanguageInput, A2ATExtension extension);
+
+    // 便捷方法：Authorization-T
+    CompletableFuture<SendMessageResult> sendAuthorization(
+        String agentName, String instruction, String naturalLanguageInput);
+
+    // 便捷方法：Notification-T（长连接 SSE）
+    CompletableFuture<SendMessageResult> sendNotification(
+        String agentName, String instruction, String naturalLanguageInput);
+}
+```
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
 | `agentName` | `String` | 目标智能体名称 |
 | `instruction` | `String` | 简短指令文本（成为 `parts[].text`） |
 | `naturalLanguageInput` | `String` | SDK 提示词生成的自然语言输入 |
-| `extensionUri` | `String` | 完整扩展 URI（metadata 键 + 头值） |
+| `extension` | `A2ATExtension` | 扩展枚举（勿硬编码 URI） |
+
+metadata 值由 A2A-T SDK 生成；SDK 不可用时回退为原始自然语言输入。
 
 ### WorkflowEngineClientConfig
 

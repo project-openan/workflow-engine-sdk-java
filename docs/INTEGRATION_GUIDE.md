@@ -304,34 +304,38 @@ Auto-loops up to `maxNegotiationRounds` (default 3).
 ### Authorization-T (pre-positioning)
 
 Before the workflow starts, send a whitelist authorization strategy to
-SPN agents:
+SPN agents. Pre-positioning uses the `ExtensionSender` facade over the
+same transport, not the workflow client:
 
 ```java
-engineClient.sendExtensionMessage(
+ExtensionSender sender = new DefaultExtensionSender(transport);
+sender.sendAuthorization(
     "SPN Domain Agent",
     "Authorization-T pre-positioning",
-    "Task type: new authorization, operation: service recovery, ...",
-    "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1"
+    "Task type: new authorization, operation: service recovery, ..."
 );
 ```
 
-The SPN agent stores the strategy and compares subsequent operations against
-the whitelist. Operations within the whitelist are executed; others are rejected.
+`A2ATExtension.AUTHORIZATION_T` is used internally; never hardcode the URI.
+The SPN agent stores the strategy and compares subsequent operations
+against the whitelist. Operations within the whitelist are executed;
+others are rejected.
 
 ### Notification-T (pre-positioning)
 
 Before the workflow starts, subscribe to recovery result notifications:
 
 ```java
-engineClient.sendExtensionMessage(
+sender.sendNotification(
     "SPN Domain Agent",
     "Notification-T subscription",
-    "Topic: service-recovery-execution-result, ...",
-    "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1"
+    "Topic: service-recovery-execution-result, ..."
 );
 ```
 
-The SPN agent reports recovery results through the notification channel.
+`A2ATExtension.NOTIFICATION_T` opens a long-lived SSE stream; later recovery
+results flow back through that response stream. The SPN agent reports
+recovery results through the notification channel.
 
 ## 8. HTTPS Configuration
 
@@ -441,7 +445,9 @@ WorkflowEngineClientConfig.builder()
 |---|---|
 | `ExecutePsop.Builder` | Workflow execution entry point |
 | `ControlPoint` / `DefaultControlPoint` | Business decisions (onTask, onSelfTask, onRoute, onNegotiation, etc.) |
-| `WorkflowEngineClient` | Send messages to agents (sendMessage, sendExtensionMessage) |
+| `WorkflowEngineClient` / `DefaultWorkflowEngineClient` | Workflow send (sendMessage, auth, extensions) |
+| `ExtensionSender` / `DefaultExtensionSender` | One-shot pre-positioning (sendAuthorization, sendNotification) |
+| `A2ATransport` | Shared wire layer (httpx runtime, auth, SSE consumer) |
 | `WorkflowEngineClientConfig` | Configuration (SSL, auth, A2A-T, negotiation rounds, custom handlers) |
 | `AuthProvider` | Custom authentication |
 | `ExtensionHandler` | Custom extension handler |

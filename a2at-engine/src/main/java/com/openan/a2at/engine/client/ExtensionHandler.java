@@ -32,15 +32,15 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Extension handler for A2A-T extensions (SDK-internal).
  *
-* <p>Mirrors the Python SDK's {@code ExtensionHandler}. Built-in handlers:
-* Task-T, Negotiation-T, Authorization-T, Notification-T.
-* Handlers that involve user decisions delegate to ControlPoint methods.
- * <p>Mirrors the Python SDK's {@code ExtensionHandler}. Built-in handlers:
- * Task-T, Negotiation-T. Authorization-T / Notification-T are
- * pre-positioning operations (one-shot, via sendExtensionMessage), so they
- * are not part of this in-workflow handler chain. Reactive hooks for
- * agent-pushed Authorization-T / Notification-T data delegate to
- * {@link ExtensionCallback}.
+ * <p>The in-workflow handler chain registers Task-T and Negotiation-T.
+ * Task-T generates the structured task prompt on send; Negotiation-T
+ * extracts the negotiation context on receive and feeds the auto-loop.
+ *
+ * <p>Authorization-T / Notification-T are pre-positioning operations
+ * (one-shot, via {@link ExtensionSender#sendExtensionMessage}), so they are
+ * not part of this in-workflow chain. Reactive hooks for agent-pushed
+ * Authorization-T / Notification-T data, when handlers for those types are
+ * registered manually, delegate to {@link ExtensionCallback}.
  */
 public interface ExtensionHandler {
 

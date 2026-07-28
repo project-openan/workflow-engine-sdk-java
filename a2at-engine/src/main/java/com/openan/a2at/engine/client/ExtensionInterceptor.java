@@ -34,7 +34,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Injects A2A extension URIs into HTTP headers — but only the extensions
+ * Injects A2A extension URIs into HTTP headers - but only the extensions
  * that are actually present in the current message's metadata.
  *
  * <p>Sets the {@code A2A-Extensions} header so the remote agent knows which

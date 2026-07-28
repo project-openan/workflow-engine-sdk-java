@@ -30,8 +30,11 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Default ControlPoint with single-responsibility methods.
-* SDK internally handles: Negotiation-T auto-loop, Authorization-T
-* confirmation injection, Notification-T subscription.
+ *
+ * <p>Negotiation-T auto-loop delegates to an injected
+ * {@link NegotiationStrategy} (or returns a generic clarification if none
+ * is provided). Override onNegotiation directly when a full strategy
+ * object is unnecessary.
  */
 public class DefaultControlPoint implements ControlPoint {
     private static final Logger log = LoggerFactory.getLogger(DefaultControlPoint.class);
@@ -90,9 +93,9 @@ public class DefaultControlPoint implements ControlPoint {
     }
 
     @Override
-   public CompletableFuture<String> onNegotiation(
-           String agentName, String negotiationText,
-           Map<String, Object> receiveResult) {
+    public CompletableFuture<String> onNegotiation(
+            String agentName, String negotiationText,
+            Map<String, Object> receiveResult) {
         if (negotiationStrategy != null) {
             return negotiationStrategy.resolve(agentName, negotiationText, receiveResult);
         }

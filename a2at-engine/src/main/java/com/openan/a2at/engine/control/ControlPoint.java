@@ -28,21 +28,24 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * User-facing decision interface.
- * Each method has a single responsibility.
-* SDK internally handles all A2A-T protocol mechanics (Task-T prompt generation,
-* Negotiation-T loop, Authorization-T injection, Notification-T subscription).
-* ControlPoint methods only make business decisions.
+ * Workflow-control decision interface.
+ *
+ * <p>Each method drives the workflow forward and is called by the
+ * {@link com.openan.a2at.engine.core.WorkflowExecutor} (onTask /
+ * onSelfTask / onRoute) or the client auto-negotiate loop
+ * (onNegotiation). Reactive hooks for agent-pushed A2A-T data live on
+ * {@link ExtensionCallback} instead. ControlPoint methods make business
+ * decisions; the SDK owns all A2A-T protocol mechanics.
  */
 public interface ControlPoint {
 
     /**
-     * Send a Task-T message to an agent. Just call sendMessage.
-    * SDK internally handles: Task-T prompt generation (beforeSend),
-    * negotiation auto-loop (calls onNegotiation if INPUT_REQUIRED),
-    * Authorization-T confirmation injection, Notification-T subscription.
-     * Just call sendMessage - the SDK handles the rest.
-    */
+     * Send a task to an agent. Call {@code engineClient.sendMessage(...)}.
+     *
+     * <p>The SDK handles Task-T prompt generation, the Negotiation-T
+     * auto-loop (calling {@link #onNegotiation} on INPUT_REQUIRED),
+     * auth, and extension header injection. Just send the message.
+     */
     CompletableFuture<TaskResponse> onTask(TaskRequest request, com.openan.a2at.engine.client.WorkflowEngineClient engineClient);
 
     /**
@@ -63,8 +66,8 @@ public interface ControlPoint {
     }
 
     /**
-     * Conditional branch decision. Only decide which step to go to.
-     * Do NOT send messages here.
+     * Branch decision at a conditional step. Return the next step to take.
+     * Only decide which branch; do not send messages here.
      */
     CompletableFuture<RouteDecision> onRoute(String stepName, Map<String, Object> results, List<JumpCondition> conditions);
 

@@ -182,8 +182,11 @@ class AgentAuthManager {
 
     private static List<String> extractExtensionUris(AgentCard agentCard) {
         List<String> uris = new ArrayList<>();
-        assert agentCard.capabilities().extensions() != null;
-        for (var ext : agentCard.capabilities().extensions()) {
+        var extensions = agentCard.capabilities().extensions();
+        if (extensions == null) {
+            return uris;
+        }
+        for (var ext : extensions) {
             String uri = ext.uri();
             if (!uri.isEmpty()) {
                 uris.add(uri);

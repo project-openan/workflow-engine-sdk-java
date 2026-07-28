@@ -177,7 +177,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             String followUp = "[NEGOTIATION_RESOLUTION]\nThe engine has reviewed your negotiation request and provides the following clarification:\n\n" + clarification + "\n\n---\nOriginal Task:\n" + originalMessage + "\n\nPlease re-execute the task based on the clarification above.";
             Map<String, Object> followUpMeta = new HashMap<>();
             followUpMeta.put("https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",
-                    "## 数据返回确认\n" + clarification + "\n");
+                    "## Data Return Confirmation\n" + clarification + "\n");
             return runBeforeSendHandlers(agentCard, followUp, followUpMeta)
                     .thenCompose(meta -> {
                         String ctx = contextId != null ? contextId : transport.getContextId();

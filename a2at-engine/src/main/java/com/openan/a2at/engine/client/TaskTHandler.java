@@ -113,8 +113,11 @@ class TaskTHandler implements ExtensionHandler {
     }
 
     private static String findTaskTUri(AgentCard agentCard) {
-        assert agentCard.capabilities().extensions() != null;
-        for (var ext : agentCard.capabilities().extensions()) {
+        var extensions = agentCard.capabilities().extensions();
+        if (extensions == null) {
+            return null;
+        }
+        for (var ext : extensions) {
             String uri = ext.uri();
             if (uri.contains("Task-T")) {
                 return uri;

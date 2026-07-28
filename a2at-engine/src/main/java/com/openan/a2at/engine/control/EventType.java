@@ -19,30 +19,43 @@
 
 package com.openan.a2at.engine.control;
 
-/** Execution event type constants. */
+/**
+ * Execution event type constants.
+ *
+ * <p>Stable string values delivered to {@link EventCallback#onEvent}.
+ * Grouped by origin: runner lifecycle, executor step/task events, agent
+ * traffic from the engine client, and A2A-T extension handler events.
+ * Values are plain strings so direct comparison
+ * ({@code "step_start".equals(eventType)}) works alongside the constants.
+ */
 public final class EventType {
+    // Runner lifecycle (ExecutePsop)
+    public static final String START = "start";
+    public static final String COMPLETE = "complete";
+    public static final String CLOSE = "close";
+    // Step / task execution (WorkflowExecutor)
     public static final String STEP_START = "step_start";
     public static final String STEP_COMPLETE = "step_complete";
     public static final String TASK_REQUEST = "task_request";
     public static final String TASK_RESPONSE = "task_response";
     public static final String TASK_STATUS_CHANGED = "task_status_changed";
     public static final String ROUTE_DECISION = "route_decision";
-    public static final String ERROR = "error";
     public static final String WORKFLOW_COMPLETE = "workflow_complete";
-   public static final String AGENT_REQUEST = "agent_request";
-   public static final String AGENT_RESPONSE = "agent_response";
+    // Agent traffic (DefaultWorkflowEngineClient)
+    public static final String AGENT_REQUEST = "agent_request";
+    public static final String AGENT_RESPONSE = "agent_response";
     public static final String AGENT_STATUS_UPDATE = "agent_status_update";
     public static final String AGENT_ARTIFACT_UPDATE = "agent_artifact_update";
     public static final String AGENT_MESSAGE_EVENT = "agent_message_event";
+    // A2A-T extensions (negotiation / authorization / notification)
     public static final String NEGOTIATION_REQUEST = "negotiation_request";
     public static final String NEGOTIATION_RESOLVED = "negotiation_resolved";
     public static final String NEGOTIATION_FAILED = "negotiation_failed";
     public static final String AUTHORIZATION_REQUEST = "authorization_request";
     public static final String AUTHORIZATION_RESOLVED = "authorization_resolved";
     public static final String NOTIFICATION = "notification";
-    public static final String START = "start";
-    public static final String COMPLETE = "complete";
-    public static final String CLOSE = "close";
+    // Emitted on failure by the executor (step) and the runner (final).
+    public static final String ERROR = "error";
 
     private EventType() {}
 }
