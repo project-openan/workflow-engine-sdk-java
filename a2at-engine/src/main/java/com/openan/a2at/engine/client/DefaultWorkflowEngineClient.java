@@ -558,8 +558,8 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
            // Carry the negotiation resolution as natural-language metadata
             // under the Negotiation-T URI key, per A2A-T protocol.
            Map<String, Object> followUpMeta = new HashMap<>();
-            followUpMeta.put("https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",
-                    "## \u6570\u636e\u8fd4\u56de\u786e\u8ba4\n" + clarification + "\n");
+           followUpMeta.put("https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",
+                   "## 数据返回确认\n" + clarification + "\n");
             return runBeforeSendHandlers(agentCard, followUp, followUpMeta)
                     .thenCompose(meta -> {
                         String ctx = contextId != null ? contextId : this.contextId;

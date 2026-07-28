@@ -131,9 +131,9 @@ class ContextBuilder {
         if ("en".equals(lang)) {
             langHint = "\n\nPlease respond in English.";
         }
-        if ("zh".equals(lang)) {
-            langHint = "\n\n\u8bf7\u7528\u4e2d\u6587\u56de\u590d\u3002";
-        }
+       if ("zh".equals(lang)) {
+           langHint = "\n\n请用中文回复。";
+       }
         if (contextMessage != null && !contextMessage.isEmpty()) {
             return contextMessage + "\n\n## Current Task\n" + taskDescription + langHint;
         }

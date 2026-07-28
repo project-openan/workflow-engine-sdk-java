@@ -74,7 +74,7 @@ public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
             String result = new WorkbenchOrchestrator(orchUrl, credentialsPath, sslVerify, a2atEnvPath).run(input);
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put(NegotiationUtils.TASK_PROMPT_KEY, result);
-            List<Part<?>> parts = List.of(new TextPart("\u8de8\u57ce\u6545\u969c\u534f\u540c\u8bca\u65ad\u6c47\u603b\u7ed3\u679c"));
+            List<Part<?>> parts = List.of(new TextPart("跨城故障协同诊断汇总结果"));
             emitter.addArtifact(parts, "result", "cross-city-diagnosis-summary", metadata, false, true);
             emitter.complete(buildStatusMessage(contextId, taskId, "Completed"));
             log.info("[Workbench] Task completed");

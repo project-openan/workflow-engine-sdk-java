@@ -124,7 +124,7 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
         return switch (step) {
             case "diagnosis_city1" -> buildCity1Task();
             case "diagnosis_city2" -> buildCity2Task();
-            default -> "\u8bf7\u6267\u884cSPN\u4e13\u7ebf\u6545\u969c\u8bca\u65ad\u4efb\u52a1\u3002";
+            default -> "请执行SPN专线故障诊断任务。";
         };
     }
 

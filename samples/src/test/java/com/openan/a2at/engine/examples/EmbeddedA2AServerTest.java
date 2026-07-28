@@ -108,7 +108,7 @@ class EmbeddedA2AServerTest {
         // A2A-T extension content is in metadata (Task-T/v1), not in parts.text
         String taskMeta = extractExtensionValue(result, "Task-T");
         assertNotNull(taskMeta, "Task-T metadata should be present in response");
-        assertTrue(taskMeta.contains("\u7ca4\u4e1c"),
+        assertTrue(taskMeta.contains("粤东"),
                 "Diagnosis metadata should mention Yuedong, got: " + taskMeta);
     }
 
