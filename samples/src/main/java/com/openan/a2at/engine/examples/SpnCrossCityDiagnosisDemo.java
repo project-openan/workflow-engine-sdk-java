@@ -64,7 +64,7 @@ public class SpnCrossCityDiagnosisDemo {
 
         log.info("=== Step 1: Start all A2A agents ===");
         StartAgentsServer agentsServer = new StartAgentsServer();
-        Thread agentThread = new Thread(agentsServer, "agents-server");
+        Thread agentThread = new Thread(agentsServer, "agents-starter");
         agentThread.setDaemon(true);
         agentThread.start();
         log.info("Waiting for agents to start...");

@@ -79,6 +79,12 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
     private final String caCertsPath;
     private final long sendTimeoutSeconds;
     private final String preferredProtocol;
+    private final java.util.concurrent.ExecutorService httpClientExecutor =
+            java.util.concurrent.Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r, "a2a-client");
+                t.setDaemon(true);
+                return t;
+            });
 
     /**
      * Create a runtime with the given SSL configuration.
@@ -294,6 +300,7 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofSeconds(60))
                 .sslContext(trustAllCtx)
+                .executor(httpClientExecutor)
                 .build();
         return new JdkA2AHttpClient(httpClient);
     }

@@ -175,7 +175,7 @@ public class EmbeddedA2AServer implements AutoCloseable {
                 THREAD_COUNT, THREAD_COUNT, 0L, TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<>(), r -> {
 
-                    Thread t = new Thread(r, "agent-" + agentName + "-" + UUID.randomUUID().toString().substring(0, 8));
+                    Thread t = new Thread(r, "a2a-server-" + agentName);
                     t.setDaemon(true);
                     return t;
                 });
@@ -183,7 +183,7 @@ public class EmbeddedA2AServer implements AutoCloseable {
         this.executorService = new ThreadPoolExecutor(
                 THREAD_COUNT, THREAD_COUNT, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), r -> {
 
-                    Thread t = new Thread(r, "http-" + agentName + "-" + UUID.randomUUID().toString().substring(0, 8));
+                    Thread t = new Thread(r, "a2a-http-" + agentName);
                     t.setDaemon(true);
                     return t;
                 });

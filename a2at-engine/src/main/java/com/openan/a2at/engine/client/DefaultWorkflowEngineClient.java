@@ -69,6 +69,12 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private EventCallback eventCallback = new EventCallback();
     private ControlPoint controlPoint;
     private final int maxNegotiationRounds;
+    private final java.util.concurrent.ExecutorService asyncExecutor =
+            java.util.concurrent.Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r, "engine-send");
+                t.setDaemon(true);
+                return t;
+            });
 
     public DefaultWorkflowEngineClient(List<AgentCard> agentCards, A2AJavaClientRuntime a2aClientRuntime,
                                        WorkflowEngineClientConfig config) {
@@ -370,7 +376,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 log.error("[EngineClient] Failed to send message to {}: {}", agentName, e.getMessage(), e);
                 throw new RuntimeException("Agent call failed: " + e.getMessage(), e);
             }
-        });
+        }, asyncExecutor);
     }
 
     /**
@@ -417,7 +423,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                     future.completeExceptionally(e);
                 }
             }
-        }, "notif-stream-" + agentName);
+        }, "notif-t-" + agentName);
         streamThread.setDaemon(true);
         streamThread.start();
         return future.orTimeout(5, TimeUnit.SECONDS)
