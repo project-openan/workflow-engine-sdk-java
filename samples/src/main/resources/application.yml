@@ -1,4 +1,4 @@
-﻿server:
+server:
   port: 26337
   ssl:
     enabled: true
@@ -14,3 +14,7 @@ a2at:
   server:
     agent-card: classpath:agentcard/transport_workbench_agent.json
     path-prefix: /a2a/json
+
+a2a:
+  orch-url: https://127.0.0.1:5001
+  ssl-verify: false

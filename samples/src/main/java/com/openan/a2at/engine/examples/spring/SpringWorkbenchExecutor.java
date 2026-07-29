@@ -21,6 +21,7 @@ package com.openan.a2at.engine.examples.spring;
 
 import com.openan.a2at.engine.client.A2ATExtension;
 import com.openan.a2at.engine.examples.agents.BaseAgentExecutor;
+import com.openan.a2at.engine.examples.agents.EnvResolver;
 import com.openan.a2at.engine.examples.agents.WorkbenchOrchestrator;
 
 import org.a2aproject.sdk.server.agentexecution.RequestContext;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +64,24 @@ public class SpringWorkbenchExecutor extends BaseAgentExecutor {
     @Value("${a2a.a2at-env-path:}")
     private String a2atEnvPath;
 
+    private String resolveEnvPath() {
+        if (a2atEnvPath != null && !a2atEnvPath.isBlank()) {
+            return a2atEnvPath;
+        }
+        return EnvResolver.resolveEnvPath();
+    }
+
+    private String resolveCredentialsPath() {
+        if (credentialsPath != null && !credentialsPath.isBlank()) {
+            return credentialsPath;
+        }
+        var url = getClass().getClassLoader().getResource("spn_agent_credentials.json");
+        if (url != null) {
+            return new File(url.getPath()).getAbsolutePath();
+        }
+        return null;
+    }
+
     @Override
     public void execute(RequestContext ctx, AgentEmitter emitter) throws A2AError {
         String taskId = ctx.getTaskId();
@@ -77,7 +97,7 @@ public class SpringWorkbenchExecutor extends BaseAgentExecutor {
 
         try {
             String result =
-                    new WorkbenchOrchestrator(orchUrl, credentialsPath, sslVerify, a2atEnvPath)
+                    new WorkbenchOrchestrator(orchUrl, resolveCredentialsPath(), sslVerify, resolveEnvPath())
                             .run(input);
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put(A2ATExtension.TASK_T.uri(), result);

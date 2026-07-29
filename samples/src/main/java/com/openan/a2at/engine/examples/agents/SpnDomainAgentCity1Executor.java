@@ -105,10 +105,13 @@ public class SpnDomainAgentCity1Executor extends NegotiationBaseAgentExecutor {
             log.info(
                     "[SPN-Domain-Agent] Recovery result reported via Notification-T: {}",
                     recoveryResult);
+            pushNotificationResult(recoveryResult);
             return recoveryResult;
         }
         log.info("[SPN-Domain-Agent] Fault not in whitelist, refusing recovery");
-        return "操作不在白名单内，拒绝执行抢通。";
+        String refusalResult = "操作不在白名单内，拒绝执行抢通。";
+        pushNotificationResult(refusalResult);
+        return refusalResult;
     }
 
     @Override
