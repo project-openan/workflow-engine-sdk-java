@@ -60,9 +60,16 @@ Authorization-T 是一次性操作：下发策略 → 服务端确认 → 完成
 
 流程：
 ```
-ExtensionSender.sendAuthorization(agent, instruction, input)
-  -> A2ATransport.send(agent, message, metadata)
-  -> 服务端存储策略 -> 返回 ack -> 任务完成
+```mermaid
+graph LR
+    ES["ExtensionSender.sendAuthorization"]
+    TR["A2ATransport.send"]
+    SR["服务端存储策略"]
+    ACK["返回 ack"]
+    DONE["任务完成"]
+
+    ES --> TR --> SR --> ACK --> DONE
+```
 ```
 
 ### 3.2 Notification-T
@@ -72,13 +79,19 @@ Notification-T 需要长连接：订阅 → 流保持打开 → 后续结果通�
 设计选择：**在独立守护线程上维持长连接 SSE 流**。
 
 ```
-ExtensionSender.sendNotification(agent, instruction, input)
-  -> A2ATransport.sendNotificationStream(agent, message, metadata)
-  -> 守护线程启动
-  -> 服务端返回 ack -> future 完成
-  -> 流保持打开
-  -> 后续结果通过同一 SSE 流推送
-  -> 客户端断开或服务端关闭时流结束
+```mermaid
+graph TD
+    ES["ExtensionSender.sendNotification"]
+    TR["A2ATransport.sendNotificationStream"]
+    DT["守护线程启动"]
+    ACK["服务端返回 ack"]
+    FUT["future 完成"]
+    OPEN["流保持打开"]
+    PUSH["后续结果通过同一 SSE 流推送"]
+    END["客户端断开或服务端关闭时流结束"]
+
+    ES --> TR --> DT --> ACK --> FUT --> OPEN --> PUSH --> END
+```
 ```
 
 ---

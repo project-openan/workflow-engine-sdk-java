@@ -143,11 +143,16 @@ Notification-T 载荷时触发。
 ### 4.3 扩展处理器链
 
 ```
-sendMessage(agent, message)
-  -> before_send:  Task-T 生成提示词，注入 metadata
-  -> transport.send（Task-T metadata 在线上传输）
-  -> after_receive: Negotiation-T 提取上下文（驱动自动循环）
-  -> auto_negotiate 循环（如果 INPUT_REQUIRED）
+```mermaid
+graph TD
+    SM["sendMessage(agent, message)"]
+    BS["before_send: Task-T 生成提示词，注入 metadata"]
+    TS["transport.send（Task-T metadata 在线上传输）"]
+    AR["after_receive: Negotiation-T 提取上下文（驱动自动循环）"]
+    AN["auto_negotiate 循环（如果 INPUT_REQUIRED）"]
+
+    SM --> BS --> TS --> AR --> AN
+```
 ```
 
 `ExtensionRegistry.getHandlersForExtensions` 将智能体声明的扩展 URI 与处理器关键字
@@ -189,59 +194,66 @@ sendMessage(agent, message)
 ### 7.1 带协商的工作流执行
 
 ```
-宿主          执行器           EngineClient       智能体
- |  run(workflow)|                |                 |
- |-------------->|                |                 |
- |              | onTask(req)     |                 |
- |              |--------------->|                 |
- |              |                | before_send:Task-T|
- |              |                |---------------->|
- |              |                |   send message  |
- |              |                |<----------------|
- |              |                | after_receive:  |
- |              |                |  Negotiation-T  |
- |              |                | (INPUT_REQUIRED)|
- |              |<---------------| negotiation result|
- |              | onNegotiation  |                 |
- |<-------------|  (宿主提供澄清) |                 |
- |------------->|                |                 |
- |              |--------------->| follow-up send  |
- |              |                |---------------->|
- |              |                |<----------------|
- |              |<---------------| final result    |
- | ExecutionResult|             |                 |
- |<-------------|                |                 |
+```mermaid
+sequenceDiagram
+    participant H as 宿主
+    participant E as 执行器
+    participant C as EngineClient
+    participant A as 智能体
+
+    H->>E: run(workflow)
+    E->>C: onTask(req)
+    C->>A: before_send: Task-T
+    A-->>C: INPUT_REQUIRED (Negotiation-T)
+    C->>E: negotiation result
+    E->>H: onNegotiation (宿主提供澄清)
+    H->>E: clarification
+    E->>C: follow-up send
+    C->>A: send follow-up
+    A-->>C: final result
+    C->>E: final result
+    E->>H: ExecutionResult
+```
 ```
 
 ### 7.2 前置下发授权
 
 ```
-宿主                ExtensionSender         Transport        智能体
- | sendAuthorization|                        |               |
- |------------------>|                        |               |
- |                   | generate prompt (SDK) |               |
- |                   | send(instruction,auth)|               |
- |                   |----------------------->|               |
- |                   |                        |-------------->|
- |                   |                        |<--------------|
- |                   |<-----------------------| auth result   |
- |<------------------|                        |               |
+```mermaid
+sequenceDiagram
+    participant H as 宿主
+    participant ES as ExtensionSender
+    participant T as Transport
+    participant A as 智能体
+
+    H->>ES: sendAuthorization
+    ES->>ES: generate prompt (SDK)
+    ES->>T: send(instruction, auth)
+    T->>A: send
+    A-->>T: auth result
+    T-->>ES: auth result
+    ES-->>H: result
+```
 ```
 
 ### 7.3 Notification 订阅
 
 ```
-宿主           ExtensionSender         Transport             智能体
- | sendNotification|                     |                      |
- |--------------->|                     |                      |
- |                | sendNotificationStream|                     |
- |                |--------------------->|                      |
- |                |                     | open long-lived SSE  |
- |                |                     |---------------------->|
- |                |                     |<--- ack (working) ----|
- |                |<--------------------| first event -> future |
- |<---------------|                     |                      |
-                                                (后续结果通过同一连接流回)
+```mermaid
+sequenceDiagram
+    participant H as 宿主
+    participant ES as ExtensionSender
+    participant T as Transport
+    participant A as 智能体
+
+    H->>ES: sendNotification
+    ES->>T: sendNotificationStream
+    T->>A: open long-lived SSE
+    A-->>T: ack (working)
+    T-->>ES: first event -> future
+    ES-->>H: result
+    Note over T,A: 后续结果通过同一连接流回
+```
 ```
 
 ---

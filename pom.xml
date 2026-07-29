@@ -12,7 +12,7 @@
 
     <name>a2at-engine-java-parent</name>
     <description>A2A-T workflow execution engine for multi-agent orchestration (Java) - parent</description>
-    <url>https://github.com/project-openan/workflow-exec-engine</url>
+    <url>https://github.com/Zhoujie628/a2at-engine-java</url>
 
     <licenses>
         <license>
@@ -20,6 +20,22 @@
             <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
         </license>
     </licenses>
+
+    <scm>
+        <connection>scm:git:git@github.com:Zhoujie628/a2at-engine-java.git</connection>
+        <developerConnection>scm:git:git@github.com:Zhoujie628/a2at-engine-java.git</developerConnection>
+        <url>https://github.com/Zhoujie628/a2at-engine-java</url>
+    </scm>
+
+    <developers>
+        <developer>
+            <id>zhoujie628</id>
+            <name>Zhoujie</name>
+            <email>zhoujie@example.com</email>
+            <organization>OpenAN</organization>
+            <organizationUrl>https://github.com/Zhoujie628</organizationUrl>
+        </developer>
+    </developers>
 
     <modules>
         <module>a2at-engine</module>
@@ -38,6 +54,7 @@
         <junit.version>5.10.2</junit.version>
         <log4j2.version>2.24.3</log4j2.version>
         <spring-boot.version>3.3.10</spring-boot.version>
+        <central.plugin.version>0.7.0</central.plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -70,7 +87,92 @@
                     <artifactId>maven-source-plugin</artifactId>
                     <version>3.3.1</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>3.11.2</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-gpg-plugin</artifactId>
+                    <version>3.2.7</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.sonatype.central</groupId>
+                    <artifactId>central-publishing-maven-plugin</artifactId>
+                    <version>${central.plugin.version}</version>
+                </plugin>
             </plugins>
         </pluginManagement>
+
+        <plugins>
+            <!-- Source JAR (required by Maven Central) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Javadoc JAR (required by Maven Central) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <doclint>none</doclint>
+                    <failOnError>false</failOnError>
+                </configuration>
+            </plugin>
+
+            <!-- GPG signing (required by Maven Central) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Central Publishing Plugin -->
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <autoPublish>false</autoPublish>
+                    <waitUntil>published</waitUntil>
+                </configuration>
+            </plugin>
+        </plugins>
     </build>
+
 </project>

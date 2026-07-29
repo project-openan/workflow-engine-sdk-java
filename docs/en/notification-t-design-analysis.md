@@ -18,35 +18,30 @@ The engine currently sends Authorization-T, Notification-T, and Task-T as three 
 calls. Each opens its own HTTP connection (SSE stream), gets a response, and closes.
 
 ```
-Workbench                               SPN Agent
-  |                                        |
-  |-- 1. sendAuthorization --------------->|  execute() called
-  |    (message/send, metadata has          |  detectPrePositionedExtension() -> "Authorization-T"
-  |     Authorization-T URI + policy text) |  handlePrePositionedExtension():
-  |                                        |    authorizationPolicy = payloadText  (stored in memory)
-  |<-- ack artifact + COMPLETED -----------|  execute() returns -> SSE stream closes
-  |                                        |
-  |-- 2. sendNotification ---------------->|  execute() called (new task)
-  |    (message/send, metadata has          |  detectPrePositionedExtension() -> "Notification-T"
-  |     Notification-T URI + subscription) |  handlePrePositionedExtension():
-  |                                        |    notificationSubscription = payloadText (stored in memory)
-  |<-- ack artifact + COMPLETED -----------|  execute() returns -> SSE stream closes
-  |                                        |
-  |-- 3. Task-T diagnosis (workflow) ----->|  execute() called (new task)
-  |    (message/stream, metadata has        |  detectPrePositionedExtension() -> null
-  |     Task-T URI)                        |  handleNewTask() -> negotiation (INPUT_REQUIRED)
-  |<-- INPUT_REQUIRED ---------------------|  SSE stream stays open (waiting for negotiation reply)
-  |-- negotiation reply ------------------>|  handleFollowUp() -> executeBusiness()
-  |                                        |    diagnosis -> selfTriggerRecovery()
-  |                                        |      getAuthorizationPolicy() (reads stored policy)
-  |                                        |      matches whitelist -> execute recovery
-  |<-- artifact (recovery result) ---------|      artifact.metadata = {Notification-T URI: result}
-  |<-- COMPLETED --------------------------|  execute() returns -> SSE stream closes
+```mermaid
+sequenceDiagram
+    participant W as Workbench
+    participant S as SPN Agent
+
+    W->>S: 1. sendAuthorization (message/send)
+    Note right of S: detect Authorization-T, store policy
+    S-->>W: ack artifact + COMPLETED
+    W->>S: 2. sendNotification (message/send)
+    Note right of S: detect Notification-T, store subscription
+    S-->>W: ack artifact + COMPLETED
+    W->>S: 3. Task-T diagnosis (message/stream)
+    S-->>W: INPUT_REQUIRED (negotiation)
+    W->>S: negotiation reply
+    Note right of S: diagnosis -> selfTriggerRecovery()
+    Note right of S: check whitelist -> execute recovery
+    S-->>W: artifact (recovery result)
+    S-->>W: COMPLETED (stream closes)
+```
 ```
 
 ### Key Code Locations
 
-- sendExtensionMessage: DefaultWorkflowEngineClient.java
+- sendExtensionMessage: DefaultExtensionSender.java
     - Generates metadata value via A2ATClient.generateTaskPrompt () (LLM + template)
     - Falls back to raw natural-language input if SDK unavailable
     - Calls doSendViaA2ARuntime () -> supplyAsync -> a2aClientRuntime.sendMessage ()
@@ -110,23 +105,20 @@ stream open. When recovery completes, the SPN Agent pushes the result through th
 disconnecting.
 
 ```
-Workbench                               SPN Agent
-  |                                        |
-  |-- Notification-T subscribe ---------->|  execute() called
-  |    (message/stream, SSE)              |  detect Notification-T in metadata
-  |<-- "subscribed" status update --------|  emit WORKING + "subscribed"
-  |                                        |  execute() does NOT return (blocks)
-  |    (stream stays open)                 |  wait on internal queue/signal
-  |                                        |
-  |-- Task-T diagnosis (separate conn) -->|  execute() called (new task, separate thread)
-  |<-- negotiation -> diagnosis -> recovery|  executeBusiness() -> selfTriggerRecovery()
-  |<-- COMPLETED (Task-T stream closes) ---|  recovery done -> signal queue
-  |                                        |
-  |<-- SSE event: recovery result ---------|  queue receives signal -> push event to
-  |    (through Notification-T stream)     |  the still-open Notification-T stream
-  |                                        |
-  |-- close connection ------------------->|  execute() returns, stream closes
-  |    (cancel subscription)               |
+```mermaid
+sequenceDiagram
+    participant W as Workbench
+    participant S as SPN Agent
+
+    W->>S: Notification-T subscribe (message/stream, SSE)
+    S-->>W: "subscribed" status update
+    Note over S: execute() blocks, stream stays open
+    W->>S: Task-T diagnosis (separate connection)
+    Note right of S: diagnosis -> recovery -> signal queue
+    S-->>W: COMPLETED (Task-T stream closes)
+    S-->>W: SSE event: recovery result (via Notification-T stream)
+    W->>S: close connection (cancel subscription)
+```
 ```
 
 ### Authentication
@@ -231,33 +223,38 @@ This pattern is correct and requires no modification.
 ### Complete Business Flow
 
 ```
-Upper layer            Workbench (A2A Server)       SPN Agent City1      SPN Agent City2
-    |                        |                           |                    |
-    |-- Task-T diagnosis --->|                           |                    |
-    |                        |                           |                    |
-    |                        |-- Auth-T (pre-position)->|                    |
-    |                        |-- Notif-T (pre-position, -->| SSE stays open  |
-    |                        |    keep SSE open)         |                    |
-    |                        |-- Auth-T (pre-position) ---------------------->|
-    |                        |-- Notif-T (pre-position, --------------------->| SSE stays open
-    |                        |    keep SSE open)         |                    |
-    |                        |                           |                    |
-    |                        |-- Task-T diagnosis ------>|                    |
-    |                        |-- Task-T diagnosis ------------------------------>|  (parallel)
-    |                        |                           |                    |
-    |                        |<-- Negotiation-T ---------|  (ONLY if params   |
-    |                        |    (conditional)          |   missing/wrong)   |
-    |                        |-- negotiation reply ----->|                    |
-    |                        |<-- diagnosis result ------|                    |
-    |                        |<-- diagnosis result ----------------------------|
-    |                        |                           |                    |
-    |                        |                           | check whitelist    | no fault, no recovery
-    |                        |                           | -> auto recovery   |
-    |                        |<-- recovery result -------|  (via Notif-T SSE) |
-    |                        |<-- recovery result ------------------------------>| (or no result if no fault)
-    |                        |                           |                    |
-    |                        | (SelfLoop: merge)        |                    |
-    |<-- merged result ------|                           |                    |
+```mermaid
+sequenceDiagram
+    participant U as Upper layer
+    participant W as Workbench
+    participant S1 as SPN Agent City1
+    participant S2 as SPN Agent City2
+
+    U->>W: Task-T diagnosis
+    par
+        W->>S1: Auth-T pre-position
+        W->>S1: Notif-T pre-position (SSE stays open)
+    and
+        W->>S2: Auth-T pre-position
+        W->>S2: Notif-T pre-position (SSE stays open)
+    end
+    par
+        W->>S1: Task-T diagnosis
+    and
+        W->>S2: Task-T diagnosis
+    end
+    alt params missing/wrong
+        S1-->>W: Negotiation-T (conditional)
+        W->>S1: negotiation reply
+    end
+    S1-->>W: diagnosis result
+    S2-->>W: diagnosis result
+    Note over S1: check whitelist -> auto recovery
+    S1-->>W: recovery result (via Notif-T SSE)
+    S2-->>W: recovery result (or no result)
+    Note over W: SelfLoop: merge
+    W-->>U: merged result
+```
 ```
 
 ### Key Design Decisions (confirmed)
