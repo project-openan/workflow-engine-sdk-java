@@ -24,6 +24,7 @@
 |------------------------------------------|------|-------------|-----------------------------------|
 | `psop(Workflow)`                         | 必填 | -           | PSOP 工作流定义                   |
 | `agentCards(List<AgentCard>)`            | 必填 | `List.of()` | 工作流中所有智能体的 AgentCard    |
+| `engineClient(WorkflowEngineClient)`    | 可选 | null        | 预配置客户端（null=自动创建）   |
 | `controlPoint(ControlPoint)`             | 必填 | -           | 用户决策实现                      |
 | `runtimeIntent(String)`                  | 可选 | `""`        | 自然语言意图，用于上下文组装      |
 | `lang(String)`                           | 可选 | `"zh"`      | 语言提示（`"zh"` 或 `"en"`）      |
@@ -71,17 +72,10 @@ public interface WorkflowEngineClient {
 
     void setControlPoint(ControlPoint controlPoint);
 
-    void setExtensionCallback(ExtensionCallback extensionCallback);
 
     void setEventCallback(EventCallback callback);
 
     void close();
-
-    List<String> getAgentNames();
-
-    void updateAgentCards(List<AgentCard> agentCards);
-
-    void registerHandler(ExtensionHandler handler);
 }
 ```
 

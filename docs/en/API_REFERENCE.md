@@ -25,6 +25,7 @@ Entry point for executing a PSOP workflow. Uses the Builder pattern.
 | `psop(Workflow)`                         | required | -           | PSOP workflow definition                     |
 | `agentCards(List<AgentCard>)`            | required | `List.of()` | Agent cards for all agents in the workflow   |
 | `controlPoint(ControlPoint)`             | required | -           | User decision implementation                 |
+| `engineClient(WorkflowEngineClient)`    | optional | null        | Pre-configured client (null = auto-create)  |
 | `runtimeIntent(String)`                  | optional | `""`        | Natural-language intent for context assembly |
 | `lang(String)`                           | optional | `"zh"`      | Language hint (`"zh"` or `"en"`)             |
 | `a2atEnvPath(String)`                    | optional | null        | Path to `.env` file for A2A-T SDK            |
@@ -71,17 +72,9 @@ public interface WorkflowEngineClient {
 
     void setControlPoint(ControlPoint controlPoint);
 
-    void setExtensionCallback(ExtensionCallback extensionCallback);
-
     void setEventCallback(EventCallback callback);
 
     void close();
-
-    List<String> getAgentNames();
-
-    void updateAgentCards(List<AgentCard> agentCards);
-
-    void registerHandler(ExtensionHandler handler);
 }
 ```
 
