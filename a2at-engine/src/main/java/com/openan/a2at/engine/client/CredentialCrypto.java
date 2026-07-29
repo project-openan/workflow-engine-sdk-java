@@ -59,6 +59,41 @@ public final class CredentialCrypto {
     private CredentialCrypto() {}
 
     /**
+     * CLI entry point for encrypting a plaintext password.
+     *
+     * <p>Usage:
+     * <pre>
+     *   # Option 1: set env var, then encrypt
+     *   set A2AT_CRED_KEY=0123456789abcdef...
+     *   java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123"
+     *
+     *   # Option 2: pass key as second argument
+     *   java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123" 0123456789abcdef...
+     * </pre>
+     *
+     * <p>Output: the encrypted string (e.g. {@code enc:<iv>:<ciphertext>}) to stdout.
+     * Copy this value into the credentials JSON file's {@code value} field.
+     *
+     * @param args {@code args[0]} = plaintext, {@code args[1]} = optional key-hex
+     */
+    public static void main(String[] args) {
+        if (args.length == 0) {
+            System.err.println("Usage: java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto <plaintext> [key-hex]");
+            System.err.println("  Set A2AT_CRED_KEY env var (32-byte hex) or pass as second argument.");
+            System.exit(1);
+        }
+        String plaintext = args[0];
+        if (args.length >= 2) {
+            System.setProperty(ENV_KEY, args[1]);
+        }
+        try {
+            String encrypted = encrypt(plaintext);
+            System.out.println(encrypted);
+        } catch (IllegalStateException e) {
+            System.err.println("Error: " + e.getMessage());
+            System.exit(1);
+        }
+    }/**
      * Decrypt a credential value if it has the {@code enc:} prefix. Values without the prefix are
      * returned as-is (plaintext fallback).
      *
