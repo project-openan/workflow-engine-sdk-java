@@ -1,10 +1,9 @@
 # A2A-T Engine SDK - Design
 
-> Architecture and design rationale for the `a2at-engine` Python SDK and the
-> `a2at-engine-java` Java SDK. This document describes the system as shipped
-> in v1.0; the two SDKs are intentionally parallel and maintain feature
-> parity. It is written for engineers integrating or extending the SDK, not
-> as a walkthrough of any particular bug-fix history.
+> Architecture and design rationale for the A2A-T Workflow Execution Engine.
+> This document describes the system as shipped in v1.0. It is written for
+> engineers integrating or extending the SDK, not as a walkthrough of any
+> particular bug-fix history.
 
 ---
 
@@ -49,8 +48,8 @@ Foundation - Decision       ControlPoint / ExtensionCallback
 This layer is the heart of the transport-facade split.
 
 **`A2ATransport`** is the shared wire layer. It owns exactly one concern:
-getting bytes to and from remote agents. That means the HTTP client (httpx in Python, the A2A SDK client runtime in
-Java), the auth manager and interceptors, the agent-card map, and the streaming-response consumer. It exposes two send
+getting bytes to and from remote agents. That means the A2A SDK client runtime,
+the auth manager and interceptors, the agent-card map, and the streaming-response consumer. It exposes two send
 primitives - `send` (collect-and-return) and
 `sendNotificationStream` (long-lived SSE) - plus static extractors that turn the raw SDK event stream into text, task
 state, and metadata.
@@ -90,7 +89,7 @@ Step dispatch rules:
 
 ### 2.3 Layer 2 - Orchestration
 
-**`execute_psop`** (Python) / **`ExecutePsop`** (Java) is the high-level runner. It wraps the executor with a lifecycle
+**`ExecutePsop`** is the high-level runner. It wraps the executor with a lifecycle
 (start / complete / error / close), event serialization, client-disconnect cancellation, and an
 `onFinish` persistence hook. Most integrations use this layer.
 
@@ -278,44 +277,13 @@ Host                  ExtensionSender          Transport              Agent
 
 ---
 
-## 8. Cross-SDK Parity
-
-The Python and Java SDKs are designed for feature parity. Module-to-class mapping:
-
-| Concern              | Python module                                     | Java class                                                        |
-|----------------------|---------------------------------------------------|-------------------------------------------------------------------|
-| Shared wire layer    | `client/a2a_transport.py`                         | `client/A2ATransport`                                             |
-| Workflow send facade | `client/engine_client.py`                         | `client/DefaultWorkflowEngineClient`                              |
-| One-shot facade      | `client/extension_sender.py`                      | `client/DefaultExtensionSender`                                   |
-| Extension handlers   | `client/extension_handlers.py`                    | `client/TaskTHandler`, `NegotiationTHandler`, `ExtensionRegistry` |
-| Extension enums      | `client/extensions.py`                            | `client/A2ATExtension`                                            |
-| Auth                 | `client/auth_manager.py`, `credential_service.py` | `client/AgentAuthManager`, `AgentCredentialService`               |
-| SSL/TLS              | `client/ssl_context.py`                           | `client/SslContextFactory`                                        |
-| SSE normalization    | `client/sse_normalization.py`                     | `client/SseNormalization`                                         |
-| Flow decisions       | `control/control_points.py`                       | `control/ControlPoint`, `DefaultControlPoint`                     |
-| Reactive hooks       | `control/control_points.py`                       | `control/ExtensionCallback`                                       |
-| Events               | `control/control_points.py` (`EventType`)         | `control/EventType`, `EventCallback`                              |
-| DAG traversal        | `core/executor.py`                                | `core/WorkflowExecutor`                                           |
-| Context assembly     | `core/context_builder.py`                         | `core/ContextBuilder`                                             |
-| Models               | `core/models.py`                                  | `model/*`                                                         |
-| Registry             | `registry/registry_client.py`                     | `registry/RegistryClient`, `LoadPsop`                             |
-| Runner               | `runner.py` (`execute_psop`)                      | `runner/ExecutePsop`                                              |
-
-Naming conventions differ by language (Python snake_case, Java camelCase)
-but the public surface, event types, extension URIs, and model fields are aligned.
-
----
-
 ## 9. Dependencies
 
-**Python SDK:** `a2a-sdk` (A2A protocol), `a2a-t-sdk` (A2A-T extensions),
-`httpx`, `loguru`, `protobuf`, `packaging`.
 
 **Java SDK:** `org.a2aproject.sdk:a2a-java-sdk-client` (A2A protocol),
 `net.openan.a2at.sdk:a2a-t-client` (A2A-T extensions), Jackson, SLF4J, Lombok.
 
-Both SDKs are standalone: they do not depend on the orchestration center. The orchestration center consumes the Python
-SDK as a library.
+The SDK is standalone: it does not depend on the orchestration center.
 
 ---
 

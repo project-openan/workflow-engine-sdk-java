@@ -8,32 +8,16 @@ contribute patches.
 Add to your `pom.xml`:
 
 ```xml
-
-<dependencies>
-    <dependency>
-        <groupId>com.openan.a2at</groupId>
-        <artifactId>a2at-engine</artifactId>
-        <version>0.3.0</version>
-    </dependency>
-    <!-- A2A protocol SDK -->
-    <dependency>
-        <groupId>org.a2aproject.sdk</groupId>
-        <artifactId>a2a-java-sdk-client</artifactId>
-        <version>1.0.0.Beta1</version>
-    </dependency>
-    <dependency>
-        <groupId>org.a2aproject.sdk</groupId>
-        <artifactId>a2a-java-sdk-client-transport-rest</artifactId>
-        <version>1.0.0.Beta1</version>
-    </dependency>
-    <!-- A2A-T extension SDK -->
-    <dependency>
-        <groupId>net.openan.a2a-t.sdk</groupId>
-        <artifactId>a2a-t-client</artifactId>
-        <version>1.0.0</version>
-    </dependency>
-</dependencies>
+<dependency>
+    <groupId>com.openan.a2at</groupId>
+    <artifactId>a2at-engine</artifactId>
+    <version>1.0.0</version>
+</dependency>
 ```
+
+The engine transitively pulls in the A2A protocol SDK (`a2a-java-sdk-client` with REST,
+JSON-RPC, and gRPC transports) and the A2A-T extension SDK (`a2a-t-client`). No additional
+dependencies are needed.
 
 ## 2. Core Concepts
 

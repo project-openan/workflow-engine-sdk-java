@@ -10,7 +10,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.0.0] - 2026-07-28
 
 First public release. The SDK ships a clean transport-facade architecture with single-responsibility decision interfaces
-and full A2A-T extension support. Feature parity with the Python SDK is maintained.
+and full A2A-T extension support. Full A2A-T extension support and multi-protocol transport.
 
 ### Added
 
@@ -30,7 +30,7 @@ and full A2A-T extension support. Feature parity with the Python SDK is maintain
 - `A2ATExtension` enum encapsulating all extension URIs (no hardcoded strings)
 - `DefaultExtensionSender` prompt-generation dispatch (Task-T via the A2A-T SDK; Authorization-T / Notification-T /
   Negotiation-T reserved for SDK support)
-- [DESIGN.md](docs/DESIGN.md) architecture document
+- [Design Document](docs/en/DESIGN.md) architecture document
 
 ### Changed
 

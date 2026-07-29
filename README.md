@@ -1,66 +1,47 @@
-# a2at-engine-java
+# A2A-T Workflow Execution Engine (Java)
 
-Standalone workflow execution SDK for A2A-T multi-agent orchestration (Java).
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-17+-orange.svg)](https://adoptium.net/)
+[![Maven](https://img.shields.io/badge/Maven-3.6+-red.svg)](https://maven.apache.org/)
 
-This is the Java equivalent of the Python [a2at-engine](https://github.com/project-openan/workflow-exec-engine) SDK.
-Feature parity is maintained across both SDKs.
+A standalone SDK for executing multi-agent workflows over the [A2A protocol](https://a2aproject.github.io/a2a-java/) with [A2A-T](https://projects.tmforum.org/a2aproject/telecommunication/extensions/) telecom extensions.
 
-## Architecture
+The engine handles all protocol mechanics: A2A message transport, SSE streaming, Task-T prompt generation, Negotiation-T auto-loop, authentication, and TLS. You implement only business decisions.
 
-Three layers, same as the Python version:
+## Features
 
-| Layer    | Entry Point            | What It Handles                                        |
-|----------|------------------------|--------------------------------------------------------|
-| 2 (high) | `ExecutePsop.Builder`  | Event stream, lifecycle, onFinish hook                 |
-| 1 (mid)  | `WorkflowExecutor`     | DAG traversal, context assembly, ControlPoint dispatch |
-| 0 (low)  | `WorkflowEngineClient` | A2A send, auth, extensions, SSL, SSE normalization     |
-
-## Feature Parity with Python SDK
-
-All Python SDK modules have Java equivalents:
-
-| Python module                     | Java equivalent                              | Purpose                                               |
-|-----------------------------------|----------------------------------------------|-------------------------------------------------------|
-| `client/engine_client.py`         | `client/DefaultWorkflowEngineClient`         | A2A message send, streaming, text extraction          |
-| `client/agentcard_normalizer.py`  | `client/AgentCardNormalizer`                 | OpenAPI -> structured security scheme normalization   |
-| `client/ssl_context.py`           | `client/SslContextFactory`                   | Outbound TLS context with CA trust store              |
-| `client/credential_service.py`    | `client/AgentCredentialService`              | Bearer token login + TTL cache                        |
-| `client/auth_manager.py`          | `client/AgentAuthManager`                    | Interceptor builder from AgentCard securitySchemes    |
-| `client/extension_interceptor.py` | `client/ExtensionInterceptor`                | A2A-Extensions HTTP header injection (metadata-aware) |
-| `client/extension_handlers.py`    | `client/ExtensionRegistry` + handler classes | Task-T, Negotiation-T                                 |
-| `client/sse_normalization.py`     | `client/SseNormalization`                    | Non-standard SSE response coercion                    |
-| `control/control_points.py`       | `control/ControlPoint` + `EventCallback`     | User decision interface                               |
-| `core/executor.py`                | `core/WorkflowExecutor`                      | DAG traversal + step execution                        |
-| `core/context_builder.py`         | `core/ContextBuilder`                        | Upstream context assembly                             |
-| `registry/registry_client.py`     | `registry/RegistryClient` + `LoadPsop`       | AgentCard + PSOP fetch                                |
-| `runner.py`                       | `runner/ExecutePsop`                         | High-level runner with event stream                   |
-
-## Dependencies
-
-- `org.a2aproject.sdk:a2a-java-sdk-client` -- A2A protocol (AgentCard, Client, MessageSendParams)
-- `net.openan.a2at.sdk:a2a-t-client` -- A2A-T extensions (A2ATClient, Task-T, Negotiation-T)
-- Jackson, SLF4J, Lombok
-
-## Documentation
-
-### English
-
-- [Integration Guide](docs/en/INTEGRATION_GUIDE.md) -- Setup, configuration, secondary development
-- [API Reference](docs/en/API_REFERENCE.md) -- Public interface and class documentation
-- [Design Document](docs/en/DESIGN.md) -- Architecture, module structure, design decisions
-- [Developer Guide](docs/en/DEVELOPER_GUIDE.md) -- Internal architecture, contribution, debugging
-
-### 中文
-
-- [集成指南](docs/zh/INTEGRATION_GUIDE.md) -- 安装、配置、二次开发
-- [API 参考](docs/zh/API_REFERENCE.md) -- 公共接口和类文档
-- [业务流](docs/zh/业务流.md) -- SPN 跨城诊断业务流程
-- [调用过程](docs/zh/调用过程.md) -- 端到端报文交互示例
+- **A2A-T Extension Support**: Task-T (structured task prompts), Negotiation-T (auto negotiation loop), Authorization-T (pre-positioned whitelist), Notification-T (long-lived SSE subscription)
+- **DAG Workflow Execution**: Parallel dispatch, self-loop steps, conditional routing
+- **Multi-Protocol Transport**: REST, JSON-RPC, and gRPC auto-selected from AgentCard
+- **Authentication**: Bearer token login with TTL cache, AES-256-GCM encrypted credentials, custom `AuthProvider`
+- **HTTPS/TLS**: Configurable trust store, self-signed cert support for development
+- **Protocol Logging**: Full request/response header and body dumps for debugging
 
 ## Quick Start
 
+### 1. Add Maven dependency
+
+```xml
+<dependency>
+    <groupId>com.openan.a2at</groupId>
+    <artifactId>a2at-engine</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+For Spring Boot server-side integration:
+
+```xml
+<dependency>
+    <groupId>com.openan.a2at</groupId>
+    <artifactId>a2at-spring-boot-starter</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+### 2. Execute a workflow
+
 ```java
-import com.openan.a2at.engine.*;
 import com.openan.a2at.engine.client.*;
 import com.openan.a2at.engine.control.*;
 import com.openan.a2at.engine.model.*;
@@ -69,71 +50,115 @@ import com.openan.a2at.engine.registry.*;
 
 import java.util.concurrent.*;
 
-// 1. Define or load a workflow (PSOP)
-Workflow workflow = LoadPsop.load("https://127.0.0.1:5001", "psop-id", null, false);
+// 1. Load workflow (PSOP) from orchestration center
+Workflow workflow = LoadPsop.load(
+        "https://127.0.0.1:5001", "psop-id", null, false);
 
-        // 2. Load AgentCards from registry or JSON files
-        RegistryClient registry = new RegistryClient("https://127.0.0.1:5001", false);
-        List<Map<String, Object>> cardMaps = registry.fetchAgentCards();
+// 2. Load agent cards
+RegistryClient registry = new RegistryClient("https://127.0.0.1:5001", false);
+List<AgentCard> agentCards = registry.fetchAgentCards();
 
-        // 3. Implement ControlPoint (only onTask + onRoute required)
-        ControlPoint cp = new DefaultControlPoint() {
-            @Override
-            public CompletableFuture<TaskResponse> onTask(TaskRequest request, WorkflowEngineClient client) {
-                return client.sendMessage(request.getAgentName(), request.getMessage())
-                        .thenApply(r -> TaskResponse.builder().success(true).output(r.getText()).build());
-            }
-        };
-
-        // 4. Execute via Builder
-        ExecutionResult result = ExecutePsop.builder()
-                .psop(workflow)
-                .agentCards(agentCards)
-                .controlPoint(cp)
-                .runtimeIntent("Diagnose fault")
-                .lang("zh")
-                .a2atEnvPath(".env")
-                .credentialsConfigPath("creds.json")
+// 3. Create transport + engine client
+A2ATransport transport = new A2ATransport(agentCards, null,
+        WorkflowEngineClientConfig.builder()
                 .sslVerify(false)
-                .onFinish((r, history) -> System.out.println("Done: " + r.isSuccess()))
-                .execute()
-                .get(10, TimeUnit.MINUTES);
+                .a2atEnvPath(".env")
+                .credentialsConfigPath("credentials.json")
+                .build());
+WorkflowEngineClient client = new DefaultWorkflowEngineClient(transport);
+
+// 4. Implement ControlPoint (business decisions only)
+ControlPoint controlPoint = new DefaultControlPoint() {
+    @Override
+    public CompletableFuture<TaskResponse> onTask(
+            TaskRequest request, WorkflowEngineClient engineClient) {
+        return engineClient
+                .sendMessage(request.getAgentName(), request.getMessage())
+                .thenApply(r -> TaskResponse.builder()
+                        .success(true)
+                        .output(r.getText())
+                        .build());
+    }
+};
+
+// 5. Execute
+ExecutionResult result = ExecutePsop.builder()
+        .psop(workflow)
+        .agentCards(agentCards)
+        .controlPoint(controlPoint)
+        .engineClient(client)
+        .runtimeIntent("Diagnose fault")
+        .lang("zh")
+        .execute()
+        .get(10, TimeUnit.MINUTES);
+
+System.out.println("Success: " + result.isSuccess());
 ```
+
+## Architecture
+
+```
+Layer 2 - Orchestration    ExecutePsop
+   |     lifecycle, event stream, onFinish hook
+Layer 1 - Traversal        WorkflowExecutor
+   |     DAG walk, parallel dispatch, context assembly, routing
+Layer 0 - Transport        WorkflowEngineClient / A2ATransport
+         A2A send, auth, extensions, SSL, SSE
+```
+
+| Layer | Entry Point | Responsibility |
+|-------|-------------|----------------|
+| High | `ExecutePsop.Builder` | Event stream, lifecycle, `onFinish` persistence |
+| Mid | `WorkflowExecutor` | DAG traversal, context assembly, ControlPoint dispatch |
+| Low | `WorkflowEngineClient` / `A2ATransport` | A2A send, auth, extensions, SSL, SSE normalization |
 
 ## Package Structure
 
-```text
-src/main/java/com/openan/a2at/engine/
-|-- model/          # Workflow, Task, JumpCondition, StepType, etc.
-|-- control/        # ControlPoint, EventType, EventCallback
-|-- core/           # WorkflowExecutor, ContextBuilder (package-private)
-|-- client/         # DefaultWorkflowEngineClient + WorkflowEngineClient interface
-|   |-- AgentAuthManager        # Interceptor builder from securitySchemes
-|   |-- AgentCredentialService  # Bearer token login + cache
-|   |-- AuthProvider            # Custom auth provider interface
-|   |-- ExtensionInterceptor    # A2A-Extensions header injection (metadata-aware)
-|   |-- ExtensionRegistry       # Task-T / Negotiation-T handler registry
-|   |-- ExtensionHandler        # Extension handler interface (for custom extensions)
-|   |-- TaskTHandler            # Task-T prompt generation (via a2a-t-sdk)
-|   |-- NegotiationTHandler     # Negotiation-T receive/auto-loop
-|   |-- ProtocolLogger          # Protocol-level request/response logging
-|   |-- EnvFileLoader           # .env file to system properties bridge
-|   |-- SslContextFactory       # Outbound TLS context (trust-all for dev)
-|   `-- WorkflowEngineClientConfig  # Builder config: SSL + auth + A2A-T
-|-- runner/         # ExecutePsop (high-level runner)
-`-- registry/       # RegistryClient, LoadPsop
+```
+com.openan.a2at.engine
+├── client          # A2A transport, auth, extensions (package-private internals)
+│   ├── WorkflowEngineClient         # Send facade interface
+│   ├── DefaultWorkflowEngineClient  # Send + Negotiation-T auto-loop
+│   ├── ExtensionSender              # One-shot pre-positioning (Auth-T, Notification-T)
+│   ├── A2ATransport                 # Shared wire layer (runtime, auth, SSE)
+│   ├── AuthProvider                 # Custom auth provider interface
+│   ├── WorkflowEngineClientConfig   # Builder config: SSL, auth, A2A-T
+│   ├── LlmHelper                    # LLM utility (wraps a2a-t-sdk LLMClient)
+│   └── CredentialCrypto             # AES-256-GCM credential encryption
+├── control          # User-facing decision interfaces
+│   ├── ControlPoint                 # onTask, onSelfTask, onRoute, onNegotiation
+│   ├── DefaultControlPoint          # Default routing implementation
+│   ├── EventCallback                # Event stream callback
+│   └── NegotiationStrategy          # Pluggable negotiation clarification
+├── model            # Data models (Workflow, Task, StepType, etc.)
+├── registry         # LoadPsop, RegistryClient
+└── runner           # ExecutePsop (entry point)
 ```
 
-## Maven
+## Documentation
 
-```xml
-<dependency>
-    <groupId>com.openan.a2at</groupId>
-    <artifactId>a2at-engine-java</artifactId>
-    <version>0.3.0</version>
-</dependency>
-```
+### English
+
+- [Integration Guide](docs/en/INTEGRATION_GUIDE.md) - Setup, configuration, secondary development
+- [API Reference](docs/en/API_REFERENCE.md) - Public interface and class documentation
+- [Design Document](docs/en/DESIGN.md) - Architecture, module structure, design decisions
+- [Developer Guide](docs/en/DEVELOPER_GUIDE.md) - Internal architecture, contribution, debugging
+
+### 中文
+
+- [集成指南](docs/zh/INTEGRATION_GUIDE.md) - 安装、配置、二次开发
+- [API 参考](docs/zh/API_REFERENCE.md) - 公共接口和类文档
+- [业务流](docs/zh/业务流.md) - SPN 跨城诊断业务流程
+- [调用过程](docs/zh/调用过程.md) - 端到端报文交互示例
+
+## Modules
+
+| Module | Description |
+|--------|-------------|
+| `a2at-engine` | Core SDK: workflow execution, A2A transport, extensions, auth |
+| `a2at-spring-boot-starter` | Spring Boot auto-configuration for A2A server side |
+| `samples` | Demo applications (embedded + Spring Boot variants) |
 
 ## License
 
-Apache License 2.0
+[Apache License 2.0](LICENSE)

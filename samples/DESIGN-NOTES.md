@@ -37,7 +37,7 @@ samples/src/main/resources/
 
 **不要改编排中心定义的 AgentCard JSON 格式，尤其是 URL 的路径前缀。**
 
-现网 AgentCard 的 URL 格式是 `http://host:port/a2a/json`，路径前缀 `/a2a/json` 是标准做法（Python 版 FastAPI 也这样做）。A2A
+现网 AgentCard 的 URL 格式是 `http://host:port/a2a/json`，路径前缀 `/a2a/json` 是标准做法。A2A
 REST 端点实际是 `http://host:port/a2a/json/message:stream`。
 
 `EmbeddedA2AServer` 必须从 AgentCard URL 提取路径前缀，在该前缀下注册路由：
@@ -55,7 +55,7 @@ String path = fullPath.startsWith(pathPrefix) ? fullPath.substring(pathPrefix.le
 
 **`TransportWorkbenchAgentExecutor` 执行工作流时，从 classpath 的 agentcard JSON 加载 agent card，不从注册中心 fetch。**
 
-原因：注册中心可能残留 Python 版注册的旧 card（端口 8904、URL 不带前缀等），与 Java 版的 agent 不匹配。注册返回 409 duplicate
+原因：注册中心可能残留 之前注册的旧 card（端口 8904、URL 不带前缀等），与 Java 版的 agent 不匹配。注册返回 409 duplicate
 时注册中心不会更新，导致引擎拿到错误的 URL。
 
 ```java
