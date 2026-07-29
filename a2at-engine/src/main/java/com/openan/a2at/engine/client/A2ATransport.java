@@ -504,7 +504,11 @@ public class A2ATransport implements AutoCloseable {
             for (String schemeName : schemes.keySet()) {
                 Map<String, Object> schemeCfg = schemeConfigs.getOrDefault(schemeName, Map.of());
                 String credential = credSvc.getCredential(schemeName, null);
-                if (credential == null) continue;
+                if (credential == null) {
+                    throw new SecurityException(
+                            "Authentication failed for agent " + agentName
+                                    + " (scheme=" + schemeName + "), request blocked");
+                }
                 String authHeader = (String) schemeCfg.get("auth_header");
                 if (authHeader != null && !authHeader.isEmpty()) {
                     String prefix = (String) schemeCfg.getOrDefault("auth_header_prefix", "");
