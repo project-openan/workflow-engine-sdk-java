@@ -89,9 +89,13 @@ public class JdkHttpA2AServer implements AutoCloseable {
 
     private static final int THREAD_COUNT = 8;
 
-    private static final String KEYSTORE_RESOURCE = "a2a-server-keystore.p12";
+    private static final String DEFAULT_KEYSTORE_RESOURCE = "a2a-server-keystore.p12";
 
-    private static final String KEYSTORE_PASSWORD = "changeit";
+    private static final String DEFAULT_KEYSTORE_PASSWORD = "changeit";
+
+    private final String keystoreResource;
+
+    private final String keystorePassword;
 
     private final HttpsServer server;
 
@@ -109,6 +113,19 @@ public class JdkHttpA2AServer implements AutoCloseable {
     public JdkHttpA2AServer(
             String host, int port, Map<String, Object> agentCard, AgentExecutor agentExecutor)
             throws IOException {
+        this(host, port, agentCard, agentExecutor, DEFAULT_KEYSTORE_RESOURCE, DEFAULT_KEYSTORE_PASSWORD);
+    }
+
+    public JdkHttpA2AServer(
+            String host,
+            int port,
+            Map<String, Object> agentCard,
+            AgentExecutor agentExecutor,
+            String keystoreResource,
+            String keystorePassword)
+            throws IOException {
+        this.keystoreResource = keystoreResource;
+        this.keystorePassword = keystorePassword;
         this.agentCardMap = agentCard;
         this.agentName = String.valueOf(agentCard.getOrDefault("name", "unknown"));
         this.pathPrefix = extractPathPrefix(agentCard);
@@ -160,17 +177,17 @@ public class JdkHttpA2AServer implements AutoCloseable {
         log.info("[{}] A2A server started on https://{}:{}/", agentName, host, port);
     }
 
-    private static SSLContext createSslContext() throws IOException {
+    private SSLContext createSslContext() throws IOException {
         try (InputStream is =
-                JdkHttpA2AServer.class.getClassLoader().getResourceAsStream(KEYSTORE_RESOURCE)) {
+                JdkHttpA2AServer.class.getClassLoader().getResourceAsStream(keystoreResource)) {
             if (is == null) {
-                throw new IOException("Keystore not found on classpath: " + KEYSTORE_RESOURCE);
+                throw new IOException("Keystore not found on classpath: " + keystoreResource);
             }
             KeyStore ks = KeyStore.getInstance("PKCS12");
-            ks.load(is, KEYSTORE_PASSWORD.toCharArray());
+            ks.load(is, keystorePassword.toCharArray());
             KeyManagerFactory kmf =
                     KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-            kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
+            kmf.init(ks, keystorePassword.toCharArray());
             SSLContext ctx = SSLContext.getInstance("TLS");
             ctx.init(kmf.getKeyManagers(), null, null);
             return ctx;
