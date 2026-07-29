@@ -19,6 +19,7 @@
 
 package com.openan.a2at.engine.examples.agents;
 
+import com.openan.a2at.engine.client.LlmHelper;
 import org.a2aproject.sdk.server.agentexecution.RequestContext;
 import org.a2aproject.sdk.server.tasks.AgentEmitter;
 import org.slf4j.Logger;

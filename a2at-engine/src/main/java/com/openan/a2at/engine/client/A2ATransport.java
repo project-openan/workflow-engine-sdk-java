@@ -107,7 +107,9 @@ public class A2ATransport implements AutoCloseable {
         } else {
             this.authManager = new AgentAuthManager();
         }
-        loadEnvToSystemProperties(config.getA2atEnvPath());
+        if (config.getA2atEnvPath() != null) {
+            EnvFileLoader.loadToSystemProperties(java.nio.file.Path.of(config.getA2atEnvPath()));
+        }
         this.a2atClient = initA2atClient(config.getA2atEnvPath());
         this.authProvider = config.getAuthProvider();
         for (AgentCard card : agentCards) {
@@ -219,33 +221,7 @@ public class A2ATransport implements AutoCloseable {
         return uris;
     }
 
-    private void loadEnvToSystemProperties(String envPath) {
-        if (envPath == null || envPath.isEmpty()) {
-            return;
-        }
-        try {
-            for (String line : java.nio.file.Files.readAllLines(java.nio.file.Path.of(envPath))) {
-                String trimmed = line.trim();
-                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                    continue;
-                }
-                int eq = trimmed.indexOf("=");
-                if (eq <= 0) {
-                    continue;
-                }
-                String key = trimmed.substring(0, eq).trim();
-                String val = trimmed.substring(eq + 1).trim();
-                if (System.getProperty(key) == null && System.getenv(key) == null) {
-                    System.setProperty(key, val);
-                }
-            }
-            log.debug("[Transport] Loaded .env into system properties: {}", envPath);
-        } catch (Exception e) {
-            log.warn("[Transport] Failed to load .env: {}", e.getMessage());
-        }
-    }
-
-    private A2ATClient initA2atClient(String a2atEnvPath) {
+        private A2ATClient initA2atClient(String a2atEnvPath) {
         if (a2atEnvPath == null || a2atEnvPath.isEmpty()) {
             return null;
         }

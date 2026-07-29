@@ -19,6 +19,7 @@
 
 package com.openan.a2at.engine.examples.agents;
 
+import com.openan.a2at.engine.client.LlmHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

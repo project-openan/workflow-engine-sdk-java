@@ -56,10 +56,10 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Spring Boot auto-configuration for the A2A-T server side.
+ * Spring Boot autoconfiguration for the A2A-T server side.
  *
  * <p>When {@code a2at-spring-boot-starter} is on the classpath of a web application, this
- * auto-configuration assembles all SDK server components as Spring beans:
+ * autoconfiguration assembles all SDK server components as Spring beans:
  *
  * <ul>
  *   <li>{@link AgentCard} - loaded from {@code a2at.server.agent-card} path

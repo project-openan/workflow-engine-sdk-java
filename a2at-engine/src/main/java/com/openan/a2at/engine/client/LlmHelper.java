@@ -17,7 +17,7 @@
  *    under the License.
  */
 
-package com.openan.a2at.engine.examples.agents;
+package com.openan.a2at.engine.client;
 
 import net.openan.a2at.sdk.llm.LLMClient;
 import net.openan.a2at.sdk.llm.LLMClientConfig;
