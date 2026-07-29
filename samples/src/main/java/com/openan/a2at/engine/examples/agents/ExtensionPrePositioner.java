@@ -26,6 +26,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * Pre-positions Authorization-T and Notification-T to downstream agents.
@@ -55,8 +57,17 @@ public class ExtensionPrePositioner {
                         + "上报通知数据格式为TextPart。";
     }
 
-    /** Pre-position Authorization-T + Notification-T to every non-workbench agent. */
-    public void prePosition(ExtensionSender sender, List<AgentCard> agentCards) {
+    /**
+     * Pre-position Authorization-T + Notification-T to every non-workbench agent.
+     *
+     * <p>When {@code notificationCallback} is non-null, subsequent events pushed by agents
+     * through the Notification-T SSE stream (e.g. recovery results) are forwarded to the
+     * callback. The callback receives a Map with keys: agent, text, metadata, state.
+     */
+    public void prePosition(
+            ExtensionSender sender,
+            List<AgentCard> agentCards,
+            Consumer<Map<String, Object>> notificationCallback) {
         for (AgentCard card : agentCards) {
             String name = card.name();
             if (name.contains("Workbench")) {
@@ -65,8 +76,15 @@ public class ExtensionPrePositioner {
             log.info("[PrePosition] Authorization-T to {}", name);
             sender.sendAuthorization(name, "下发授权放行策略", authInput).join();
             log.info("[PrePosition] Notification-T to {}", name);
-            sender.sendNotification(name, "订阅业务抢通结果通知", notifInput).join();
+            sender.sendNotification(
+                    name, "订阅业务抢通结果通知", notifInput,
+                    notificationCallback).join();
         }
         log.info("[PrePosition] Extension pre-positioning complete");
+    }
+
+    /** Pre-position without Notification-T event callback. */
+    public void prePosition(ExtensionSender sender, List<AgentCard> agentCards) {
+        prePosition(sender, agentCards, null);
     }
 }

@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>工作台集成指南.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> or <div class="page"></div> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="a2a-t-工作流执行引擎-sdk-工作台集成指南">A2A-T 工作流执行引擎 SDK 工作台集成指南</h1>
+<blockquote>
+<p>面向广东移动传输工作台智能体研发团队。本文档以 SPN 专线故障跨城协同诊断联创场景为例，从工作台视角说明接入 A2A-T 执行引擎 SDK 的完整路径。读者拿到本文档后，可端到端完成集成。</p>
+</blockquote>
+<hr>
+<h2 id="1-场景全景">1. 场景全景</h2>
+<h3 id="11-业务拓扑">1.1 业务拓扑</h3>
+<pre><code class="language-mermaid"><div class="mermaid">graph TD
+    WAIMO["WAIMO 故障中心<br/>(上层业务系统)"]
+    WB["传输工作台智能体 (工作台)<br/>接入 a2at-engine-java SDK<br/>本文档的集成方"]
+    OMC1["SPN Domain Agent<br/>(粤东 OMC, 华为)"]
+    OMC2["SPN Domain Agent<br/>(粤西 OMC, 华为)"]
+
+    WAIMO -->|"A2A-T Task-T 下发原始诊断任务"| WB
+    WB -->|"A2A-T 下发诊断"| OMC1
+    WB -->|"A2A-T 下发诊断"| OMC2
+</div></code></pre>
+<p>工作台是编排方。它接收 WAIMO 故障中心通过 A2A-T 下发的原始诊断任务，编排下游多地市 SPN Domain Agent (华为 OMC) 执行故障根因诊断，汇总结果并上报。</p>
+<h3 id="12-四类-a2a-t-交互">1.2 四类 A2A-T 交互</h3>
+<p>SDK 在该场景中承载四类 A2A-T 交互，对应业务流文档的四个接口:</p>
+<table>
+<thead>
+<tr>
+<th>序号</th>
+<th>A2A-T 扩展</th>
+<th>业务含义</th>
+<th>发起方</th>
+<th>时机</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Task-T</td>
+<td>下发诊断任务</td>
+<td>工作台 -&gt; OMC</td>
+<td>工作流执行中</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Negotiation-T</td>
+<td>参数修正协商</td>
+<td>OMC &lt;-&gt; 工作台</td>
+<td>OMC 发现参数缺失时反向发起</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Authorization-T</td>
+<td>抢通授权</td>
+<td>工作台 -&gt; OMC</td>
+<td>工作流启动前，前置预定位</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Notification-T</td>
+<td>抢通结果订阅/上报</td>
+<td>工作台 -&gt; OMC (订阅) / OMC -&gt; 工作台 (SSE 上报)</td>
+<td>工作流启动前订阅，执行中上报</td>
+</tr>
+</tbody>
+</table>
+<p>序号 1、2 在工作流执行过程中发生，由 SDK 的 <code>WorkflowEngineClient</code> 承载。序号 3、4 是前置动作，在工作流启动前完成，由 SDK 的 <code>ExtensionSender</code> 承载。这两条路径共享同一个底层传输层 <code>A2ATransport</code>，职责隔离。</p>
+<h3 id="13-sdk-自动处理-vs-工作台实现">1.3 SDK 自动处理 vs 工作台实现</h3>
+<p>引擎的设计原则是: <strong>协议机制由 SDK 承担，业务决策由工作台实现</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>SDK 自动处理</th>
+<th>工作台实现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A2A 消息收发、SSE 流式传输、事件提取</td>
+<td>是否发送任务、发送什么内容</td>
+</tr>
+<tr>
+<td>Agent 认证 (Bearer 令牌获取/刷新)</td>
+<td>凭证配置 (credentials.json)</td>
+</tr>
+<tr>
+<td>Task-T 结构化提示词生成 (调用 A2A-T SDK)</td>
+<td>诊断任务的原始自然语言输入</td>
+</tr>
+<tr>
+<td>Negotiation-T 自动协商循环 (重发 follow-up)</td>
+<td>协商澄清内容 (onNegotiation 返回)</td>
+</tr>
+<tr>
+<td>Authorization-T / Notification-T 报文构造</td>
+<td>授权策略描述、订阅主题描述</td>
+</tr>
+<tr>
+<td>DAG 遍历、上下文组装、状态管理</td>
+<td>分支路由决策 (onRoute 返回)</td>
+</tr>
+<tr>
+<td>事件全量产出 (EventType)</td>
+<td>事件处理 (EventCallback)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-集成全景图">2. 集成全景图</h2>
+<p>工作台集成 SDK 共需完成六步。先总后分，每步后续均有详细说明和代码示例。</p>
+<pre><code class="language-mermaid"><div class="mermaid">graph LR
+    S1["步骤 1<br/>引入 Maven 依赖"]
+    S2["步骤 2<br/>准备配置文件<br/>AgentCard + 凭证 + .env"]
+    S3["步骤 3<br/>实现 AgentExecutor<br/>A2A 服务端入口"]
+    S4["步骤 4<br/>实现 ControlPoint<br/>工作流决策回调"]
+    S5["步骤 5<br/>组装编排管线<br/>加载卡片 -> 预定位 -> 执行"]
+    S6["步骤 6 (可选)<br/>实现 ExtensionCallback<br/>授权/通知响应钩子"]
+
+    S1 --> S2 --> S3 --> S4 --> S5
+    S5 -.-> S6
+</div></code></pre>
+<p>职责分布:</p>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>工作台实现</th>
+<th>SDK 提供</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AgentExecutor</code></td>
+<td>是</td>
+<td>否</td>
+<td>工作台的 A2A 服务端入口，接收 WAIMO 下发的任务</td>
+</tr>
+<tr>
+<td><code>ControlPoint</code></td>
+<td>是 (4 个方法)</td>
+<td>接口 + 默认实现</td>
+<td>工作流决策: 任务下发、自处理、路由、协商</td>
+</tr>
+<tr>
+<td><code>ExtensionCallback</code></td>
+<td>是 (2 个方法，可选)</td>
+<td>接口 + 默认实现</td>
+<td>响应 OMC 推送的授权请求/通知</td>
+</tr>
+<tr>
+<td><code>WorkbenchOrchestrator</code></td>
+<td>是</td>
+<td>否</td>
+<td>组装编排管线的业务类</td>
+</tr>
+<tr>
+<td><code>WorkflowEngineClient</code></td>
+<td>否</td>
+<td>是</td>
+<td>工作流发送门面 (Task-T + 协商循环)</td>
+</tr>
+<tr>
+<td><code>ExtensionSender</code></td>
+<td>否</td>
+<td>是</td>
+<td>前置预定位门面 (授权 + 订阅)</td>
+</tr>
+<tr>
+<td><code>A2ATransport</code></td>
+<td>否</td>
+<td>是</td>
+<td>共享传输层 (HTTP + 认证 + SSE)</td>
+</tr>
+<tr>
+<td><code>ExecutePsop</code></td>
+<td>否</td>
+<td>是</td>
+<td>高层运行器 (生命周期 + 事件 + 持久化)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="3-逐步集成">3. 逐步集成</h2>
+<h3 id="步骤-1-引入-maven-依赖">步骤 1: 引入 Maven 依赖</h3>
+<p>工作台项目 <code>pom.xml</code> 中添加:</p>
+<pre class="hljs"><code><div><span class="hljs-tag">&lt;<span class="hljs-name">dependency</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">groupId</span>&gt;</span>com.openan.a2at<span class="hljs-tag">&lt;/<span class="hljs-name">groupId</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">artifactId</span>&gt;</span>a2at-engine<span class="hljs-tag">&lt;/<span class="hljs-name">artifactId</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">version</span>&gt;</span>1.0.0<span class="hljs-tag">&lt;/<span class="hljs-name">version</span>&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">dependency</span>&gt;</span>
+</div></code></pre>
+<p>如果工作台基于 Spring Boot 且需要 SDK 自动装配 A2A 服务端 (AgentCard 加载、REST 控制器、事件总线):</p>
+<pre class="hljs"><code><div><span class="hljs-tag">&lt;<span class="hljs-name">dependency</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">groupId</span>&gt;</span>com.openan.a2at<span class="hljs-tag">&lt;/<span class="hljs-name">groupId</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">artifactId</span>&gt;</span>a2at-spring-boot-starter<span class="hljs-tag">&lt;/<span class="hljs-name">artifactId</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">version</span>&gt;</span>1.0.0<span class="hljs-tag">&lt;/<span class="hljs-name">version</span>&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">dependency</span>&gt;</span>
+</div></code></pre>
+<p>Spring Boot starter 会自动注册 <code>AgentCard</code>、<code>RequestHandler</code>、<code>RestHandler</code>、<code>A2AController</code> 等 Bean。工作台只需提供一个 <code>AgentExecutor</code> 实现类标注 <code>@Component</code> 即可。</p>
+<h3 id="步骤-2-准备配置文件">步骤 2: 准备配置文件</h3>
+<p>集成需要三类配置文件。</p>
+<h4 id="21-agentcard-工作台自身的">2.1 AgentCard (工作台自身的)</h4>
+<p>工作台作为 A2A 服务端，需要声明自己的 AgentCard。该文件告知 WAIMO 故障中心如何调用工作台:</p>
+<pre class="hljs"><code><div><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Transport Workbench Agent&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;description&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;传输工作台智能体: 接收上层诊断任务，编排多地市 OMC 执行诊断并汇总&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;1.0.0&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;capabilities&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;streaming&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;extensions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;uri&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://projects.tmforum.org/a2aproject/telecommunication/extensions/Task-T/v1&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;required&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;uri&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;required&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;uri&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;required&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;uri&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;required&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">]</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;skills&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cross-city-fault-diagnosis&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;跨城故障协同诊断&quot;</span><span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;supportedInterfaces&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;protocolBinding&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;HTTP+JSON&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;url&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://工作台地址/a2a/json&quot;</span><span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</div></code></pre>
+<p>下游 SPN Domain Agent 的 AgentCard 由华为提供或从注册中心获取。工作台只需加载它们用于 SDK 通信。关键信息是 <code>name</code> (SDK 中用此名称寻址) 和 <code>supportedInterfaces.url</code> (通信地址)。</p>
+<h4 id="22-凭证配置-credentialsjson">2.2 凭证配置 (credentials.json)</h4>
+<p>SPN Domain Agent (华为 OMC) 使用 Bearer 认证。SDK 的 <code>AgentAuthManager</code> 自动获取并刷新令牌，工作台只需提供凭证:</p>
+<pre class="hljs"><code><div><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;SPN Domain Agent City1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;bearerAuth&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;login_url&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://omc-city1地址/rest/plat/smapp/v1/oauth/token&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;method&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PUT&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;request_fields&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;grantType&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;password&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;userName&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;admin&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;value&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;enc:加密后的密码&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;ipaddr&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;*&quot;</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;token_field&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;accessSession&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;token_ttl&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3600</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;SPN Domain Agent City2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;bearerAuth&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;login_url&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://omc-city2地址/rest/plat/smapp/v1/oauth/token&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;method&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PUT&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;request_fields&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;grantType&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;password&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;userName&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;admin&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;value&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;enc:加密后的密码&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;ipaddr&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;*&quot;</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;token_field&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;accessSession&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;token_ttl&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3600</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</div></code></pre>
+<p>键名必须与 AgentCard 的 <code>name</code> 字段一致。SDK 依据此键名匹配 AgentCard 与凭证。密码字段 <code>value</code> 使用 <code>enc:</code> 前缀标识加密内容，SDK 的 <code>CredentialCrypto</code> 自动解密。</p>
+<h4 id="23-a2a-t-sdk-环境-env">2.3 A2A-T SDK 环境 (.env)</h4>
+<p>A2A-T SDK 的 LLM 配置 (用于 Task-T 提示词生成、场景识别等)。最小配置:</p>
+<pre class="hljs"><code><div><span class="hljs-attr">LLM_API_KEY</span>=你的API密钥
+<span class="hljs-attr">LLM_BASE_URL</span>=https://api.example.com/v1
+<span class="hljs-attr">LLM_MODEL</span>=gpt-<span class="hljs-number">4</span>o
+<span class="hljs-attr">LLM_LANGUAGE</span>=zh-CN
+</div></code></pre>
+<p>SDK 通过此配置调用 A2A-T SDK 生成 Task-T 结构化提示词。如果此文件未配置或生成失败，SDK 会降级为使用原始输入文本作为消息内容，不阻断流程。</p>
+<h3 id="步骤-3-实现-agentexecutor">步骤 3: 实现 AgentExecutor</h3>
+<p>工作台作为 A2A 服务端，需要实现 <code>AgentExecutor</code> 接口。这是 WAIMO 故障中心调用工作台的入口。SDK 不提供此实现 -- 它是工作台的业务代码。</p>
+<p><code>AgentExecutor</code> 来自 A2A Java SDK (<code>org.a2aproject.sdk.server.agentexecution.AgentExecutor</code>)。工作台实现 <code>execute</code> 方法接收上层任务，实现 <code>cancel</code> 方法处理取消。</p>
+<p>接口签名:</p>
+<pre class="hljs"><code><div><span class="hljs-keyword">public</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">AgentExecutor</span> {
+    <span class="hljs-keyword">void</span> <span class="hljs-title function_">execute</span><span class="hljs-params">(RequestContext ctx, AgentEmitter emitter)</span> <span class="hljs-keyword">throws</span> A2AError;
+    <span class="hljs-keyword">void</span> <span class="hljs-title function_">cancel</span><span class="hljs-params">(RequestContext ctx, AgentEmitter emitter)</span> <span class="hljs-keyword">throws</span> A2AError;
+}
+</div></code></pre>
+<p>工作台实现示例:</p>
+<pre class="hljs"><code><div><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">TransportWorkbenchExecutor</span> <span class="hljs-keyword">implements</span> <span class="hljs-title class_">AgentExecutor</span> {
+
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> String orchUrl;           <span class="hljs-comment">// 编排中心地址 (PSOP 搜索/加载)</span>
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> String credentialsPath;    <span class="hljs-comment">// 凭证配置路径</span>
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> <span class="hljs-type">boolean</span> sslVerify;         <span class="hljs-comment">// 是否校验 TLS 证书</span>
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> String a2atEnvPath;        <span class="hljs-comment">// A2A-T .env 路径</span>
+
+    <span class="hljs-keyword">public</span> <span class="hljs-title function_">TransportWorkbenchExecutor</span><span class="hljs-params">(String orchUrl, String credentialsPath,
+                                       <span class="hljs-type">boolean</span> sslVerify, String a2atEnvPath)</span> {
+        <span class="hljs-built_in">this</span>.orchUrl = orchUrl;
+        <span class="hljs-built_in">this</span>.credentialsPath = credentialsPath;
+        <span class="hljs-built_in">this</span>.sslVerify = sslVerify;
+        <span class="hljs-built_in">this</span>.a2atEnvPath = a2atEnvPath;
+    }
+
+    <span class="hljs-meta">@Override</span>
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">execute</span><span class="hljs-params">(RequestContext ctx, AgentEmitter emitter)</span> <span class="hljs-keyword">throws</span> A2AError {
+        <span class="hljs-type">String</span> <span class="hljs-variable">taskId</span> <span class="hljs-operator">=</span> ctx.getTaskId();
+        <span class="hljs-type">String</span> <span class="hljs-variable">contextId</span> <span class="hljs-operator">=</span> ctx.getContextId();
+        <span class="hljs-type">String</span> <span class="hljs-variable">input</span> <span class="hljs-operator">=</span> extractText(ctx.getMessage());
+
+        <span class="hljs-comment">// 1. 向 WAIMO 回报任务已接收 (A2A 状态消息)</span>
+        emitter.submit(buildStatusMessage(contextId, taskId, <span class="hljs-string">&quot;任务已接收&quot;</span>));
+        emitter.startWork(buildStatusMessage(contextId, taskId, <span class="hljs-string">&quot;正在处理&quot;</span>));
+
+        <span class="hljs-keyword">try</span> {
+            <span class="hljs-comment">// 2. 委托编排管线执行完整的诊断流程</span>
+            <span class="hljs-type">String</span> <span class="hljs-variable">result</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">WorkbenchOrchestrator</span>(
+                    orchUrl, credentialsPath, sslVerify, a2atEnvPath
+            ).run(input);
+
+            <span class="hljs-comment">// 3. 返回诊断汇总结果 (A2A Artifact)</span>
+            List&lt;Part&lt;?&gt;&gt; parts = List.of(<span class="hljs-keyword">new</span> <span class="hljs-title class_">TextPart</span>(<span class="hljs-string">&quot;跨城故障协同诊断汇总结果&quot;</span>));
+            emitter.addArtifact(parts, <span class="hljs-string">&quot;result&quot;</span>, <span class="hljs-string">&quot;cross-city-diagnosis&quot;</span>, <span class="hljs-literal">null</span>, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>);
+            emitter.complete(buildStatusMessage(contextId, taskId, <span class="hljs-string">&quot;完成&quot;</span>));
+        } <span class="hljs-keyword">catch</span> (Exception e) {
+            emitter.fail(buildStatusMessage(contextId, taskId, <span class="hljs-string">&quot;失败: &quot;</span> + e.getMessage()));
+        }
+    }
+
+    <span class="hljs-meta">@Override</span>
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">cancel</span><span class="hljs-params">(RequestContext ctx, AgentEmitter emitter)</span> <span class="hljs-keyword">throws</span> A2AError {
+        emitter.cancel();
+    }
+
+    <span class="hljs-comment">// --- 工具方法 ---</span>
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> String <span class="hljs-title function_">extractText</span><span class="hljs-params">(Message message)</span> {
+        <span class="hljs-type">StringBuilder</span> <span class="hljs-variable">sb</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">StringBuilder</span>();
+        <span class="hljs-keyword">for</span> (Part&lt;?&gt; part : message.parts()) {
+            <span class="hljs-keyword">if</span> (part <span class="hljs-keyword">instanceof</span> TextPart tp) sb.append(tp.text());
+        }
+        <span class="hljs-keyword">return</span> sb.toString();
+    }
+
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> Message <span class="hljs-title function_">buildStatusMessage</span><span class="hljs-params">(String contextId, String taskId, String text)</span> {
+        <span class="hljs-keyword">return</span> Message.builder()
+                .messageId(UUID.randomUUID().toString())
+                .contextId(contextId)
+                .taskId(taskId)
+                .role(Message.Role.ROLE_AGENT)
+                .parts(<span class="hljs-keyword">new</span> <span class="hljs-title class_">TextPart</span>(text))
+                .build();
+    }
+}
+</div></code></pre>
+<p><code>AgentEmitter</code> 的调用时序: <code>submit</code> (已接收) -&gt; <code>startWork</code> (处理中) -&gt; <code>addArtifact</code> (结果) -&gt; <code>complete</code> (完成)。这一时序是 A2A 协议的标准消息交互，WAIMO 故障中心据此感知任务进度。</p>
+<p>如果使用 Spring Boot starter，只需将此类标注 <code>@Component</code>，starter 自动注册到 A2A 服务:</p>
+<pre class="hljs"><code><div><span class="hljs-meta">@Component</span>
+<span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">TransportWorkbenchExecutor</span> <span class="hljs-keyword">implements</span> <span class="hljs-title class_">AgentExecutor</span> { ... }
+</div></code></pre>
+<h3 id="步骤-4-实现-controlpoint">步骤 4: 实现 ControlPoint</h3>
+<p><code>ControlPoint</code> 是工作台实现的核心决策接口。SDK 在工作流执行过程中调用这四个方法，工作台决定&quot;做什么&quot;，SDK 负责&quot;怎么发&quot;。</p>
+<pre class="hljs"><code><div><span class="hljs-keyword">public</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">ControlPoint</span> {
+    CompletableFuture&lt;TaskResponse&gt; <span class="hljs-title function_">onTask</span><span class="hljs-params">(TaskRequest request, WorkflowEngineClient engineClient)</span>;
+    <span class="hljs-keyword">default</span> CompletableFuture&lt;TaskResponse&gt; <span class="hljs-title function_">onSelfTask</span><span class="hljs-params">(TaskRequest request)</span> { ... }
+    CompletableFuture&lt;RouteDecision&gt; <span class="hljs-title function_">onRoute</span><span class="hljs-params">(String stepName, Map&lt;String, Object&gt; results, List&lt;JumpCondition&gt; conditions)</span>;
+    <span class="hljs-keyword">default</span> CompletableFuture&lt;String&gt; <span class="hljs-title function_">onNegotiation</span><span class="hljs-params">(String agentName, String negotiationText, Map&lt;String, Object&gt; receiveResult)</span> { ... }
+}
+</div></code></pre>
+<p>可以继承 <code>DefaultControlPoint</code> (已实现 onSelfTask、onNegotiation 默认逻辑)，只重写需要的方法。下面逐个说明。</p>
+<h4 id="41-ontask----下发诊断任务">4.1 onTask -- 下发诊断任务</h4>
+<p>SDK 在工作流走到一个需要向下游 Agent 发送任务的步骤时调用此方法。工作台决定发送什么内容给哪个 Agent。</p>
+<p><code>request</code> 包含: <code>agentName</code> (目标 Agent 名称)、<code>stepName</code> (当前步骤名)、<code>message</code> (SDK 组装的完整消息，含上游上下文)。</p>
+<p>关键设计: 给每个 OMC 发送的任务只包含该 OMC 相关的参数，不混入其他地市的信息。示例中 <code>buildTargetedTaskMessage</code> 依据步骤名构造针对性消息:</p>
+<pre class="hljs"><code><div><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">WorkbenchControlPoint</span> <span class="hljs-keyword">extends</span> <span class="hljs-title class_">DefaultControlPoint</span> {
+
+    <span class="hljs-meta">@Override</span>
+    <span class="hljs-keyword">public</span> CompletableFuture&lt;TaskResponse&gt; <span class="hljs-title function_">onTask</span><span class="hljs-params">(
+            TaskRequest request, WorkflowEngineClient engineClient)</span> {
+        <span class="hljs-type">String</span> <span class="hljs-variable">step</span> <span class="hljs-operator">=</span> request.getStepName();
+        <span class="hljs-type">String</span> <span class="hljs-variable">agentName</span> <span class="hljs-operator">=</span> request.getAgentName();
+
+        <span class="hljs-comment">// 依据步骤构造针对性任务消息 (只含该 OMC 相关参数)</span>
+        <span class="hljs-type">String</span> <span class="hljs-variable">targetedMessage</span> <span class="hljs-operator">=</span> buildTargetedTaskMessage(step);
+
+        <span class="hljs-keyword">return</span> engineClient.sendMessage(agentName, targetedMessage)
+                .thenApply(r -&gt; {
+                    <span class="hljs-type">boolean</span> <span class="hljs-variable">success</span> <span class="hljs-operator">=</span> r.getText() != <span class="hljs-literal">null</span> &amp;&amp; !r.getText().isEmpty();
+                    <span class="hljs-keyword">return</span> TaskResponse.builder()
+                            .success(success)
+                            .output(r.getText())
+                            .build();
+                })
+                .exceptionally(e -&gt; TaskResponse.builder()
+                        .success(<span class="hljs-literal">false</span>)
+                        .error(<span class="hljs-string">&quot;Agent 调用失败: &quot;</span> + e.getMessage())
+                        .build());
+    }
+
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> String <span class="hljs-title function_">buildTargetedTaskMessage</span><span class="hljs-params">(String step)</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">switch</span> (step) {
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&quot;diagnosis_city1&quot;</span> -&gt; <span class="hljs-string">&quot;&quot;&quot;
+                ## 任务
+                SPN 专线故障诊断 - 粤东 OMC 侧
+
+                ## 故障参数
+                - 端口状态: port-7 = DOWN
+                - 光功率: -28dBm (阈值 -20dBm)
+                - 所属单板: line-card-03
+                - 端口号: port-7
+
+                请针对粤东 OMC 侧端口故障进行诊断。&quot;&quot;&quot;</span>;
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&quot;diagnosis_city2&quot;</span> -&gt; <span class="hljs-string">&quot;&quot;&quot;
+                ## 任务
+                SPN 专线故障诊断 - 粤西 OMC 侧
+
+                ## 排查要求
+                - 排查粤西 OMC 端口状态是否正常
+                - 确认光功率是否在正常范围
+                - 确认是否存在异常告警
+
+                请针对粤西 OMC 侧进行排查。&quot;&quot;&quot;</span>;
+            <span class="hljs-keyword">default</span> -&gt; <span class="hljs-string">&quot;请执行 SPN 专线故障诊断任务。&quot;</span>;
+        };
+    }
+}
+</div></code></pre>
+<p><code>engineClient.sendMessage(agentName, message)</code> 内部自动完成: Task-T 提示词生成 -&gt; Bearer 认证 -&gt; SSE 流式发送 -&gt; 事件提取 -&gt; Negotiation-T 协商循环。工作台只需调用一行。</p>
+<h4 id="42-onselftask----本地汇总-自环节点">4.2 onSelfTask -- 本地汇总 (自环节点)</h4>
+<p>当工作流步骤标记为 <code>SELF_LOOP</code> 时，SDK 调用此方法。这意味着该步骤由工作台本地处理，不向下游发送 A2A-T 消息。典型用途: 汇总多个 OMC 的诊断结果。</p>
+<pre class="hljs"><code><div><span class="hljs-meta">@Override</span>
+<span class="hljs-keyword">public</span> CompletableFuture&lt;TaskResponse&gt; <span class="hljs-title function_">onSelfTask</span><span class="hljs-params">(TaskRequest request)</span> {
+    <span class="hljs-type">String</span> <span class="hljs-variable">message</span> <span class="hljs-operator">=</span> request.getMessage();
+    <span class="hljs-comment">// 工作台本地汇总逻辑 (可调用 LLM 做故障定位结论)</span>
+    <span class="hljs-type">String</span> <span class="hljs-variable">fallback</span> <span class="hljs-operator">=</span> <span class="hljs-string">&quot;汇总分析完成。故障定位: 粤东地市 OMC，端口 Down，光功率 -28dBm 低于阈值。&quot;</span>;
+    <span class="hljs-type">String</span> <span class="hljs-variable">sys</span> <span class="hljs-operator">=</span> <span class="hljs-string">&quot;你是 SPN 跨城故障协同诊断汇总专家。根据两地市 OMC 诊断结果，输出故障定位结论。&quot;</span>;
+    <span class="hljs-type">String</span> <span class="hljs-variable">result</span> <span class="hljs-operator">=</span> LlmHelper.text(a2atEnvPath, sys, message, fallback);
+    <span class="hljs-keyword">return</span> CompletableFuture.completedFuture(
+            TaskResponse.builder().success(<span class="hljs-literal">true</span>).output(result).build());
+}
+</div></code></pre>
+<p><code>DefaultControlPoint</code> 的默认实现是将 <code>request.message</code> 原样返回。如果不需要 LLM 汇总，可以不重写此方法。</p>
+<h4 id="43-onroute----分支路由">4.3 onRoute -- 分支路由</h4>
+<p>当工作流步骤有条件分支时 (即 <code>next</code> 列表中 <code>JumpCondition</code> 带有非空 <code>condition</code>)，SDK 调用此方法。工作台根据已有结果决定走哪个分支。</p>
+<p>返回 <code>RouteDecision</code>，其 <code>nextStep</code> 必须是 <code>conditions</code> 中声明的某个步骤名:</p>
+<pre class="hljs"><code><div><span class="hljs-meta">@Override</span>
+<span class="hljs-keyword">public</span> CompletableFuture&lt;RouteDecision&gt; <span class="hljs-title function_">onRoute</span><span class="hljs-params">(
+        String stepName, Map&lt;String, Object&gt; results, List&lt;JumpCondition&gt; conditions)</span> {
+    <span class="hljs-comment">// 简单场景: 取第一个非终止分支</span>
+    <span class="hljs-type">String</span> <span class="hljs-variable">nextStep</span> <span class="hljs-operator">=</span> conditions.get(<span class="hljs-number">0</span>).getStep();
+    <span class="hljs-keyword">for</span> (JumpCondition jc : conditions) {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-string">&quot;end&quot;</span>.equals(jc.getStep()) &amp;&amp; !<span class="hljs-string">&quot;retry&quot;</span>.equals(jc.getStep())) {
+            nextStep = jc.getStep();
+            <span class="hljs-keyword">break</span>;
+        }
+    }
+    <span class="hljs-keyword">return</span> CompletableFuture.completedFuture(
+            RouteDecision.builder().nextStep(nextStep).reason(<span class="hljs-string">&quot;默认路由&quot;</span>).build());
+}
+</div></code></pre>
+<p>路由规则说明:</p>
+<ul>
+<li>步骤没有 <code>next</code> -&gt; 终止步骤，工作流结束。</li>
+<li><code>next</code> 中所有 <code>condition</code> 为空 -&gt; 无条件扇出: 并行调度所有下游步骤。</li>
+<li><code>next</code> 中有 <code>condition</code> -&gt; 条件分支: 调用 <code>onRoute</code>，返回单个目标步骤 (N 选 1)。</li>
+</ul>
+<p>复杂场景可使用 LLM 决策路由 (参考编排中心 <code>DynamicWorkflowEngine._llm_route_decision</code> 的实现)。</p>
+<h4 id="44-onnegotiation----协商澄清">4.4 onNegotiation -- 协商澄清</h4>
+<p>当 OMC 返回 <code>INPUT_REQUIRED</code> (Negotiation-T) 时，SDK 自动进入协商循环。SDK 调用此方法获取澄清文本，然后自动重发给 OMC。工作台只需返回澄清内容，不需要自行发送消息。</p>
+<p>触发条件: OMC 发现任务参数有误或缺失 (必选参数缺失、取值不在枚举范围、语义校验错误等)。</p>
+<pre class="hljs"><code><div><span class="hljs-meta">@Override</span>
+<span class="hljs-keyword">public</span> CompletableFuture&lt;String&gt; <span class="hljs-title function_">onNegotiation</span><span class="hljs-params">(
+        String agentName, String negotiationText, Map&lt;String, Object&gt; receiveResult)</span> {
+    <span class="hljs-comment">// negotiationText: OMC 的协商请求内容 (明确指出缺失/错误的参数及修正建议)</span>
+    <span class="hljs-comment">// 返回: 工作台补全或修正后的澄清文本</span>
+
+    <span class="hljs-type">String</span> <span class="hljs-variable">clarification</span> <span class="hljs-operator">=</span> <span class="hljs-string">&quot;客户 A 粤东-粤西间 SPN 专线中断，&quot;</span>
+            + <span class="hljs-string">&quot;粤东 OMC 告警端口 Down，光功率 -28dBm。&quot;</span>
+            + <span class="hljs-string">&quot;请根据此上下文修正参数后重新执行诊断。&quot;</span>;
+    <span class="hljs-keyword">return</span> CompletableFuture.completedFuture(clarification);
+}
+</div></code></pre>
+<p>SDK 自动将返回的澄清文本封装为 Negotiation-T follow-up 消息重发给 OMC，最多重试 3 轮 (可配置)。如果 OMC 在 3 轮内收敛 (返回正常结果)，工作流继续。如果未收敛，<code>sendMessage</code> 返回的 <code>SendMessageResult</code> 中 <code>taskState</code> 仍为 <code>INPUT_REQUIRED</code>。</p>
+<p>协商循环时序:</p>
+<pre><code class="language-mermaid"><div class="mermaid">sequenceDiagram
+    participant WB as 工作台
+    participant SDK as SDK 引擎客户端
+    participant OMC as OMC
+
+    WB->>SDK: onTask -> sendMessage
+    SDK->>OMC: Task-T 下发诊断任务
+    OMC-->>SDK: INPUT_REQUIRED (Negotiation-T)
+    SDK->>WB: onNegotiation()
+    WB-->>SDK: 返回澄清文本
+    SDK->>OMC: follow-up 重发 (含澄清)
+    OMC-->>SDK: 诊断结果 (COMPLETED)
+    SDK-->>WB: TaskResponse
+</div></code></pre>
+<h3 id="步骤-5-组装编排管线">步骤 5: 组装编排管线</h3>
+<p>这一步将所有组件串联起来。工作台实现一个编排类，在 <code>AgentExecutor.execute</code> 被调用时运行完整的诊断流程。</p>
+<pre class="hljs"><code><div><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">WorkbenchOrchestrator</span> {
+
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> String orchUrl;
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> String credentialsPath;
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> <span class="hljs-type">boolean</span> sslVerify;
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> String a2atEnvPath;
+
+    <span class="hljs-keyword">public</span> String <span class="hljs-title function_">run</span><span class="hljs-params">(String messageText)</span> <span class="hljs-keyword">throws</span> Exception {
+        <span class="hljs-comment">// 1. 加载 AgentCard (工作台自身 + 下游 OMC)</span>
+        List&lt;AgentCard&gt; agentCards = loadAgentCards();
+
+        <span class="hljs-comment">// 2. 搜索 + 加载 PSOP 工作流 (从编排中心)</span>
+        <span class="hljs-type">String</span> <span class="hljs-variable">psopId</span> <span class="hljs-operator">=</span> searchPsop(messageText);
+        <span class="hljs-type">Workflow</span> <span class="hljs-variable">workflow</span> <span class="hljs-operator">=</span> LoadPsop.load(orchUrl, psopId, <span class="hljs-literal">null</span>, sslVerify);
+
+        <span class="hljs-comment">// 3. 创建共享传输层 + 两个门面</span>
+        <span class="hljs-type">A2ATransport</span> <span class="hljs-variable">transport</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">A2ATransport</span>(
+                agentCards,
+                <span class="hljs-literal">null</span>,
+                WorkflowEngineClientConfig.builder()
+                        .sslVerify(sslVerify)
+                        .a2atEnvPath(a2atEnvPath)
+                        .credentialsConfigPath(credentialsPath)
+                        .build());
+        <span class="hljs-type">WorkflowEngineClient</span> <span class="hljs-variable">engineClient</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">DefaultWorkflowEngineClient</span>(transport);
+        <span class="hljs-type">ExtensionSender</span> <span class="hljs-variable">extensionSender</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">DefaultExtensionSender</span>(transport);
+
+        <span class="hljs-comment">// 4. 前置预定位: 向每个 OMC 下发授权策略 + 订阅通知</span>
+        prePositionExtensions(extensionSender, agentCards);
+
+        <span class="hljs-comment">// 5. 执行工作流</span>
+        <span class="hljs-type">WorkbenchControlPoint</span> <span class="hljs-variable">controlPoint</span> <span class="hljs-operator">=</span>
+                <span class="hljs-keyword">new</span> <span class="hljs-title class_">WorkbenchControlPoint</span>(a2atEnvPath, <span class="hljs-keyword">new</span> <span class="hljs-title class_">NegotiationStrategy</span>(a2atEnvPath));
+        <span class="hljs-type">ExecutionResult</span> <span class="hljs-variable">result</span> <span class="hljs-operator">=</span> ExecutePsop.builder()
+                .psop(workflow)
+                .agentCards(agentCards)
+                .controlPoint(controlPoint)
+                .engineClient(engineClient)
+                .runtimeIntent(messageText)
+                .lang(<span class="hljs-string">&quot;zh&quot;</span>)
+                .sslVerify(sslVerify)
+                .credentialsConfigPath(credentialsPath)
+                .a2atEnvPath(a2atEnvPath)
+                .eventCallback(createLogCallback())
+                .onFinish((r, events) -&gt; {
+                    <span class="hljs-comment">// 持久化执行记录 (可选)</span>
+                    log.info(<span class="hljs-string">&quot;工作流完成: success={}, 事件数={}&quot;</span>, r.isSuccess(), events.size());
+                    <span class="hljs-keyword">return</span> CompletableFuture.completedFuture(<span class="hljs-literal">null</span>);
+                })
+                .execute()
+                .join();
+
+        <span class="hljs-keyword">return</span> buildResultText(result);
+    }
+}
+</div></code></pre>
+<h4 id="51-前置预定位详解">5.1 前置预定位详解</h4>
+<p>步骤 4 的前置预定位是本场景的关键设计。授权和订阅是单次消息调用，与工作流执行分离:</p>
+<pre class="hljs"><code><div><span class="hljs-keyword">private</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">prePositionExtensions</span><span class="hljs-params">(ExtensionSender sender, List&lt;AgentCard&gt; agentCards)</span> {
+    <span class="hljs-keyword">for</span> (AgentCard card : agentCards) {
+        <span class="hljs-type">String</span> <span class="hljs-variable">name</span> <span class="hljs-operator">=</span> card.name();
+        <span class="hljs-keyword">if</span> (name.contains(<span class="hljs-string">&quot;Workbench&quot;</span>)) <span class="hljs-keyword">continue</span>;  <span class="hljs-comment">// 跳过工作台自身</span>
+
+        <span class="hljs-comment">// 授权预定位: 告知 OMC 允许自动执行的业务抢通操作</span>
+        <span class="hljs-type">String</span> <span class="hljs-variable">authInput</span> <span class="hljs-operator">=</span> <span class="hljs-string">&quot;任务类型新增授权，操作名称业务抢通，&quot;</span>
+                + <span class="hljs-string">&quot;操作类型光模块更换，操作对象 SPN 专线业务，&quot;</span>
+                + <span class="hljs-string">&quot;溢权策略 OMC 自动执行，&quot;</span>
+                + <span class="hljs-string">&quot;触发执行条件业务投诉诊断确认故障，&quot;</span>
+                + <span class="hljs-string">&quot;预期输出返回是否成功。&quot;</span>;
+        sender.sendAuthorization(name, <span class="hljs-string">&quot;下发授权放行策略&quot;</span>, authInput).join();
+
+        <span class="hljs-comment">// 订阅预定位: 向 OMC 订阅业务抢通结果通知</span>
+        <span class="hljs-type">String</span> <span class="hljs-variable">notifInput</span> <span class="hljs-operator">=</span> <span class="hljs-string">&quot;通知主题为 service-recovery-execution-result，&quot;</span>
+                + <span class="hljs-string">&quot;订阅条件为业务抢通方案执行结果，&quot;</span>
+                + <span class="hljs-string">&quot;上报通知数据格式为 TextPart。&quot;</span>;
+        sender.sendNotification(name, <span class="hljs-string">&quot;订阅业务抢通结果通知&quot;</span>, notifInput).join();
+    }
+}
+</div></code></pre>
+<ul>
+<li><code>sendAuthorization</code>: 向 OMC 下发授权白名单。OMC 在后续诊断中如果命中已授权操作 (如光模块更换)，自动执行抢通。</li>
+<li><code>sendNotification</code>: 建立 SSE 订阅通道。OMC 抢通完成后，通过此通道向工作台推送结果。</li>
+</ul>
+<p>这两个方法返回 <code>CompletableFuture&lt;SendMessageResult&gt;</code>，<code>.join()</code> 阻塞等待完成。SDK 内部自动处理 Authorization-T / Notification-T 报文构造和 Bearer 认证。</p>
+<h4 id="52-psop-工作流搜索与加载">5.2 PSOP 工作流搜索与加载</h4>
+<p>工作流 (PSOP) 存储在编排中心。SDK 提供搜索和加载方法:</p>
+<pre class="hljs"><code><div><span class="hljs-comment">// 语义搜索: 根据原始意图匹配最相关的工作流</span>
+List&lt;WorkflowSearchResult&gt; results = LoadPsop.search(orchUrl, messageText, <span class="hljs-number">3</span>, <span class="hljs-literal">null</span>, sslVerify);
+<span class="hljs-type">String</span> <span class="hljs-variable">psopId</span> <span class="hljs-operator">=</span> results.get(<span class="hljs-number">0</span>).getWorkflowId();
+
+<span class="hljs-comment">// 加载完整工作流定义</span>
+<span class="hljs-type">Workflow</span> <span class="hljs-variable">workflow</span> <span class="hljs-operator">=</span> LoadPsop.load(orchUrl, psopId, <span class="hljs-literal">null</span>, sslVerify);
+</div></code></pre>
+<p>如果搜索失败或编排中心不可用，应提供 fallback 工作流 ID 或本地加载。</p>
+<h4 id="53-eventcallback----事件追踪">5.3 EventCallback -- 事件追踪</h4>
+<p><code>ExecutePsop</code> 在执行过程中产出全量事件。工作台可实现 <code>EventCallback</code> 追踪执行进度、记录日志、向前端推送:</p>
+<pre class="hljs"><code><div><span class="hljs-keyword">private</span> EventCallback <span class="hljs-title function_">createLogCallback</span><span class="hljs-params">()</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">EventCallback</span>() {
+        <span class="hljs-meta">@Override</span>
+        <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">onEvent</span><span class="hljs-params">(String type, Map&lt;String, Object&gt; data)</span> {
+            <span class="hljs-keyword">switch</span> (type) {
+                <span class="hljs-keyword">case</span> EventType.START -&gt; log.info(<span class="hljs-string">&quot;[开始] 工作流: {}&quot;</span>, data.get(<span class="hljs-string">&quot;workflow&quot;</span>));
+                <span class="hljs-keyword">case</span> EventType.STEP_START -&gt; log.info(<span class="hljs-string">&quot;[步骤开始] {}&quot;</span>, data.get(<span class="hljs-string">&quot;step&quot;</span>));
+                <span class="hljs-keyword">case</span> EventType.AGENT_REQUEST -&gt; log.info(<span class="hljs-string">&quot;[发送] -&gt; {}&quot;</span>, data.get(<span class="hljs-string">&quot;agent&quot;</span>));
+                <span class="hljs-keyword">case</span> EventType.AGENT_RESPONSE -&gt; log.info(<span class="hljs-string">&quot;[接收] &lt;- {}&quot;</span>, data.get(<span class="hljs-string">&quot;agent&quot;</span>));
+                <span class="hljs-keyword">case</span> EventType.NEGOTIATION_REQUEST -&gt;
+                        log.info(<span class="hljs-string">&quot;[协商请求] agent={}, 第{}轮&quot;</span>, data.get(<span class="hljs-string">&quot;agent&quot;</span>), data.get(<span class="hljs-string">&quot;round&quot;</span>));
+                <span class="hljs-keyword">case</span> EventType.NEGOTIATION_RESOLVED -&gt;
+                        log.info(<span class="hljs-string">&quot;[协商完成] agent={}&quot;</span>, data.get(<span class="hljs-string">&quot;agent&quot;</span>));
+                <span class="hljs-keyword">case</span> EventType.AUTHORIZATION_REQUEST -&gt;
+                        log.info(<span class="hljs-string">&quot;[授权请求] agent={}&quot;</span>, data.get(<span class="hljs-string">&quot;agent&quot;</span>));
+                <span class="hljs-keyword">case</span> EventType.NOTIFICATION -&gt;
+                        log.info(<span class="hljs-string">&quot;[通知] agent={}&quot;</span>, data.get(<span class="hljs-string">&quot;agent&quot;</span>));
+                <span class="hljs-keyword">case</span> EventType.ROUTE_DECISION -&gt;
+                        log.info(<span class="hljs-string">&quot;[路由] {} -&gt; {}&quot;</span>, data.get(<span class="hljs-string">&quot;step&quot;</span>), data.get(<span class="hljs-string">&quot;next&quot;</span>));
+                <span class="hljs-keyword">case</span> EventType.STEP_COMPLETE -&gt; log.info(<span class="hljs-string">&quot;[步骤完成] {}&quot;</span>, data.get(<span class="hljs-string">&quot;step&quot;</span>));
+                <span class="hljs-keyword">case</span> EventType.COMPLETE -&gt; log.info(<span class="hljs-string">&quot;[完成]&quot;</span>);
+                <span class="hljs-keyword">case</span> EventType.ERROR -&gt; log.error(<span class="hljs-string">&quot;[错误] {}&quot;</span>, data.get(<span class="hljs-string">&quot;error&quot;</span>));
+                <span class="hljs-keyword">case</span> EventType.CLOSE -&gt; log.info(<span class="hljs-string">&quot;[关闭]&quot;</span>);
+            }
+        }
+    };
+}
+</div></code></pre>
+<p>事件类型完整列表见 SDK 的 <code>EventType</code> 常量类。关键事件: <code>start</code> -&gt; <code>step_start</code> -&gt; <code>agent_request</code> / <code>agent_response</code> (含 <code>negotiation_*</code> / <code>authorization_*</code> / <code>notification</code>) -&gt; <code>step_complete</code> -&gt; <code>complete</code> / <code>error</code> -&gt; <code>close</code>。</p>
+<h3 id="步骤-6-可选-实现-extensioncallback">步骤 6: (可选) 实现 ExtensionCallback</h3>
+<p>如果工作台需要在 OMC 主动推送授权请求或通知时做出响应 (而非仅在前置预定位阶段单向下发)，可实现 <code>ExtensionCallback</code>:</p>
+<pre class="hljs"><code><div><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">WorkbenchExtensionCallback</span> <span class="hljs-keyword">extends</span> <span class="hljs-title class_">ExtensionCallback</span> {
+
+    <span class="hljs-meta">@Override</span>
+    <span class="hljs-keyword">public</span> CompletableFuture&lt;Boolean&gt; <span class="hljs-title function_">onAuthorization</span><span class="hljs-params">(
+            String agentName, Map&lt;String, Object&gt; authRequest)</span> {
+        <span class="hljs-comment">// OMC 在诊断过程中反向请求授权 (场景: 发现需要未预授权的操作)</span>
+        <span class="hljs-comment">// 返回 true 批准，false 拒绝</span>
+        log.info(<span class="hljs-string">&quot;[授权审批] agent={}, 请求: {}&quot;</span>, agentName, authRequest);
+        <span class="hljs-comment">// 生产环境可接入审批流 (人工确认、规则引擎等)</span>
+        <span class="hljs-keyword">return</span> CompletableFuture.completedFuture(<span class="hljs-literal">true</span>);
+    }
+
+    <span class="hljs-meta">@Override</span>
+    <span class="hljs-keyword">public</span> CompletableFuture&lt;Void&gt; <span class="hljs-title function_">onNotification</span><span class="hljs-params">(
+            String agentName, Map&lt;String, Object&gt; notification)</span> {
+        <span class="hljs-comment">// OMC 主动推送的通知 (场景: 抢通结果上报、状态变更等)</span>
+        log.info(<span class="hljs-string">&quot;[通知接收] agent={}, 内容: {}&quot;</span>, agentName, notification);
+        <span class="hljs-comment">// 生产环境可写入数据库、推送前端、触发后续流程</span>
+        <span class="hljs-keyword">return</span> CompletableFuture.completedFuture(<span class="hljs-literal">null</span>);
+    }
+}
+</div></code></pre>
+<p>挂载到 engineClient:</p>
+<pre class="hljs"><code><div>engineClient.setExtensionCallback(<span class="hljs-keyword">new</span> <span class="hljs-title class_">WorkbenchExtensionCallback</span>());
+</div></code></pre>
+<p>注意: <code>onAuthorization</code> 和 <code>onNotification</code> 是响应 OMC 在 Task-T 响应中携带的扩展数据。前置预定位阶段通过 <code>ExtensionSender</code> 下发的授权/订阅是单向推送，不触发这两个回调。两者的区别:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>前置预定位 (ExtensionSender)</th>
+<th>响应回调 (ExtensionCallback)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>发起方</td>
+<td>工作台主动下发</td>
+<td>OMC 在 Task-T 响答中携带</td>
+</tr>
+<tr>
+<td>时机</td>
+<td>工作流启动前</td>
+<td>工作流执行过程中</td>
+</tr>
+<tr>
+<td>用途</td>
+<td>下发授权白名单、建立订阅通道</td>
+<td>审批 OMC 运行时授权请求、接收推送通知</td>
+</tr>
+<tr>
+<td>SDK 组件</td>
+<td><code>ExtensionSender</code></td>
+<td><code>ExtensionCallback</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="4-完整调用时序">4. 完整调用时序</h2>
+<p>以下是工作台收到 WAIMO 下发诊断任务后的完整端到端时序:</p>
+<pre><code class="language-mermaid"><div class="mermaid">sequenceDiagram
+    participant WAIMO as WAIMO 故障中心
+    participant WB as 工作台 (AgentExecutor)
+    participant SDK as SDK 编排管线
+    participant OMC as OMC (华为)
+
+    WAIMO->>WB: A2A-T Task-T (原始诊断任务)
+    WB-->>WAIMO: submit("任务已接收")
+    WB-->>WAIMO: startWork("处理中")
+
+    WB->>SDK: run(input)
+
+    Note over SDK: 步骤 1: 加载 AgentCard
+    Note over SDK: 步骤 2: 搜索/加载 PSOP
+    Note over SDK: 步骤 3: 创建 transport + 门面
+
+    rect rgb(240, 248, 255)
+    Note over SDK,OMC: 步骤 4: 前置预定位
+    SDK->>OMC: sendAuthorization (授权白名单)
+    OMC-->>SDK: 授权成功
+    SDK->>OMC: sendNotification (订阅)
+    OMC-->>SDK: 订阅成功
+    end
+
+    rect rgb(255, 248, 240)
+    Note over SDK,OMC: 步骤 5: 执行工作流
+
+    Note over SDK: step_start: diagnosis_city1
+    SDK->>OMC: onTask -> sendMessage (Task-T 诊断)
+    OMC-->>SDK: 诊断结果
+    Note over SDK,OMC: (或 Negotiation-T 协商循环)
+    Note over SDK: step_complete: diagnosis_city1
+
+    Note over SDK: step_start: diagnosis_city2
+    SDK->>OMC: onTask -> sendMessage (Task-T 诊断)
+    OMC-->>SDK: 诊断结果
+    Note over SDK: step_complete: diagnosis_city2
+
+    Note over SDK: step_start: merge (SELF_LOOP)
+    Note over SDK: onSelfTask (本地汇总, 无 A2A-T)
+    Note over SDK: step_complete: merge
+
+    Note over SDK: complete (工作流结束)
+    Note over SDK: onFinish (持久化)
+    end
+
+    SDK-->>WB: ExecutionResult
+
+    WB-->>WAIMO: addArtifact(诊断汇总结果)
+    WB-->>WAIMO: complete("完成")
+
+    rect rgb(240, 255, 240)
+    Note over SDK,OMC: 后续: OMC 自动抢通并通过 SSE 通道上报结果
+    OMC-->>SDK: Notification-T (抢通结果)
+    Note over SDK: onNotification (ExtensionCallback)
+    end
+</div></code></pre>
+<hr>
+<h2 id="5-工作台需交付物清单">5. 工作台需交付物清单</h2>
+<table>
+<thead>
+<tr>
+<th>交付物</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TransportWorkbenchExecutor</code></td>
+<td>Java 类</td>
+<td>实现 <code>AgentExecutor</code>，A2A 服务端入口</td>
+</tr>
+<tr>
+<td><code>WorkbenchControlPoint</code></td>
+<td>Java 类</td>
+<td>继承 <code>DefaultControlPoint</code>，实现 onTask/onSelfTask/onRoute/onNegotiation</td>
+</tr>
+<tr>
+<td><code>WorkbenchOrchestrator</code></td>
+<td>Java 类</td>
+<td>组装编排管线 (加载卡片 -&gt; 预定位 -&gt; 执行)</td>
+</tr>
+<tr>
+<td><code>WorkbenchExtensionCallback</code> (可选)</td>
+<td>Java 类</td>
+<td>继承 <code>ExtensionCallback</code>，实现 onAuthorization/onNotification</td>
+</tr>
+<tr>
+<td><code>agentcard/transport_workbench_agent.json</code></td>
+<td>JSON</td>
+<td>工作台自身的 AgentCard</td>
+</tr>
+<tr>
+<td><code>spn_agent_credentials.json</code></td>
+<td>JSON</td>
+<td>下游 OMC 的认证凭证</td>
+</tr>
+<tr>
+<td><code>.env</code></td>
+<td>INI</td>
+<td>A2A-T SDK 的 LLM 配置</td>
+</tr>
+<tr>
+<td><code>application.yml</code> (Spring Boot)</td>
+<td>YAML</td>
+<td><code>a2at.server.agent-card</code> 等配置项</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="6-生产环境注意事项">6. 生产环境注意事项</h2>
+<h3 id="61-tls-与证书">6.1 TLS 与证书</h3>
+<p>生产环境 OMC 通常使用自签名证书。<code>WorkflowEngineClientConfig</code> 中:</p>
+<ul>
+<li><code>sslVerify(true)</code>: 校验证书 (需配置 CA 信任库 <code>caCertsPath</code>)</li>
+<li><code>sslVerify(false)</code>: 跳过校验 (仅开发环境)</li>
+</ul>
+<pre class="hljs"><code><div>WorkflowEngineClientConfig.builder()
+        .sslVerify(<span class="hljs-literal">true</span>)
+        .caCertsPath(<span class="hljs-string">&quot;/path/to/ca-truststore.jks&quot;</span>)
+        .credentialsConfigPath(credentialsPath)
+        .a2atEnvPath(a2atEnvPath)
+        .build()
+</div></code></pre>
+<h3 id="62-凭证加密">6.2 凭证加密</h3>
+<p><code>spn_agent_credentials.json</code> 中的密码字段使用 <code>enc:</code> 前缀标识加密内容。SDK 的 <code>CredentialCrypto</code> 使用对称加密自动解密。加密密钥通过环境变量或配置文件注入。生产环境不应明文存储密码。</p>
+<h3 id="63-协商轮次限制">6.3 协商轮次限制</h3>
+<p>默认协商最多 3 轮。如果 OMC 的协商场景复杂，可在创建 <code>WorkflowEngineClient</code> 时调整:</p>
+<pre class="hljs"><code><div><span class="hljs-comment">// Java: DefaultWorkflowEngineClient 构造时传入</span>
+<span class="hljs-type">WorkflowEngineClient</span> <span class="hljs-variable">engineClient</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">DefaultWorkflowEngineClient</span>(transport, <span class="hljs-literal">null</span>, <span class="hljs-literal">null</span>, <span class="hljs-number">5</span>);
+</div></code></pre>
+<h3 id="64-sse-长连接管理">6.4 SSE 长连接管理</h3>
+<p><code>sendNotification</code> 建立的 SSE 订阅通道是长连接。SDK 的 <code>A2ATransport</code> 管理连接池和超时。工作台应在服务关闭时调用 <code>transport.close()</code> 释放连接。<code>ExecutePsop</code> 在工作流结束后自动关闭 <code>engineClient</code>，但 <code>ExtensionSender</code> 的连接需要手动管理 (或共享同一个 transport，随 engineClient 一起关闭)。</p>
+<h3 id="65-并发与并行">6.5 并发与并行</h3>
+<p>SDK 的 <code>WorkflowExecutor</code> 自动并行调度同一层的步骤 (无依赖关系的步骤并发执行)。步骤内的子任务也并行执行。工作台无需自行管理并发。如果 OMC 有并发限制，通过工作流定义中的步骤分层 (layer) 控制执行顺序。</p>
+<h3 id="66-错误处理">6.6 错误处理</h3>
+<p><code>SendMessageResult</code> 包含 <code>taskState</code> 字段。关键状态:</p>
+<ul>
+<li><code>COMPLETED</code>: 任务正常完成</li>
+<li><code>INPUT_REQUIRED</code>: 需要协商 (SDK 自动处理，超过轮次后返回此状态)</li>
+<li><code>FAILED</code>: 任务失败</li>
+</ul>
+<p>工作台在 <code>onTask</code> 中应检查 <code>result.getText()</code> 是否为空来判断成功:</p>
+<pre class="hljs"><code><div>.thenApply(r -&gt; TaskResponse.builder()
+        .success(r.getText() != <span class="hljs-literal">null</span> &amp;&amp; !r.getText().isEmpty())
+        .output(r.getText())
+        .build())
+</div></code></pre>
+<hr>
+<h2 id="7-接口速查表">7. 接口速查表</h2>
+<h3 id="工作台实现的接口">工作台实现的接口</h3>
+<table>
+<thead>
+<tr>
+<th>接口</th>
+<th>方法</th>
+<th>签名 (Java)</th>
+<th>何时调用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AgentExecutor</code></td>
+<td><code>execute</code></td>
+<td><code>void execute(RequestContext ctx, AgentEmitter emitter)</code></td>
+<td>WAIMO 下发任务时</td>
+</tr>
+<tr>
+<td><code>AgentExecutor</code></td>
+<td><code>cancel</code></td>
+<td><code>void cancel(RequestContext ctx, AgentEmitter emitter)</code></td>
+<td>WAIMO 取消任务时</td>
+</tr>
+<tr>
+<td><code>ControlPoint</code></td>
+<td><code>onTask</code></td>
+<td><code>CompletableFuture&lt;TaskResponse&gt; onTask(TaskRequest, WorkflowEngineClient)</code></td>
+<td>步骤需要向下游发任务</td>
+</tr>
+<tr>
+<td><code>ControlPoint</code></td>
+<td><code>onSelfTask</code></td>
+<td><code>CompletableFuture&lt;TaskResponse&gt; onSelfTask(TaskRequest)</code></td>
+<td>自环节点本地处理</td>
+</tr>
+<tr>
+<td><code>ControlPoint</code></td>
+<td><code>onRoute</code></td>
+<td><code>CompletableFuture&lt;RouteDecision&gt; onRoute(String, Map, List)</code></td>
+<td>条件分支选择</td>
+</tr>
+<tr>
+<td><code>ControlPoint</code></td>
+<td><code>onNegotiation</code></td>
+<td><code>CompletableFuture&lt;String&gt; onNegotiation(String, String, Map)</code></td>
+<td>OMC 返回 INPUT_REQUIRED</td>
+</tr>
+<tr>
+<td><code>ExtensionCallback</code></td>
+<td><code>onAuthorization</code></td>
+<td><code>CompletableFuture&lt;Boolean&gt; onAuthorization(String, Map)</code></td>
+<td>OMC 推送授权请求</td>
+</tr>
+<tr>
+<td><code>ExtensionCallback</code></td>
+<td><code>onNotification</code></td>
+<td><code>CompletableFuture&lt;Void&gt; onNotification(String, Map)</code></td>
+<td>OMC 推送通知</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sdk-提供的接口">SDK 提供的接口</h3>
+<table>
+<thead>
+<tr>
+<th>接口</th>
+<th>方法</th>
+<th>签名 (Java)</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WorkflowEngineClient</code></td>
+<td><code>sendMessage</code></td>
+<td><code>CompletableFuture&lt;SendMessageResult&gt; sendMessage(String agent, String message)</code></td>
+<td>工作流中向下游发消息</td>
+</tr>
+<tr>
+<td><code>ExtensionSender</code></td>
+<td><code>sendAuthorization</code></td>
+<td><code>CompletableFuture&lt;SendMessageResult&gt; sendAuthorization(String agent, String instruction, String input)</code></td>
+<td>前置授权预定位</td>
+</tr>
+<tr>
+<td><code>ExtensionSender</code></td>
+<td><code>sendNotification</code></td>
+<td><code>CompletableFuture&lt;SendMessageResult&gt; sendNotification(String agent, String instruction, String input)</code></td>
+<td>前置订阅预定位</td>
+</tr>
+<tr>
+<td><code>ExecutePsop</code></td>
+<td><code>execute</code></td>
+<td><code>CompletableFuture&lt;ExecutionResult&gt; execute()</code> (Builder 模式)</td>
+<td>执行完整工作流</td>
+</tr>
+<tr>
+<td><code>LoadPsop</code></td>
+<td><code>search</code></td>
+<td><code>List&lt;WorkflowSearchResult&gt; search(String url, String intent, int topK, ...)</code></td>
+<td>语义搜索工作流</td>
+</tr>
+<tr>
+<td><code>LoadPsop</code></td>
+<td><code>load</code></td>
+<td><code>Workflow load(String url, String psopId, ...)</code></td>
+<td>加载工作流定义</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="8-与-demo-的关键区别">8. 与 Demo 的关键区别</h2>
+<p>本次集成是生产环境接入，与 Demo 示例代码的关键区别:</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Demo (samples)</th>
+<th>生产环境</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AgentExecutor</td>
+<td>模拟实现，返回固定文本</td>
+<td>对接真实 WAIMO 故障中心，需完整 A2A 消息时序</td>
+</tr>
+<tr>
+<td>OMC Agent</td>
+<td>模拟 Agent，预置响应</td>
+<td>华为真实 SPN Domain Agent，Bearer 认证、真实诊断逻辑</td>
+</tr>
+<tr>
+<td>AgentCard</td>
+<td>从 classpath 加载 JSON</td>
+<td>从注册中心获取或华为提供</td>
+</tr>
+<tr>
+<td>凭证</td>
+<td>明文密码</td>
+<td>加密存储 (enc: 前缀)</td>
+</tr>
+<tr>
+<td>TLS</td>
+<td>sslVerify=false</td>
+<td>生产证书校验</td>
+</tr>
+<tr>
+<td>PSOP</td>
+<td>fallback 固定 ID</td>
+<td>编排中心语义搜索 + 动态加载</td>
+</tr>
+<tr>
+<td>事件</td>
+<td>日志打印</td>
+<td>SSE 推送前端 + 持久化数据库</td>
+</tr>
+<tr>
+<td>协商</td>
+<td>固定澄清文本</td>
+<td>LLM 生成或业务规则引擎</td>
+</tr>
+<tr>
+<td>抢通结果</td>
+<td>不处理</td>
+<td>通过 Notification-T SSE 通道接收并入库</td>
+</tr>
+</tbody>
+</table>
+
+</body>
+</html>

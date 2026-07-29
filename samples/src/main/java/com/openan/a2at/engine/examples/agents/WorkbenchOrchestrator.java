@@ -138,7 +138,18 @@ public class WorkbenchOrchestrator {
             ExtensionSender extensionSender = new DefaultExtensionSender(transport);
 
         log.info("[Orchestrator] Step 4: Pre-position extensions");
-        new ExtensionPrePositioner().prePosition(extensionSender, agentCards);
+        new ExtensionPrePositioner().prePosition(extensionSender, agentCards, data -> {
+            Object agent = data.get("agent");
+            Object text = data.get("text");
+            Object metadata = data.get("metadata");
+            log.info("[onNotification] agent={}, text={} chars, metadata={}",
+                    agent,
+                    text != null ? String.valueOf(text).length() : 0,
+                    metadata != null ? "yes" : "no");
+            if (text != null) {
+                log.info("[onNotification] Recovery result from {}: {}", agent, text);
+            }
+        });
 
         log.info("[Orchestrator] Step 5: Execute workflow");
         WorkbenchControlPoint controlPoint =

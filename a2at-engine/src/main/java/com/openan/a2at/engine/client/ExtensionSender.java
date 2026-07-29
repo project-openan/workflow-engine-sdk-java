@@ -21,7 +21,9 @@ package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.model.SendMessageResult;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 /**
  * One-shot pre-positioning facade over a shared {@link A2ATransport}.
@@ -57,10 +59,26 @@ public interface ExtensionSender {
                 agentName, instruction, naturalLanguageInput, A2ATExtension.AUTHORIZATION_T);
     }
 
-    /** Convenience for Notification-T pre-positioning. */
+    /**
+     * Convenience for Notification-T pre-positioning.
+     *
+     * <p>The returned future completes on the first event (subscription confirmed).
+     * Subsequent events pushed by the agent through the long-lived SSE stream are
+     * forwarded to {@code eventCallback} as a map containing extracted text, metadata,
+     * state, and agent name. Pass {@code null} if you do not need later events.
+     */
     default CompletableFuture<SendMessageResult> sendNotification(
-            String agentName, String instruction, String naturalLanguageInput) {
+            String agentName,
+            String instruction,
+            String naturalLanguageInput,
+            Consumer<Map<String, Object>> eventCallback) {
         return sendExtensionMessage(
                 agentName, instruction, naturalLanguageInput, A2ATExtension.NOTIFICATION_T);
+    }
+
+    /** Convenience for Notification-T pre-positioning (no event callback). */
+    default CompletableFuture<SendMessageResult> sendNotification(
+            String agentName, String instruction, String naturalLanguageInput) {
+        return sendNotification(agentName, instruction, naturalLanguageInput, null);
     }
 }
