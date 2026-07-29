@@ -24,6 +24,11 @@ import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.SendMessageResult;
 
+import net.openan.a2at.sdk.client.A2ATClient;
+import net.openan.a2at.sdk.negotiation.runtime.helper.NegotiationPayloadMapper;
+import net.openan.a2at.sdk.negotiation.types.model.NegotiationContext;
+import net.openan.a2at.sdk.negotiation.types.model.NegotiationStatus;
+
 import org.a2aproject.sdk.client.ClientEvent;
 import org.a2aproject.sdk.client.MessageEvent;
 import org.a2aproject.sdk.client.TaskUpdateEvent;
@@ -216,10 +221,8 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                                     + "\n\n---\nOriginal Task:\n"
                                     + originalMessage
                                     + "\n\nPlease re-execute the task based on the clarification above.";
-                    Map<String, Object> followUpMeta = new HashMap<>();
-                    followUpMeta.put(
-                            "https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",
-                            "## Data Return Confirmation\n" + clarification + "\n");
+                    Map<String, Object> followUpMeta =
+                            buildNegotiationFollowUpMeta(agentName, negMeta, clarification);
                     return runBeforeSendHandlers(agentCard, followUp, followUpMeta)
                             .thenCompose(
                                     meta -> {
@@ -252,6 +255,42 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 });
     }
 
+    private Map<String, Object> buildNegotiationFollowUpMeta(
+            String agentName, Map<String, Object> negMeta, String clarification) {
+        A2ATClient a2atClient = transport.getA2atClient();
+        if (a2atClient != null) {
+            try {
+                Object ctxObj = negMeta.get("negotiation_context");
+                if (ctxObj instanceof Map<?, ?> rr) {
+                    Object innerCtx = rr.get("context");
+                    if (innerCtx instanceof Map<?, ?> contextMap) {
+                        @SuppressWarnings("unchecked")
+                        NegotiationContext context =
+                                NegotiationPayloadMapper.contextFromMap(
+                                        (Map<String, Object>) contextMap);
+                        Map<String, Object> payload =
+                                a2atClient.continueNegotiation(
+                                        context, NegotiationStatus.AGREED, clarification);
+                        log.info(
+                                "[Negotiation] SDK continueNegotiation payload for '{}': round {} -> AGREED",
+                                agentName,
+                                context.round());
+                        return new HashMap<>(payload);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn(
+                        "[Negotiation] continueNegotiation failed for '{}': {}; using fallback",
+                        agentName,
+                        e.getMessage());
+            }
+        }
+        Map<String, Object> meta = new HashMap<>();
+       meta.put(
+                A2ATExtension.NEGOTIATION_T.uri(),
+                "## Data Return Confirmation\n" + clarification + "\n");
+        return meta;
+    }
     // ------------------------------------------------------------------
     // Extension handler chain
     // ------------------------------------------------------------------
