@@ -143,11 +143,15 @@ com.openan.a2at.engine
 - [API Reference](docs/en/API_REFERENCE.md) - Public interface and class documentation
 - [Design Document](docs/en/DESIGN.md) - Architecture, module structure, design decisions
 - [Developer Guide](docs/en/DEVELOPER_GUIDE.md) - Internal architecture, contribution, debugging
+- [Notification-T Design Analysis](docs/en/notification-t-design-analysis.md) - Long-lived SSE design
 
 ### 中文
 
 - [集成指南](docs/zh/INTEGRATION_GUIDE.md) - 安装、配置、二次开发
 - [API 参考](docs/zh/API_REFERENCE.md) - 公共接口和类文档
+- [架构设计](docs/zh/DESIGN.md) - 架构、模块结构、设计决策
+- [开发者指南](docs/zh/DEVELOPER_GUIDE.md) - 内部架构、贡献、调试
+- [Notification-T 设计分析](docs/zh/notification-t-design-analysis.md) - 长连接 SSE 设计选型
 - [业务流](docs/zh/业务流.md) - SPN 跨城诊断业务流程
 - [调用过程](docs/zh/调用过程.md) - 端到端报文交互示例
 
