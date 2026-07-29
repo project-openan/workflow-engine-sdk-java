@@ -43,9 +43,19 @@ All Python SDK modules have Java equivalents:
 
 ## Documentation
 
-- [Integration Guide](docs/INTEGRATION_GUIDE.md) -- Setup, configuration, secondary development
-- [API Reference](docs/API_REFERENCE.md) -- Public interface and class documentation
-- [Developer Guide](DEVELOPER_GUIDE.md) -- Internal architecture and contribution guide
+### English
+
+- [Integration Guide](docs/en/INTEGRATION_GUIDE.md) -- Setup, configuration, secondary development
+- [API Reference](docs/en/API_REFERENCE.md) -- Public interface and class documentation
+- [Design Document](docs/en/DESIGN.md) -- Architecture, module structure, design decisions
+- [Developer Guide](docs/en/DEVELOPER_GUIDE.md) -- Internal architecture, contribution, debugging
+
+### 中文
+
+- [集成指南](docs/zh/INTEGRATION_GUIDE.md) -- 安装、配置、二次开发
+- [API 参考](docs/zh/API_REFERENCE.md) -- 公共接口和类文档
+- [业务流](docs/zh/业务流.md) -- SPN 跨城诊断业务流程
+- [调用过程](docs/zh/调用过程.md) -- 端到端报文交互示例
 
 ## Quick Start
 

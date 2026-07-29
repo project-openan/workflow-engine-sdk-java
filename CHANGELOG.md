@@ -61,9 +61,9 @@ and full A2A-T extension support. Feature parity with the Python SDK is maintain
   `A2AT_CRED_KEY` environment variable
 - SSE timeout configurable via `sendTimeoutSeconds` (default 600s)
 - Complete Chinese and English documentation:
-    - [Integration Guide](docs/INTEGRATION_GUIDE.md) / [中文](docs/INTEGRATION_GUIDE_zh.md)
-    - [API Reference](docs/API_REFERENCE.md) / [中文](docs/API_REFERENCE_zh.md)
-    - [Developer Guide](docs/DEVELOPER_GUIDE.md)
+    - [Integration Guide](docs/en/INTEGRATION_GUIDE.md) / [中文](docs/zh/INTEGRATION_GUIDE.md)
+    - [API Reference](docs/en/API_REFERENCE.md) / [中文](docs/zh/API_REFERENCE.md)
+    - [Developer Guide](docs/en/DEVELOPER_GUIDE.md)
     - [Contributing Guide](CONTRIBUTING.md)
 
 ### Changed
