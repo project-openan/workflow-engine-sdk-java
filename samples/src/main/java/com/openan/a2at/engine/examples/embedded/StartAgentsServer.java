@@ -17,13 +17,13 @@
  *    under the License.
  */
 
-package com.openan.a2at.engine.examples;
+package com.openan.a2at.engine.examples.embedded;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity1Executor;
 import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity2Executor;
 import com.openan.a2at.engine.examples.agents.TransportWorkbenchAgentExecutor;
-import com.openan.a2at.engine.examples.server.EmbeddedA2AServer;
+import com.openan.a2at.engine.examples.server.JdkHttpA2AServer;
 import com.openan.a2at.engine.registry.RegistryClient;
 
 import org.a2aproject.sdk.server.agentexecution.AgentExecutor;
@@ -48,6 +48,10 @@ import java.util.concurrent.CountDownLatch;
  * <p>Mirrors Python: samples/start_agents_server.py
  */
 public class StartAgentsServer implements Runnable {
+    static final String REGISTRY_URL = "https://127.0.0.1:5000";
+    static final String ORCH_URL = "https://127.0.0.1:5001";
+    static final String CRED_FILE = "spn_agent_credentials.json";
+    static final String A2AT_ENV_FILE = ".env";
     private static final Logger log = LoggerFactory.getLogger(StartAgentsServer.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
@@ -59,14 +63,60 @@ public class StartAgentsServer implements Runnable {
         System.setProperty("jdk.internal.httpclient.disableHostnameVerification", "true");
     }
 
-    static final String REGISTRY_URL = "https://127.0.0.1:5000";
-    static final String ORCH_URL = "https://127.0.0.1:5001";
-    static final String CRED_FILE = "spn_agent_credentials.json";
-    static final String A2AT_ENV_FILE = ".env";
-
-    private final List<EmbeddedA2AServer> servers = new ArrayList<>();
-    private volatile boolean running = true;
+    private final List<JdkHttpA2AServer> servers = new ArrayList<>();
     private final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private volatile boolean running = true;
+
+    @SuppressWarnings("unchecked")
+    private static AgentEntry loadAgent(String resourcePath, AgentExecutor executor)
+            throws Exception {
+        String path = StartAgentsServer.class.getClassLoader().getResource(resourcePath).getPath();
+        Map<String, Object> card = mapper.readValue(new java.io.File(path), Map.class);
+        List<Map<String, Object>> ifaces =
+                (List<Map<String, Object>>) card.getOrDefault("supportedInterfaces", List.of());
+        String url =
+                ifaces.isEmpty() ? "https://127.0.0.1:0" : String.valueOf(ifaces.get(0).get("url"));
+        URI uri = URI.create(url);
+        String host = uri.getHost() != null ? uri.getHost() : "127.0.0.1";
+        int port = uri.getPort() > 0 ? uri.getPort() : 0;
+        return new AgentEntry(host, port, card, executor);
+    }
+
+    private static void registerAgent(Map<String, Object> agentCard, boolean sslVerify) {
+        try {
+            RegistryClient registry = new RegistryClient(REGISTRY_URL, sslVerify);
+            registry.registerAgentCard(agentCard);
+            log.info("Registered agent: {}", agentCard.get("name"));
+        } catch (Exception e) {
+            log.warn("Registration failed for {}: {}", agentCard.get("name"), e.getMessage());
+        }
+    }
+
+    /**
+     * Resolve the A2AT {@code .env} file path. Searches classpath, then the project root (two
+     * levels up from the samples target/classes dir), then the current working directory. Returns
+     * null if not found.
+     */
+    public static String resolveEnvPath() {
+        var url = StartAgentsServer.class.getClassLoader().getResource(A2AT_ENV_FILE);
+        if (url != null && "file".equals(url.getProtocol())) {
+            return new java.io.File(url.getPath()).getAbsolutePath();
+        }
+        java.nio.file.Path cwd = java.nio.file.Paths.get(System.getProperty("user.dir"));
+        for (java.nio.file.Path dir = cwd; dir != null; dir = dir.getParent()) {
+            java.io.File candidate = dir.resolve(A2AT_ENV_FILE).toFile();
+            if (candidate.exists()) {
+                return candidate.getAbsolutePath();
+            }
+        }
+        return null;
+    }
+
+    public static void main(String[] args) throws Exception {
+        StartAgentsServer server = new StartAgentsServer();
+        Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
+        server.start();
+    }
 
     @Override
     public void run() {
@@ -99,8 +149,8 @@ public class StartAgentsServer implements Runnable {
 
         for (AgentEntry entry : agents) {
             try {
-                EmbeddedA2AServer server =
-                        new EmbeddedA2AServer(entry.host, entry.port, entry.card, entry.executor);
+                JdkHttpA2AServer server =
+                        new JdkHttpA2AServer(entry.host, entry.port, entry.card, entry.executor);
                 server.start();
                 servers.add(server);
                 registerAgent(entry.card, sslVerify);
@@ -132,57 +182,6 @@ public class StartAgentsServer implements Runnable {
         shutdownLatch.countDown();
     }
 
-    @SuppressWarnings("unchecked")
-    private static AgentEntry loadAgent(String resourcePath, AgentExecutor executor)
-            throws Exception {
-        String path = StartAgentsServer.class.getClassLoader().getResource(resourcePath).getPath();
-        Map<String, Object> card = mapper.readValue(new java.io.File(path), Map.class);
-        List<Map<String, Object>> ifaces =
-                (List<Map<String, Object>>) card.getOrDefault("supportedInterfaces", List.of());
-        String url =
-                ifaces.isEmpty() ? "https://127.0.0.1:0" : String.valueOf(ifaces.get(0).get("url"));
-        URI uri = URI.create(url);
-        String host = uri.getHost() != null ? uri.getHost() : "127.0.0.1";
-        int port = uri.getPort() > 0 ? uri.getPort() : 0;
-        return new AgentEntry(host, port, card, executor);
-    }
-
-    private static void registerAgent(Map<String, Object> agentCard, boolean sslVerify) {
-        try {
-            RegistryClient registry = new RegistryClient(REGISTRY_URL, sslVerify);
-            registry.registerAgentCard(agentCard);
-            log.info("Registered agent: {}", agentCard.get("name"));
-        } catch (Exception e) {
-            log.warn("Registration failed for {}: {}", agentCard.get("name"), e.getMessage());
-        }
-    }
-
     private record AgentEntry(
             String host, int port, Map<String, Object> card, AgentExecutor executor) {}
-
-    /**
-     * Resolve the A2AT {@code .env} file path. Searches classpath, then the project root (two
-     * levels up from the samples target/classes dir), then the current working directory. Returns
-     * null if not found.
-     */
-    public static String resolveEnvPath() {
-        var url = StartAgentsServer.class.getClassLoader().getResource(A2AT_ENV_FILE);
-        if (url != null && "file".equals(url.getProtocol())) {
-            return new java.io.File(url.getPath()).getAbsolutePath();
-        }
-        java.nio.file.Path cwd = java.nio.file.Paths.get(System.getProperty("user.dir"));
-        for (java.nio.file.Path dir = cwd; dir != null; dir = dir.getParent()) {
-            java.io.File candidate = dir.resolve(A2AT_ENV_FILE).toFile();
-            if (candidate.exists()) {
-                return candidate.getAbsolutePath();
-            }
-        }
-        return null;
-    }
-
-    public static void main(String[] args) throws Exception {
-        StartAgentsServer server = new StartAgentsServer();
-        Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
-        server.start();
-    }
 }

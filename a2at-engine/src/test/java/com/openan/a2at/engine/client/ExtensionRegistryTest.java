@@ -19,26 +19,25 @@
 
 package com.openan.a2at.engine.client;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-/**
- * Tests for ExtensionRegistry: URI matching, dedup, built-in handlers.
- */
+/** Tests for ExtensionRegistry: URI matching, dedup, built-in handlers. */
 class ExtensionRegistryTest {
 
     @Test
     void preRegistersTwoBuiltinHandlers() {
         ExtensionRegistry reg = new ExtensionRegistry();
-        List<ExtensionHandler> handlers = reg.getHandlersForExtensions(List.of(
-                "https://example.com/Task-T",
-                "https://example.com/Negotiation-T",
-                "https://example.com/Authorization-T",
-                "https://example.com/Notification-T"
-        ));
+        List<ExtensionHandler> handlers =
+                reg.getHandlersForExtensions(
+                        List.of(
+                                "https://example.com/Task-T",
+                                "https://example.com/Negotiation-T",
+                                "https://example.com/Authorization-T",
+                                "https://example.com/Notification-T"));
         // Authorization-T and Notification-T are pre-positioning operations,
         // not part of the workflow engine's extension handler chain.
         assertEquals(2, handlers.size());
@@ -47,9 +46,9 @@ class ExtensionRegistryTest {
     @Test
     void matchesTaskTHandler() {
         ExtensionRegistry reg = new ExtensionRegistry();
-        List<ExtensionHandler> handlers = reg.getHandlersForExtensions(List.of(
-                "https://a2a.example.org/extensions/Task-T/v1"
-        ));
+        List<ExtensionHandler> handlers =
+                reg.getHandlersForExtensions(
+                        List.of("https://a2a.example.org/extensions/Task-T/v1"));
         assertEquals(1, handlers.size());
         assertEquals("Task-T", handlers.get(0).extensionKeyword());
     }
@@ -57,9 +56,9 @@ class ExtensionRegistryTest {
     @Test
     void matchesNegotiationTHandler() {
         ExtensionRegistry reg = new ExtensionRegistry();
-        List<ExtensionHandler> handlers = reg.getHandlersForExtensions(List.of(
-                "https://a2a.example.org/extensions/NEGOTIATION-T/v1"
-        ));
+        List<ExtensionHandler> handlers =
+                reg.getHandlersForExtensions(
+                        List.of("https://a2a.example.org/extensions/NEGOTIATION-T/v1"));
         assertEquals(1, handlers.size());
         assertEquals("Negotiation-T", handlers.get(0).extensionKeyword());
     }
@@ -67,10 +66,9 @@ class ExtensionRegistryTest {
     @Test
     void deduplicatesWhenMultipleUrisMatchSameHandler() {
         ExtensionRegistry reg = new ExtensionRegistry();
-        List<ExtensionHandler> handlers = reg.getHandlersForExtensions(List.of(
-                "https://example.com/Task-T/v1",
-                "https://example.com/Task-T/v2"
-        ));
+        List<ExtensionHandler> handlers =
+                reg.getHandlersForExtensions(
+                        List.of("https://example.com/Task-T/v1", "https://example.com/Task-T/v2"));
         assertEquals(1, handlers.size(), "Task-T should be matched once even with two URIs");
     }
 
@@ -84,9 +82,8 @@ class ExtensionRegistryTest {
     @Test
     void returnsEmptyForUnmatchedUris() {
         ExtensionRegistry reg = new ExtensionRegistry();
-        List<ExtensionHandler> handlers = reg.getHandlersForExtensions(List.of(
-                "https://example.com/Unknown-Extension"
-        ));
+        List<ExtensionHandler> handlers =
+                reg.getHandlersForExtensions(List.of("https://example.com/Unknown-Extension"));
         assertTrue(handlers.isEmpty());
     }
 
@@ -100,34 +97,41 @@ class ExtensionRegistryTest {
     @Test
     void customHandlerCanBeRegistered() {
         ExtensionRegistry reg = new ExtensionRegistry();
-        ExtensionHandler custom = new ExtensionHandler() {
-            @Override
-            public String extensionKeyword() {
-                return "Custom-T";
-            }
+        ExtensionHandler custom =
+                new ExtensionHandler() {
+                    @Override
+                    public String extensionKeyword() {
+                        return "Custom-T";
+                    }
 
-            @Override
-            public java.util.concurrent.CompletableFuture<java.util.Map<String, Object>> beforeSend(
-                    org.a2aproject.sdk.spec.AgentCard agentCard, String messageText,
-                    java.util.Map<String, Object> metadata, net.openan.a2at.sdk.client.A2ATClient a2atClient, com.openan.a2at.engine.control.ControlPoint controlPoint) {
-                return java.util.concurrent.CompletableFuture.completedFuture(metadata);
-            }
+                    @Override
+                    public java.util.concurrent.CompletableFuture<java.util.Map<String, Object>>
+                            beforeSend(
+                                    org.a2aproject.sdk.spec.AgentCard agentCard,
+                                    String messageText,
+                                    java.util.Map<String, Object> metadata,
+                                    net.openan.a2at.sdk.client.A2ATClient a2atClient,
+                                    com.openan.a2at.engine.control.ControlPoint controlPoint) {
+                        return java.util.concurrent.CompletableFuture.completedFuture(metadata);
+                    }
 
-            @Override
-            public java.util.concurrent.CompletableFuture<com.openan.a2at.engine.model.SendMessageResult> afterReceive(
-                    org.a2aproject.sdk.spec.AgentCard agentCard,
-                    com.openan.a2at.engine.model.SendMessageResult result,
-                    net.openan.a2at.sdk.client.A2ATClient a2atClient,
-                    com.openan.a2at.engine.control.ControlPoint controlPoint,
-                    com.openan.a2at.engine.control.ExtensionCallback extensionCallback,
-                    com.openan.a2at.engine.control.EventCallback eventCallback) {
-                return java.util.concurrent.CompletableFuture.completedFuture(result);
-            }
-        };
+                    @Override
+                    public java.util.concurrent.CompletableFuture<
+                                    com.openan.a2at.engine.model.SendMessageResult>
+                            afterReceive(
+                                    org.a2aproject.sdk.spec.AgentCard agentCard,
+                                    com.openan.a2at.engine.model.SendMessageResult result,
+                                    net.openan.a2at.sdk.client.A2ATClient a2atClient,
+                                    com.openan.a2at.engine.control.ControlPoint controlPoint,
+                                    com.openan.a2at.engine.control.ExtensionCallback
+                                            extensionCallback,
+                                    com.openan.a2at.engine.control.EventCallback eventCallback) {
+                        return java.util.concurrent.CompletableFuture.completedFuture(result);
+                    }
+                };
         reg.register(custom);
-        List<ExtensionHandler> handlers = reg.getHandlersForExtensions(List.of(
-                "https://example.com/Custom-T/v1"
-        ));
+        List<ExtensionHandler> handlers =
+                reg.getHandlersForExtensions(List.of("https://example.com/Custom-T/v1"));
         assertTrue(handlers.size() >= 1);
         assertEquals("Custom-T", handlers.get(0).extensionKeyword());
     }

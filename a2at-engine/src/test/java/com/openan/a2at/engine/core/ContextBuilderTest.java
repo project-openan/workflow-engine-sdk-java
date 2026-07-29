@@ -19,17 +19,18 @@
 
 package com.openan.a2at.engine.core;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.openan.a2at.engine.model.JumpCondition;
 import com.openan.a2at.engine.model.Task;
 import com.openan.a2at.engine.model.Workflow;
 import com.openan.a2at.engine.model.WorkflowStep;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class ContextBuilderTest {
 
@@ -37,8 +38,12 @@ class ContextBuilderTest {
         return WorkflowStep.builder()
                 .name(name)
                 .layer(layer)
-                .next(next == null ? List.of() : next.stream()
-                        .map(s -> JumpCondition.builder().step(s).build()).toList())
+                .next(
+                        next == null
+                                ? List.of()
+                                : next.stream()
+                                        .map(s -> JumpCondition.builder().step(s).build())
+                                        .toList())
                 .contextFrom(contextFrom)
                 .subtasks(List.of(Task.builder().agent("A").description("t").build()))
                 .build();
@@ -46,7 +51,11 @@ class ContextBuilderTest {
 
     @Test
     void layerZeroReturnsRuntimeIntentOnly() {
-        Workflow wf = Workflow.builder().name("w").steps(List.of(step("s1", 0, List.of("s2"), null))).build();
+        Workflow wf =
+                Workflow.builder()
+                        .name("w")
+                        .steps(List.of(step("s1", 0, List.of("s2"), null)))
+                        .build();
         ContextBuilder cb = new ContextBuilder(wf, "my intent");
         String ctx = cb.buildContext(wf.getSteps().get(0), new HashMap<>());
         assertEquals("## Runtime Context\n\nmy intent", ctx);
@@ -54,7 +63,11 @@ class ContextBuilderTest {
 
     @Test
     void layerZeroNoIntentReturnsEmpty() {
-        Workflow wf = Workflow.builder().name("w").steps(List.of(step("s1", 0, List.of("s2"), null))).build();
+        Workflow wf =
+                Workflow.builder()
+                        .name("w")
+                        .steps(List.of(step("s1", 0, List.of("s2"), null)))
+                        .build();
         ContextBuilder cb = new ContextBuilder(wf, "");
         String ctx = cb.buildContext(wf.getSteps().get(0), new HashMap<>());
         assertEquals("", ctx);
@@ -130,7 +143,8 @@ class ContextBuilderTest {
 
     @Test
     void buildTaskMessageWithZhLang() {
-        Workflow wf = Workflow.builder().name("w").steps(List.of(step("s", 0, List.of(), null))).build();
+        Workflow wf =
+                Workflow.builder().name("w").steps(List.of(step("s", 0, List.of(), null))).build();
         ContextBuilder cb = new ContextBuilder(wf, "");
         String msg = cb.buildTaskMessage("do task", "context here", "zh");
         assertTrue(msg.contains("context here"));
@@ -141,7 +155,8 @@ class ContextBuilderTest {
 
     @Test
     void buildTaskMessageWithEnLang() {
-        Workflow wf = Workflow.builder().name("w").steps(List.of(step("s", 0, List.of(), null))).build();
+        Workflow wf =
+                Workflow.builder().name("w").steps(List.of(step("s", 0, List.of(), null))).build();
         ContextBuilder cb = new ContextBuilder(wf, "");
         String msg = cb.buildTaskMessage("do task", "context here", "en");
         assertTrue(msg.contains("Please respond in English"));
@@ -149,7 +164,8 @@ class ContextBuilderTest {
 
     @Test
     void buildTaskMessageNoContext() {
-        Workflow wf = Workflow.builder().name("w").steps(List.of(step("s", 0, List.of(), null))).build();
+        Workflow wf =
+                Workflow.builder().name("w").steps(List.of(step("s", 0, List.of(), null))).build();
         ContextBuilder cb = new ContextBuilder(wf, "");
         String msg = cb.buildTaskMessage("just a task", "", "zh");
         assertTrue(msg.startsWith("just a task"));

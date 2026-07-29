@@ -86,15 +86,13 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     // Wiring
     // ------------------------------------------------------------------
 
-    @Override
-    public void setControlPoint(ControlPoint controlPoint) {
-        this.controlPoint = controlPoint;
+    private static boolean isNegotiationNeeded(SendMessageResult result) {
+        return result.getTaskState() != null && result.getTaskState().contains("INPUT_REQUIRED");
     }
 
     @Override
-    public void setExtensionCallback(
-            com.openan.a2at.engine.control.ExtensionCallback extensionCallback) {
-        this.extensionCallback = extensionCallback;
+    public void setControlPoint(ControlPoint controlPoint) {
+        this.controlPoint = controlPoint;
     }
 
     @Override
@@ -102,29 +100,16 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         this.eventCallback = callback != null ? callback : new EventCallback();
     }
 
-    @Override
-    public void registerHandler(ExtensionHandler handler) {
-        extensionRegistry.register(handler);
-    }
-
-    @Override
-    public List<String> getAgentNames() {
-        return transport.getAgentNames();
-    }
-
-    @Override
-    public void updateAgentCards(List<AgentCard> agentCards) {
-        transport.updateAgentCards(agentCards);
-    }
-
+    // ------------------------------------------------------------------
+    // Workflow send path
+    // ------------------------------------------------------------------
     private void emit(String type, Map<String, Object> data) {
         eventCallback.onEvent(type, data);
     }
 
     // ------------------------------------------------------------------
-    // Workflow send path
+    // Auto-negotiation
     // ------------------------------------------------------------------
-
     @Override
     public CompletableFuture<SendMessageResult> sendMessage(
             String agentName, String message, String contextId, Map<String, Object> metadata) {
@@ -165,10 +150,6 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                                                             result, 1));
                         });
     }
-
-    // ------------------------------------------------------------------
-    // Auto-negotiation
-    // ------------------------------------------------------------------
 
     private CompletableFuture<SendMessageResult> autoNegotiate(
             AgentCard agentCard,
@@ -269,10 +250,6 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                                                                         round + 1));
                                     });
                 });
-    }
-
-    private static boolean isNegotiationNeeded(SendMessageResult result) {
-        return result.getTaskState() != null && result.getTaskState().contains("INPUT_REQUIRED");
     }
 
     // ------------------------------------------------------------------

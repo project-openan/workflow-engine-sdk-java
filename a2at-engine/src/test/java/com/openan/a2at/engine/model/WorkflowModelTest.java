@@ -19,31 +19,52 @@
 
 package com.openan.a2at.engine.model;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-/**
- * Tests for Workflow/WorkflowStep/Task/JumpCondition/StepType model parsing.
- */
+/** Tests for Workflow/WorkflowStep/Task/JumpCondition/StepType model parsing. */
 class WorkflowModelTest {
 
     @Test
     void parsesLinearWorkflow() {
-        Map<String, Object> data = Map.of(
-                "id", "wf-1",
-                "name", "test",
-                "steps", List.of(
-                        Map.of("name", "s1", "layer", 0,
-                                "subtasks", List.of(Map.of("agent", "A", "skill", "diag", "description", "do A")),
-                                "next", List.of(Map.of("step", "s2", "condition", ""))),
-                        Map.of("name", "s2", "layer", 1,
-                                "subtasks", List.of(Map.of("agent", "B", "description", "do B")))
-                )
-        );
+        Map<String, Object> data =
+                Map.of(
+                        "id", "wf-1",
+                        "name", "test",
+                        "steps",
+                                List.of(
+                                        Map.of(
+                                                "name",
+                                                "s1",
+                                                "layer",
+                                                0,
+                                                "subtasks",
+                                                List.of(
+                                                        Map.of(
+                                                                "agent",
+                                                                "A",
+                                                                "skill",
+                                                                "diag",
+                                                                "description",
+                                                                "do A")),
+                                                "next",
+                                                List.of(Map.of("step", "s2", "condition", ""))),
+                                        Map.of(
+                                                "name",
+                                                "s2",
+                                                "layer",
+                                                1,
+                                                "subtasks",
+                                                List.of(
+                                                        Map.of(
+                                                                "agent",
+                                                                "B",
+                                                                "description",
+                                                                "do B")))));
         Workflow wf = Workflow.fromMap(data);
         assertEquals("wf-1", wf.getId());
         assertEquals("test", wf.getName());
@@ -59,54 +80,87 @@ class WorkflowModelTest {
 
     @Test
     void stepTypeCaseInsensitiveAllSuccess() {
-        for (String v : List.of("AllSuccess", "ALLSUCCESS", "allsuccess", "ALL_SUCCESS", "all_success")) {
-            Map<String, Object> data = Map.of("name", "t", "steps",
-                    List.of(Map.of("name", "s", "step_type", v, "subtasks", List.of())));
+        for (String v :
+                List.of("AllSuccess", "ALLSUCCESS", "allsuccess", "ALL_SUCCESS", "all_success")) {
+            Map<String, Object> data =
+                    Map.of(
+                            "name",
+                            "t",
+                            "steps",
+                            List.of(Map.of("name", "s", "step_type", v, "subtasks", List.of())));
             Workflow wf = Workflow.fromMap(data);
-            assertEquals(StepType.ALL_SUCCESS, wf.getSteps().get(0).getStepType(),
+            assertEquals(
+                    StepType.ALL_SUCCESS,
+                    wf.getSteps().get(0).getStepType(),
                     "Failed for input: " + v);
         }
     }
 
     @Test
     void stepTypeCaseInsensitiveAnySuccess() {
-        for (String v : List.of("AnySuccess", "ANYSUCCESS", "anysuccess", "ANY_SUCCESS", "any_success")) {
-            Map<String, Object> data = Map.of("name", "t", "steps",
-                    List.of(Map.of("name", "s", "step_type", v, "subtasks", List.of())));
+        for (String v :
+                List.of("AnySuccess", "ANYSUCCESS", "anysuccess", "ANY_SUCCESS", "any_success")) {
+            Map<String, Object> data =
+                    Map.of(
+                            "name",
+                            "t",
+                            "steps",
+                            List.of(Map.of("name", "s", "step_type", v, "subtasks", List.of())));
             Workflow wf = Workflow.fromMap(data);
-            assertEquals(StepType.ANY_SUCCESS, wf.getSteps().get(0).getStepType(),
+            assertEquals(
+                    StepType.ANY_SUCCESS,
+                    wf.getSteps().get(0).getStepType(),
                     "Failed for input: " + v);
         }
     }
 
     @Test
     void stepTypeViaTypeFieldFallback() {
-        Map<String, Object> data = Map.of("name", "t", "steps",
-                List.of(Map.of("name", "s", "type", "AnySuccess", "subtasks", List.of())));
+        Map<String, Object> data =
+                Map.of(
+                        "name",
+                        "t",
+                        "steps",
+                        List.of(Map.of("name", "s", "type", "AnySuccess", "subtasks", List.of())));
         Workflow wf = Workflow.fromMap(data);
         assertEquals(StepType.ANY_SUCCESS, wf.getSteps().get(0).getStepType());
     }
 
     @Test
     void stepTypeDefaultsToAllSuccess() {
-        Map<String, Object> data = Map.of("name", "t", "steps",
-                List.of(Map.of("name", "s", "subtasks", List.of())));
+        Map<String, Object> data =
+                Map.of("name", "t", "steps", List.of(Map.of("name", "s", "subtasks", List.of())));
         Workflow wf = Workflow.fromMap(data);
         assertEquals(StepType.ALL_SUCCESS, wf.getSteps().get(0).getStepType());
     }
 
     @Test
     void stepTypeBogusFallsBackToAllSuccess() {
-        Map<String, Object> data = Map.of("name", "t", "steps",
-                List.of(Map.of("name", "s", "step_type", "bogus", "subtasks", List.of())));
+        Map<String, Object> data =
+                Map.of(
+                        "name",
+                        "t",
+                        "steps",
+                        List.of(Map.of("name", "s", "step_type", "bogus", "subtasks", List.of())));
         Workflow wf = Workflow.fromMap(data);
         assertEquals(StepType.ALL_SUCCESS, wf.getSteps().get(0).getStepType());
     }
 
     @Test
     void contextFromSingleStringNormalizedToList() {
-        Map<String, Object> data = Map.of("name", "t", "steps",
-                List.of(Map.of("name", "s", "context_from", "prev_step", "subtasks", List.of())));
+        Map<String, Object> data =
+                Map.of(
+                        "name",
+                        "t",
+                        "steps",
+                        List.of(
+                                Map.of(
+                                        "name",
+                                        "s",
+                                        "context_from",
+                                        "prev_step",
+                                        "subtasks",
+                                        List.of())));
         Workflow wf = Workflow.fromMap(data);
         assertNotNull(wf.getSteps().get(0).getContextFrom());
         assertEquals(List.of("prev_step"), wf.getSteps().get(0).getContextFrom());
@@ -114,16 +168,38 @@ class WorkflowModelTest {
 
     @Test
     void contextFromListPreserved() {
-        Map<String, Object> data = Map.of("name", "t", "steps",
-                List.of(Map.of("name", "s", "context_from", List.of("a", "b"), "subtasks", List.of())));
+        Map<String, Object> data =
+                Map.of(
+                        "name",
+                        "t",
+                        "steps",
+                        List.of(
+                                Map.of(
+                                        "name",
+                                        "s",
+                                        "context_from",
+                                        List.of("a", "b"),
+                                        "subtasks",
+                                        List.of())));
         Workflow wf = Workflow.fromMap(data);
         assertEquals(List.of("a", "b"), wf.getSteps().get(0).getContextFrom());
     }
 
     @Test
     void contextFromStarPreserved() {
-        Map<String, Object> data = Map.of("name", "t", "steps",
-                List.of(Map.of("name", "s", "context_from", List.of("*"), "subtasks", List.of())));
+        Map<String, Object> data =
+                Map.of(
+                        "name",
+                        "t",
+                        "steps",
+                        List.of(
+                                Map.of(
+                                        "name",
+                                        "s",
+                                        "context_from",
+                                        List.of("*"),
+                                        "subtasks",
+                                        List.of())));
         Workflow wf = Workflow.fromMap(data);
         assertEquals(List.of("*"), wf.getSteps().get(0).getContextFrom());
     }

@@ -19,26 +19,26 @@
 
 package com.openan.a2at.engine.client;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-/**
- * Tests for AgentCardNormalizer: OpenAPI -> structured format conversion.
- */
+/** Tests for AgentCardNormalizer: OpenAPI -> structured format conversion. */
 class AgentCardNormalizerTest {
 
     @Test
     void normalizeNoOpWhenAlreadyStructured() {
-        Map<String, Object> card = Map.of(
-                "name", "Agent1",
-                "securitySchemes", Map.of(
-                        "bearerAuth", Map.of("httpAuthSecurityScheme", Map.of("scheme", "bearer"))
-                )
-        );
+        Map<String, Object> card =
+                Map.of(
+                        "name",
+                        "Agent1",
+                        "securitySchemes",
+                        Map.of(
+                                "bearerAuth",
+                                Map.of("httpAuthSecurityScheme", Map.of("scheme", "bearer"))));
         Map<String, Object> result = AgentCardNormalizer.normalize(card);
         assertEquals("Agent1", result.get("name"));
         @SuppressWarnings("unchecked")
@@ -49,12 +49,14 @@ class AgentCardNormalizerTest {
     @Test
     @SuppressWarnings("unchecked")
     void convertsOpenApiBearerScheme() {
-        Map<String, Object> card = Map.of(
-                "name", "Agent1",
-                "securitySchemes", Map.of(
-                        "bearerAuth", Map.of("scheme", "bearer", "description", "Bearer auth")
-                )
-        );
+        Map<String, Object> card =
+                Map.of(
+                        "name",
+                        "Agent1",
+                        "securitySchemes",
+                        Map.of(
+                                "bearerAuth",
+                                Map.of("scheme", "bearer", "description", "Bearer auth")));
         Map<String, Object> result = AgentCardNormalizer.normalize(card);
         Map<String, Object> schemes = (Map<String, Object>) result.get("securitySchemes");
         Map<String, Object> bearer = (Map<String, Object>) schemes.get("bearerAuth");
@@ -67,17 +69,20 @@ class AgentCardNormalizerTest {
     @Test
     @SuppressWarnings("unchecked")
     void convertsOpenApiApiKeyScheme() {
-        Map<String, Object> card = Map.of(
-                "name", "Agent1",
-                "securitySchemes", Map.of(
-                        "apiKeyAuth", Map.of("type", "apiKey", "in", "header", "name", "X-API-Key")
-                )
-        );
+        Map<String, Object> card =
+                Map.of(
+                        "name",
+                        "Agent1",
+                        "securitySchemes",
+                        Map.of(
+                                "apiKeyAuth",
+                                Map.of("type", "apiKey", "in", "header", "name", "X-API-Key")));
         Map<String, Object> result = AgentCardNormalizer.normalize(card);
         Map<String, Object> schemes = (Map<String, Object>) result.get("securitySchemes");
         Map<String, Object> apiKeyWrapper = (Map<String, Object>) schemes.get("apiKeyAuth");
         assertNotNull(apiKeyWrapper.get("apiKeySecurityScheme"));
-        Map<String, Object> apiKey = (Map<String, Object>) apiKeyWrapper.get("apiKeySecurityScheme");
+        Map<String, Object> apiKey =
+                (Map<String, Object>) apiKeyWrapper.get("apiKeySecurityScheme");
         assertEquals("header", apiKey.get("location"));
         assertEquals("X-API-Key", apiKey.get("name"));
     }
@@ -85,12 +90,14 @@ class AgentCardNormalizerTest {
     @Test
     @SuppressWarnings("unchecked")
     void autoPopulatesSecurityRequirementsFromSchemes() {
-        Map<String, Object> card = Map.of(
-                "name", "Agent1",
-                "securitySchemes", Map.of(
-                        "bearerAuth", Map.of("httpAuthSecurityScheme", Map.of("scheme", "bearer"))
-                )
-        );
+        Map<String, Object> card =
+                Map.of(
+                        "name",
+                        "Agent1",
+                        "securitySchemes",
+                        Map.of(
+                                "bearerAuth",
+                                Map.of("httpAuthSecurityScheme", Map.of("scheme", "bearer"))));
         Map<String, Object> result = AgentCardNormalizer.normalize(card);
         Object secReqs = result.get("securityRequirements");
         assertNotNull(secReqs);
@@ -103,17 +110,19 @@ class AgentCardNormalizerTest {
     @Test
     @SuppressWarnings("unchecked")
     void normalizesListStyleSecurityRequirements() {
-        Map<String, Object> card = Map.of(
-                "name", "Agent1",
-                "securitySchemes", Map.of(
-                        "bearerAuth", Map.of("httpAuthSecurityScheme", Map.of("scheme", "bearer"))
-                ),
-                "securityRequirements", List.of(
-                        Map.of("schemes", List.of("bearerAuth"))
-                )
-        );
+        Map<String, Object> card =
+                Map.of(
+                        "name", "Agent1",
+                        "securitySchemes",
+                                Map.of(
+                                        "bearerAuth",
+                                        Map.of(
+                                                "httpAuthSecurityScheme",
+                                                Map.of("scheme", "bearer"))),
+                        "securityRequirements", List.of(Map.of("schemes", List.of("bearerAuth"))));
         Map<String, Object> result = AgentCardNormalizer.normalize(card);
-        List<Map<String, Object>> reqs = (List<Map<String, Object>>) result.get("securityRequirements");
+        List<Map<String, Object>> reqs =
+                (List<Map<String, Object>>) result.get("securityRequirements");
         Map<String, Object> schemesMap = (Map<String, Object>) reqs.get(0).get("schemes");
         assertNotNull(schemesMap.get("bearerAuth"));
     }
@@ -126,11 +135,11 @@ class AgentCardNormalizerTest {
 
     @Test
     void preservesNameAndCapabilities() {
-        Map<String, Object> card = Map.of(
-                "name", "MyAgent",
-                "description", "An agent",
-                "capabilities", Map.of("streaming", true)
-        );
+        Map<String, Object> card =
+                Map.of(
+                        "name", "MyAgent",
+                        "description", "An agent",
+                        "capabilities", Map.of("streaming", true));
         Map<String, Object> result = AgentCardNormalizer.normalize(card);
         assertEquals("MyAgent", result.get("name"));
         assertEquals("An agent", result.get("description"));

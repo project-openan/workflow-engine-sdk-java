@@ -1,0 +1,16 @@
+﻿server:
+  port: 26337
+  ssl:
+    enabled: true
+    key-store: classpath:a2a-server-keystore.p12
+    key-store-password: changeit
+    key-store-type: PKCS12
+
+spring:
+  main:
+    banner-mode: off
+
+a2at:
+  server:
+    agent-card: classpath:agentcard/transport_workbench_agent.json
+    path-prefix: /a2a/json

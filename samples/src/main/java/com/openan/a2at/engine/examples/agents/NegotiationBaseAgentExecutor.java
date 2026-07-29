@@ -59,15 +59,12 @@ import java.util.concurrent.TimeUnit;
 public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(NegotiationBaseAgentExecutor.class);
-
-    private volatile A2ATClient a2atClient;
-
     // Pre-positioned extensions (Authorization-T / Notification-T) are handled
     // by a dedicated handler, keeping this class focused on Negotiation-T.
     private final PrePositionedExtensionHandler prePositionedHandler =
             new PrePositionedExtensionHandler();
-
     private final BlockingQueue<String> notificationQueue = new LinkedBlockingQueue<>();
+    private volatile A2ATClient a2atClient;
 
     /** The pre-positioned Authorization-T whitelist policy text, or null. */
     protected final String getAuthorizationPolicy() {

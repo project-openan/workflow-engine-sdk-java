@@ -92,6 +92,21 @@ class AgentAuthManager {
         }
     }
 
+    private static List<String> extractExtensionUris(AgentCard agentCard) {
+        List<String> uris = new ArrayList<>();
+        var extensions = agentCard.capabilities().extensions();
+        if (extensions == null) {
+            return uris;
+        }
+        for (var ext : extensions) {
+            String uri = ext.uri();
+            if (!uri.isEmpty()) {
+                uris.add(uri);
+            }
+        }
+        return uris;
+    }
+
     /** Get or create a credential service for the given agent. */
     public AgentCredentialService getService(String agentName) {
         return services.computeIfAbsent(
@@ -163,10 +178,8 @@ class AgentAuthManager {
                             .anyMatch(
                                     v ->
                                             v != null
-                                                    && (v
-                                                                    .containsKey("auth_header")
-                                                            || v
-                                                                    .containsKey("accept_header")));
+                                                    && (v.containsKey("auth_header")
+                                                            || v.containsKey("accept_header")));
             if (useCustomHeaders) {
                 interceptors.add(new CustomAuthInterceptor(credSvc, agentCfg));
                 log.info(
@@ -184,20 +197,5 @@ class AgentAuthManager {
         }
 
         return interceptors;
-    }
-
-    private static List<String> extractExtensionUris(AgentCard agentCard) {
-        List<String> uris = new ArrayList<>();
-        var extensions = agentCard.capabilities().extensions();
-        if (extensions == null) {
-            return uris;
-        }
-        for (var ext : extensions) {
-            String uri = ext.uri();
-            if (!uri.isEmpty()) {
-                uris.add(uri);
-            }
-        }
-        return uris;
     }
 }

@@ -119,6 +119,148 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
         this(false, null, 600L, null);
     }
 
+    private static String extractAgentUrl(AgentCard agentCard) {
+        if (!agentCard.supportedInterfaces().isEmpty()) {
+            return agentCard.supportedInterfaces().get(0).url();
+        }
+        return "?";
+    }
+
+    private static void onEvent(
+            String agentName,
+            ClientEvent event,
+            List<ClientEvent> events,
+            AtomicReference<ClientEvent> lastEventRef,
+            Consumer<ClientEvent> eventSink,
+            CountDownLatch done) {
+        events.add(event);
+        lastEventRef.set(event);
+        logEvent(agentName, event);
+        ProtocolLogger.logResponseEvent(agentName, event);
+        if (eventSink != null) {
+            try {
+                eventSink.accept(event);
+            } catch (Exception e) {
+                log.warn(
+                        "[A2ARuntime] eventSink callback failed for {} (event_class={}): {}",
+                        agentName,
+                        event.getClass().getSimpleName(),
+                        e.getMessage(),
+                        e);
+            }
+        }
+        if (isTerminal(event)) {
+            log.info(
+                    "[A2ARuntime] Terminal event for '{}': {}",
+                    agentName,
+                    describeTerminalEvent(event));
+            done.countDown();
+        }
+    }
+
+    private static void onError(
+            String agentName,
+            Throwable error,
+            CountDownLatch done,
+            AtomicReference<Throwable> errorRef) {
+        if (done.getCount() == 0) {
+            log.debug(
+                    "[A2ARuntime] Connection closed after terminal event for '{}': {}",
+                    agentName,
+                    error.getMessage());
+        } else {
+            String msg = error.getMessage() != null ? error.getMessage() : "";
+            boolean connectionClosed =
+                    msg.contains("connection closed locally")
+                            || msg.contains("chunked transfer encoding, state: READING_LENGTH");
+            if (connectionClosed) {
+                log.debug("[A2ARuntime] Connection closed for '{}': {}", agentName, msg);
+            } else {
+                errorRef.set(error);
+                log.error(
+                        "[A2ARuntime] Error callback for '{}': {}",
+                        agentName,
+                        error.getMessage(),
+                        error);
+            }
+            done.countDown();
+        }
+    }
+
+    private static boolean isTerminal(ClientEvent event) {
+        if (event instanceof TaskEvent taskEvent) {
+            return isTerminal(taskEvent.getTask().status().state());
+        }
+        if (event instanceof TaskUpdateEvent taskUpdateEvent) {
+            if (taskUpdateEvent.getUpdateEvent() instanceof TaskStatusUpdateEvent statusUpdate) {
+                return isTerminal(statusUpdate.status().state());
+            }
+            // Artifact updates are not terminal
+            if (taskUpdateEvent.getUpdateEvent() instanceof TaskArtifactUpdateEvent) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isTerminal(TaskState state) {
+        return state == TaskState.TASK_STATE_COMPLETED
+                || state == TaskState.TASK_STATE_FAILED
+                || state == TaskState.TASK_STATE_CANCELED
+                || state == TaskState.TASK_STATE_REJECTED
+                || state == TaskState.TASK_STATE_INPUT_REQUIRED
+                || state == TaskState.TASK_STATE_AUTH_REQUIRED;
+    }
+
+    private static void logEvent(String agentName, ClientEvent event) {
+        if (event instanceof TaskEvent te) {
+            TaskStatus st = te.getTask().status();
+            log.info(
+                    "[A2ARuntime] Event[Task] agent='{}', state={}, final={}",
+                    agentName,
+                    st.state(),
+                    isTerminal(st.state()));
+        } else if (event instanceof TaskUpdateEvent tue) {
+            if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
+                TaskStatus st = sue.status();
+                log.info(
+                        "[A2ARuntime] Event[StatusUpdate] agent='{}', state={}, final={}",
+                        agentName,
+                        st.state(),
+                        sue.isFinal());
+            } else if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae) {
+                log.info(
+                        "[A2ARuntime] Event[ArtifactUpdate] agent='{}', name={}, append={}, lastChunk={}",
+                        agentName,
+                        ae.artifact().name(),
+                        ae.append(),
+                        ae.lastChunk());
+            }
+        } else if (event instanceof MessageEvent me) {
+            log.info(
+                    "[A2ARuntime] Event[Message] agent='{}', role={}, parts={}",
+                    agentName,
+                    me.getMessage().role(),
+                    me.getMessage().parts().size());
+        } else {
+            log.debug(
+                    "[A2ARuntime] Event[{}] agent='{}'",
+                    event.getClass().getSimpleName(),
+                    agentName);
+        }
+    }
+
+    private static String describeTerminalEvent(ClientEvent event) {
+        if (event instanceof TaskEvent te) {
+            return te.getTask().status().state().name();
+        }
+        if (event instanceof TaskUpdateEvent tue
+                && tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
+            return sue.status().state().name();
+        }
+        return event.getClass().getSimpleName();
+    }
+
     @Override
     public Iterable<ClientEvent> sendMessage(
             AgentCard agentCard,
@@ -168,13 +310,6 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
         }
         log.info("[A2ARuntime] Completed for '{}': {} event(s)", agentCard.name(), events.size());
         return events;
-    }
-
-    private static String extractAgentUrl(AgentCard agentCard) {
-        if (!agentCard.supportedInterfaces().isEmpty()) {
-            return agentCard.supportedInterfaces().get(0).url();
-        }
-        return "?";
     }
 
     private Client createClient(AgentCard agentCard, String agentUrl) {
@@ -254,67 +389,6 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
                 .build();
     }
 
-    private static void onEvent(
-            String agentName,
-            ClientEvent event,
-            List<ClientEvent> events,
-            AtomicReference<ClientEvent> lastEventRef,
-            Consumer<ClientEvent> eventSink,
-            CountDownLatch done) {
-        events.add(event);
-        lastEventRef.set(event);
-        logEvent(agentName, event);
-        ProtocolLogger.logResponseEvent(agentName, event);
-        if (eventSink != null) {
-            try {
-                eventSink.accept(event);
-            } catch (Exception e) {
-                log.warn(
-                        "[A2ARuntime] eventSink callback failed for {} (event_class={}): {}",
-                        agentName,
-                        event.getClass().getSimpleName(),
-                        e.getMessage(),
-                        e);
-            }
-        }
-        if (isTerminal(event)) {
-            log.info(
-                    "[A2ARuntime] Terminal event for '{}': {}",
-                    agentName,
-                    describeTerminalEvent(event));
-            done.countDown();
-        }
-    }
-
-    private static void onError(
-            String agentName,
-            Throwable error,
-            CountDownLatch done,
-            AtomicReference<Throwable> errorRef) {
-        if (done.getCount() == 0) {
-            log.debug(
-                    "[A2ARuntime] Connection closed after terminal event for '{}': {}",
-                    agentName,
-                    error.getMessage());
-        } else {
-            String msg = error.getMessage() != null ? error.getMessage() : "";
-            boolean connectionClosed =
-                    msg.contains("connection closed locally")
-                            || msg.contains("chunked transfer encoding, state: READING_LENGTH");
-            if (connectionClosed) {
-                log.debug("[A2ARuntime] Connection closed for '{}': {}", agentName, msg);
-            } else {
-                errorRef.set(error);
-                log.error(
-                        "[A2ARuntime] Error callback for '{}': {}",
-                        agentName,
-                        error.getMessage(),
-                        error);
-            }
-            done.countDown();
-        }
-    }
-
     private void awaitCompletion(
             String agentName,
             CountDownLatch done,
@@ -373,79 +447,5 @@ public class DefaultA2AJavaClientRuntime implements A2AJavaClientRuntime {
                         .executor(httpClientExecutor)
                         .build();
         return new JdkA2AHttpClient(httpClient);
-    }
-
-    private static boolean isTerminal(ClientEvent event) {
-        if (event instanceof TaskEvent taskEvent) {
-            return isTerminal(taskEvent.getTask().status().state());
-        }
-        if (event instanceof TaskUpdateEvent taskUpdateEvent) {
-            if (taskUpdateEvent.getUpdateEvent() instanceof TaskStatusUpdateEvent statusUpdate) {
-                return isTerminal(statusUpdate.status().state());
-            }
-            // Artifact updates are not terminal
-            if (taskUpdateEvent.getUpdateEvent() instanceof TaskArtifactUpdateEvent) {
-                return false;
-            }
-        }
-        return false;
-    }
-
-    private static boolean isTerminal(TaskState state) {
-        return state == TaskState.TASK_STATE_COMPLETED
-                || state == TaskState.TASK_STATE_FAILED
-                || state == TaskState.TASK_STATE_CANCELED
-                || state == TaskState.TASK_STATE_REJECTED
-                || state == TaskState.TASK_STATE_INPUT_REQUIRED
-                || state == TaskState.TASK_STATE_AUTH_REQUIRED;
-    }
-
-    private static void logEvent(String agentName, ClientEvent event) {
-        if (event instanceof TaskEvent te) {
-            TaskStatus st = te.getTask().status();
-            log.info(
-                    "[A2ARuntime] Event[Task] agent='{}', state={}, final={}",
-                    agentName,
-                    st.state(),
-                    isTerminal(st.state()));
-        } else if (event instanceof TaskUpdateEvent tue) {
-            if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
-                TaskStatus st = sue.status();
-                log.info(
-                        "[A2ARuntime] Event[StatusUpdate] agent='{}', state={}, final={}",
-                        agentName,
-                        st.state(),
-                        sue.isFinal());
-            } else if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae) {
-                log.info(
-                        "[A2ARuntime] Event[ArtifactUpdate] agent='{}', name={}, append={}, lastChunk={}",
-                        agentName,
-                        ae.artifact().name(),
-                        ae.append(),
-                        ae.lastChunk());
-            }
-        } else if (event instanceof MessageEvent me) {
-            log.info(
-                    "[A2ARuntime] Event[Message] agent='{}', role={}, parts={}",
-                    agentName,
-                    me.getMessage().role(),
-                    me.getMessage().parts().size());
-        } else {
-            log.debug(
-                    "[A2ARuntime] Event[{}] agent='{}'",
-                    event.getClass().getSimpleName(),
-                    agentName);
-        }
-    }
-
-    private static String describeTerminalEvent(ClientEvent event) {
-        if (event instanceof TaskEvent te) {
-            return te.getTask().status().state().name();
-        }
-        if (event instanceof TaskUpdateEvent tue
-                && tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
-            return sue.status().state().name();
-        }
-        return event.getClass().getSimpleName();
     }
 }

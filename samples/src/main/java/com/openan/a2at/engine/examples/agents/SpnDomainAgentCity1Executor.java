@@ -19,8 +19,6 @@
 
 package com.openan.a2at.engine.examples.agents;
 
-import com.openan.a2at.engine.examples.StartAgentsServer;
-
 import org.a2aproject.sdk.server.agentexecution.RequestContext;
 import org.a2aproject.sdk.server.tasks.AgentEmitter;
 import org.slf4j.Logger;
@@ -49,6 +47,28 @@ public class SpnDomainAgentCity1Executor extends NegotiationBaseAgentExecutor {
 
     private static final String RECOVERY_RESULT = "粤东OMC端口光模块已更换，端口恢复Up，专线业务恢复正常。";
 
+    private static String llmDiagnosisResult(String input, String fallback) {
+        String env = EnvResolver.resolveEnvPath();
+        String sys = "你是SPN领域粤东OMC故障诊断专家。根据输入诊断信息，输出诊断结果、修复方案和故障根因，提及粤东。简洁专业，中文。";
+        String user = "输入：\n" + input + "\n\n已知：粤东OMC端口port-7=DOWN，光功率-28dBm（阈值-20dBm）。请输出诊断结论。";
+        return LlmHelper.text(env, sys, user, fallback);
+    }
+
+    private static String llmRecoveryResult(String input, String fallback) {
+        String env = EnvResolver.resolveEnvPath();
+        String sys = "你是SPN领域粤东OMC抢通执行专家。用一句话报告抢通成功结果，提及粤东OMC端口恢复Up、专线业务恢复。中文。";
+        String user = "输入：\n" + input + "\n\n已更换光模块，端口恢复Up。请输出抢通结果。";
+        return LlmHelper.text(env, sys, user, fallback);
+    }
+
+    private static void sleepBriefly() {
+        try {
+            Thread.sleep(300);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     @Override
     protected boolean needsNegotiation(String input) {
         return true;
@@ -56,7 +76,7 @@ public class SpnDomainAgentCity1Executor extends NegotiationBaseAgentExecutor {
 
     @Override
     protected String resolveEnvPath() {
-        return StartAgentsServer.resolveEnvPath();
+        return EnvResolver.resolveEnvPath();
     }
 
     @Override
@@ -111,27 +131,5 @@ public class SpnDomainAgentCity1Executor extends NegotiationBaseAgentExecutor {
     @Override
     protected String buildArtifactName() {
         return "spn-fault-diagnosis";
-    }
-
-    private static String llmDiagnosisResult(String input, String fallback) {
-        String env = StartAgentsServer.resolveEnvPath();
-        String sys = "你是SPN领域粤东OMC故障诊断专家。根据输入诊断信息，输出诊断结果、修复方案和故障根因，提及粤东。简洁专业，中文。";
-        String user = "输入：\n" + input + "\n\n已知：粤东OMC端口port-7=DOWN，光功率-28dBm（阈值-20dBm）。请输出诊断结论。";
-        return LlmHelper.text(env, sys, user, fallback);
-    }
-
-    private static String llmRecoveryResult(String input, String fallback) {
-        String env = StartAgentsServer.resolveEnvPath();
-        String sys = "你是SPN领域粤东OMC抢通执行专家。用一句话报告抢通成功结果，提及粤东OMC端口恢复Up、专线业务恢复。中文。";
-        String user = "输入：\n" + input + "\n\n已更换光模块，端口恢复Up。请输出抢通结果。";
-        return LlmHelper.text(env, sys, user, fallback);
-    }
-
-    private static void sleepBriefly() {
-        try {
-            Thread.sleep(300);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
     }
 }

@@ -21,7 +21,6 @@ package com.openan.a2at.engine.examples.agents;
 
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.control.DefaultControlPoint;
-import com.openan.a2at.engine.examples.StartAgentsServer;
 import com.openan.a2at.engine.model.JumpCondition;
 import com.openan.a2at.engine.model.RouteDecision;
 import com.openan.a2at.engine.model.TaskRequest;
@@ -59,58 +58,11 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
     }
 
     public WorkbenchControlPoint(String a2atEnvPath, NegotiationStrategy negotiationStrategy) {
-        this.a2atEnvPath = a2atEnvPath != null ? a2atEnvPath : StartAgentsServer.resolveEnvPath();
+        this.a2atEnvPath = a2atEnvPath != null ? a2atEnvPath : EnvResolver.resolveEnvPath();
         this.negotiationStrategy =
                 negotiationStrategy != null
                         ? negotiationStrategy
                         : new NegotiationStrategy(this.a2atEnvPath);
-    }
-
-    @Override
-    public CompletableFuture<TaskResponse> onTask(
-            TaskRequest request, WorkflowEngineClient engineClient) {
-        String step = request.getStepName();
-        String agentName = request.getAgentName();
-        String targetedMessage = buildTargetedTaskMessage(step);
-        return engineClient
-                .sendMessage(agentName, targetedMessage)
-                .thenApply(
-                        r -> {
-                            boolean success = r.getText() != null && !r.getText().isEmpty();
-                            log.info(
-                                    "[onTask] Response from {}: {} chars, success={}",
-                                    agentName,
-                                    r.getText() != null ? r.getText().length() : 0,
-                                    success);
-                            return TaskResponse.builder()
-                                    .success(success)
-                                    .output(r.getText())
-                                    .build();
-                        })
-                .exceptionally(
-                        e -> {
-                            log.error("[onTask] Failed for {}: {}", agentName, e.getMessage());
-                            return TaskResponse.builder()
-                                    .success(false)
-                                    .error("Agent call failed: " + e.getMessage())
-                                    .build();
-                        });
-    }
-
-    @Override
-    public CompletableFuture<TaskResponse> onSelfTask(TaskRequest request) {
-        String step = request.getStepName();
-        log.info(
-                "[onSelfTask] Self-loop step={}, agent={} (local merge, no A2A-T)",
-                step,
-                request.getAgentName());
-        String message = request.getMessage();
-        String fallback = analyzeFaultLocation(message);
-        String sys = "你是SPN跨城故障协同诊断汇总专家。根据两地市OMC诊断结果，输出故障定位结论。简洁专业，中文。";
-        String result = LlmHelper.text(a2atEnvPath, sys, message, fallback);
-        log.info("[onSelfTask] Merge result ({} chars): {}", result.length(), result);
-        return CompletableFuture.completedFuture(
-                TaskResponse.builder().success(true).output(result).build());
     }
 
     private static String analyzeFaultLocation(String messageText) {
@@ -171,6 +123,53 @@ SPN专线故障诊断 - 粤西OMC侧
 
 请针对粤西OMC侧进行排查。请用中文回复。"""
                 .stripIndent();
+    }
+
+    @Override
+    public CompletableFuture<TaskResponse> onTask(
+            TaskRequest request, WorkflowEngineClient engineClient) {
+        String step = request.getStepName();
+        String agentName = request.getAgentName();
+        String targetedMessage = buildTargetedTaskMessage(step);
+        return engineClient
+                .sendMessage(agentName, targetedMessage)
+                .thenApply(
+                        r -> {
+                            boolean success = r.getText() != null && !r.getText().isEmpty();
+                            log.info(
+                                    "[onTask] Response from {}: {} chars, success={}",
+                                    agentName,
+                                    r.getText() != null ? r.getText().length() : 0,
+                                    success);
+                            return TaskResponse.builder()
+                                    .success(success)
+                                    .output(r.getText())
+                                    .build();
+                        })
+                .exceptionally(
+                        e -> {
+                            log.error("[onTask] Failed for {}: {}", agentName, e.getMessage());
+                            return TaskResponse.builder()
+                                    .success(false)
+                                    .error("Agent call failed: " + e.getMessage())
+                                    .build();
+                        });
+    }
+
+    @Override
+    public CompletableFuture<TaskResponse> onSelfTask(TaskRequest request) {
+        String step = request.getStepName();
+        log.info(
+                "[onSelfTask] Self-loop step={}, agent={} (local merge, no A2A-T)",
+                step,
+                request.getAgentName());
+        String message = request.getMessage();
+        String fallback = analyzeFaultLocation(message);
+        String sys = "你是SPN跨城故障协同诊断汇总专家。根据两地市OMC诊断结果，输出故障定位结论。简洁专业，中文。";
+        String result = LlmHelper.text(a2atEnvPath, sys, message, fallback);
+        log.info("[onSelfTask] Merge result ({} chars): {}", result.length(), result);
+        return CompletableFuture.completedFuture(
+                TaskResponse.builder().success(true).output(result).build());
     }
 
     @Override

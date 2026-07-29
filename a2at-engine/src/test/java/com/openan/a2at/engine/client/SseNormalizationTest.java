@@ -19,15 +19,15 @@
 
 package com.openan.a2at.engine.client;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
- * Tests for SseNormalization: bare Task wrapping, artifactUpdate,
- * statusUpdate, already-SSE pass-through.
+ * Tests for SseNormalization: bare Task wrapping, artifactUpdate, statusUpdate, already-SSE
+ * pass-through.
  */
 class SseNormalizationTest {
 

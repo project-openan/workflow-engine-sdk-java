@@ -54,16 +54,6 @@ public class PrePositionedExtensionHandler {
     private volatile String authorizationPolicy;
     private volatile String notificationSubscription;
 
-    /** The pre-positioned Authorization-T whitelist policy text, or null. */
-    public String getAuthorizationPolicy() {
-        return authorizationPolicy;
-    }
-
-    /** The pre-positioned Notification-T subscription text, or null. */
-    public String getNotificationSubscription() {
-        return notificationSubscription;
-    }
-
     /**
      * Detect whether the incoming message carries an Authorization-T or Notification-T extension in
      * its metadata. Returns the extension keyword ("Authorization-T" or "Notification-T"), or null
@@ -83,6 +73,36 @@ public class PrePositionedExtensionHandler {
             }
         }
         return null;
+    }
+
+    private static void emitStatus(
+            AgentEmitter emitter,
+            TaskState state,
+            String contextId,
+            String taskId,
+            String text,
+            Map<String, Object> metadata) {
+        TaskStatus status =
+                new TaskStatus(
+                        state, BaseAgentExecutor.buildStatusMessage(contextId, taskId, text), null);
+        TaskStatusUpdateEvent event =
+                TaskStatusUpdateEvent.builder()
+                        .taskId(taskId)
+                        .contextId(contextId)
+                        .status(status)
+                        .metadata(metadata)
+                        .build();
+        emitter.emitEvent(event);
+    }
+
+    /** The pre-positioned Authorization-T whitelist policy text, or null. */
+    public String getAuthorizationPolicy() {
+        return authorizationPolicy;
+    }
+
+    /** The pre-positioned Notification-T subscription text, or null. */
+    public String getNotificationSubscription() {
+        return notificationSubscription;
     }
 
     /**
@@ -124,25 +144,5 @@ public class PrePositionedExtensionHandler {
                 Map.of());
         emitter.complete(BaseAgentExecutor.buildStatusMessage(contextId, taskId, "Completed"));
         log.info("[{}] {} pre-positioning completed", agentTag, extKeyword);
-    }
-
-    private static void emitStatus(
-            AgentEmitter emitter,
-            TaskState state,
-            String contextId,
-            String taskId,
-            String text,
-            Map<String, Object> metadata) {
-        TaskStatus status =
-                new TaskStatus(
-                        state, BaseAgentExecutor.buildStatusMessage(contextId, taskId, text), null);
-        TaskStatusUpdateEvent event =
-                TaskStatusUpdateEvent.builder()
-                        .taskId(taskId)
-                        .contextId(contextId)
-                        .status(status)
-                        .metadata(metadata)
-                        .build();
-        emitter.emitEvent(event);
     }
 }

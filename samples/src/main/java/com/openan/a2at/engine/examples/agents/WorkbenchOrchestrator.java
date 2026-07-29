@@ -87,6 +87,28 @@ public class WorkbenchOrchestrator {
         this.a2atEnvPath = a2atEnvPath;
     }
 
+    private static String buildResultText(ExecutionResult result) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Workflow execution ")
+                .append(result.isSuccess() ? "succeeded" : "failed")
+                .append(".\n");
+        if (result.getHistory() != null) {
+            for (Map<String, Object> h : result.getHistory()) {
+                sb.append("- Step: ")
+                        .append(h.get("step"))
+                        .append(", Agent: ")
+                        .append(h.get("agent"))
+                        .append(", Status: ")
+                        .append(h.get("status"))
+                        .append("\n");
+            }
+        }
+        if (result.getError() != null) {
+            sb.append("Error: ").append(result.getError());
+        }
+        return sb.toString();
+    }
+
     /** Run the full orchestration pipeline and return the result text. */
     public String run(String messageText) throws Exception {
         log.info("[Orchestrator] Step 1: Load agent cards");
@@ -178,28 +200,6 @@ public class WorkbenchOrchestrator {
             log.warn("[Orchestrator] PSOP search failed, using fallback: {}", e.getMessage());
         }
         return FALLBACK_PSOP_ID;
-    }
-
-    private static String buildResultText(ExecutionResult result) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Workflow execution ")
-                .append(result.isSuccess() ? "succeeded" : "failed")
-                .append(".\n");
-        if (result.getHistory() != null) {
-            for (Map<String, Object> h : result.getHistory()) {
-                sb.append("- Step: ")
-                        .append(h.get("step"))
-                        .append(", Agent: ")
-                        .append(h.get("agent"))
-                        .append(", Status: ")
-                        .append(h.get("status"))
-                        .append("\n");
-            }
-        }
-        if (result.getError() != null) {
-            sb.append("Error: ").append(result.getError());
-        }
-        return sb.toString();
     }
 
     private EventCallback createLogCallback() {

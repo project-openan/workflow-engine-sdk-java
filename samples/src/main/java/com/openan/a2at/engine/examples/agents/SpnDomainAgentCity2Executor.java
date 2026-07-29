@@ -19,8 +19,6 @@
 
 package com.openan.a2at.engine.examples.agents;
 
-import com.openan.a2at.engine.examples.StartAgentsServer;
-
 import org.a2aproject.sdk.server.agentexecution.RequestContext;
 import org.a2aproject.sdk.server.tasks.AgentEmitter;
 import org.slf4j.Logger;
@@ -46,9 +44,25 @@ public class SpnDomainAgentCity2Executor extends NegotiationBaseAgentExecutor {
 
     private static final String RECOVERY_RESULT = "粤西侧OMC抢通完成，业务恢复正常。";
 
+    private static String llmDiagnosisResult(String input, String fallback) {
+        String env = EnvResolver.resolveEnvPath();
+        String sys =
+                "你是SPN领域粤西OMC故障诊断专家。根据输入诊断信息，粤西侧端口正常、光功率-17dBm(正常范围)、无异常告警。输出诊断结果：粤西无需修复、故障不在此地市。简洁专业，中文。";
+        String user = "输入：\n" + input + "\n\n粤西OMC端口port-3=UP，光功率-17dBm，无告警。请输出诊断结论。";
+        return LlmHelper.text(env, sys, user, fallback);
+    }
+
+    private static void sleepBriefly() {
+        try {
+            Thread.sleep(300);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     @Override
     protected String resolveEnvPath() {
-        return StartAgentsServer.resolveEnvPath();
+        return EnvResolver.resolveEnvPath();
     }
 
     @Override
@@ -79,21 +93,5 @@ public class SpnDomainAgentCity2Executor extends NegotiationBaseAgentExecutor {
     @Override
     protected String buildArtifactName() {
         return "spn-fault-diagnosis";
-    }
-
-    private static String llmDiagnosisResult(String input, String fallback) {
-        String env = StartAgentsServer.resolveEnvPath();
-        String sys =
-                "你是SPN领域粤西OMC故障诊断专家。根据输入诊断信息，粤西侧端口正常、光功率-17dBm(正常范围)、无异常告警。输出诊断结果：粤西无需修复、故障不在此地市。简洁专业，中文。";
-        String user = "输入：\n" + input + "\n\n粤西OMC端口port-3=UP，光功率-17dBm，无告警。请输出诊断结论。";
-        return LlmHelper.text(env, sys, user, fallback);
-    }
-
-    private static void sleepBriefly() {
-        try {
-            Thread.sleep(300);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
     }
 }

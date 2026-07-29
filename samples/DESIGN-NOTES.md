@@ -37,7 +37,8 @@ samples/src/main/resources/
 
 **不要改编排中心定义的 AgentCard JSON 格式，尤其是 URL 的路径前缀。**
 
-现网 AgentCard 的 URL 格式是 `http://host:port/a2a/json`，路径前缀 `/a2a/json` 是标准做法（Python 版 FastAPI 也这样做）。A2A REST 端点实际是 `http://host:port/a2a/json/message:stream`。
+现网 AgentCard 的 URL 格式是 `http://host:port/a2a/json`，路径前缀 `/a2a/json` 是标准做法（Python 版 FastAPI 也这样做）。A2A
+REST 端点实际是 `http://host:port/a2a/json/message:stream`。
 
 `EmbeddedA2AServer` 必须从 AgentCard URL 提取路径前缀，在该前缀下注册路由：
 
@@ -54,7 +55,8 @@ String path = fullPath.startsWith(pathPrefix) ? fullPath.substring(pathPrefix.le
 
 **`TransportWorkbenchAgentExecutor` 执行工作流时，从 classpath 的 agentcard JSON 加载 agent card，不从注册中心 fetch。**
 
-原因：注册中心可能残留 Python 版注册的旧 card（端口 8904、URL 不带前缀等），与 Java 版的 agent 不匹配。注册返回 409 duplicate 时注册中心不会更新，导致引擎拿到错误的 URL。
+原因：注册中心可能残留 Python 版注册的旧 card（端口 8904、URL 不带前缀等），与 Java 版的 agent 不匹配。注册返回 409 duplicate
+时注册中心不会更新，导致引擎拿到错误的 URL。
 
 ```java
 private static List<Map<String, Object>> loadAgentCardsFromConfig() {
@@ -66,14 +68,15 @@ private static List<Map<String, Object>> loadAgentCardsFromConfig() {
 
 a2a-java SDK 的 `RestHandler` 返回的 SSE 事件有 4 种格式，引擎客户端必须全部处理：
 
-| SSE 事件 key | 内容 | 提取方式 |
-|---|---|---|
-| `task` | 完整 Task 对象 | `task.artifacts[].parts[].text` |
-| `message` | Message 事件 | `message.parts[].text` |
-| `statusUpdate` | 状态更新 | `statusUpdate.status.state` + `statusUpdate.parts[].text` |
-| `artifactUpdate` | 产物更新 | `artifactUpdate.artifact.parts[].text` + `artifactUpdate.artifact.metadata` |
+| SSE 事件 key     | 内容           | 提取方式                                                                    |
+|------------------|----------------|-----------------------------------------------------------------------------|
+| `task`           | 完整 Task 对象 | `task.artifacts[].parts[].text`                                             |
+| `message`        | Message 事件   | `message.parts[].text`                                                      |
+| `statusUpdate`   | 状态更新       | `statusUpdate.status.state` + `statusUpdate.parts[].text`                   |
+| `artifactUpdate` | 产物更新       | `artifactUpdate.artifact.parts[].text` + `artifactUpdate.artifact.metadata` |
 
 `extractTextFromResultMap` 必须处理三种来源：
+
 - `artifacts`（复数，list 形式，task 响应中）
 - `artifact`（单数，artifactUpdate 事件中）
 - 顶层 `parts`（statusUpdate 事件中 status.message.parts）
@@ -83,8 +86,8 @@ a2a-java SDK 的 `RestHandler` 返回的 SSE 事件有 4 种格式，引擎客�
 ```java
 // 正确：用引擎提供的 WorkflowEngineClient.sendMessage()
 DefaultWorkflowEngineClient client = new DefaultWorkflowEngineClient(
-        List.of(agentCard), null,
-        WorkflowEngineClientConfig.builder().sslVerify(false).build());
+                List.of(agentCard), null,
+                WorkflowEngineClientConfig.builder().sslVerify(false).build());
 SendMessageResult result = client.sendMessage("Transport Workbench Agent", taskText).join();
 
 // 错误：手写 HttpClient + JSON 拼接（绕过了 A2A-T 协议处理）
@@ -108,11 +111,12 @@ static {
 - **SRP**：`WorkbenchControlPoint` 只管工作流决策（路由、授权、通知），`TransportWorkbenchAgentExecutor` 只管消息 I/O
 - **DRY**：`BaseAgentExecutor` 提供共享的 `extractText` / `buildStatusMessage`，3 个 Agent executor 都继承它
 - **无 Unicode 转义**：Java 源文件中的中文字符串直接用字面中文，不用 `\uXXXX`
-  - 用 `apply_patch` 写文件（保持 UTF-8），不用 PowerShell here-string（会损坏中文）
+    - 用 `apply_patch` 写文件（保持 UTF-8），不用 PowerShell here-string（会损坏中文）
 
 ## 九、PSOP 工作流定义
 
 编排中心的 `psop_spn_cross_city_diagnosis.json` 已经正确定义：
+
 - `merge_analysis` 节点分配给 `"Transport Workbench Agent"`，skill 为 `cross-city-fault-diagnosis`
 - `layer=1`，`context_from=["diagnosis_city1", "diagnosis_city2"]`
 - `merge_analysis` 是 `SelfLoop` 类型：工作台 Agent 通过 `WorkbenchControlPoint.onSelfTask` 本地汇总，不走 A2A-T 给自己发消息

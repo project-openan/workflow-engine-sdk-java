@@ -76,6 +76,10 @@ public final class AgentCardJacksonModule extends SimpleModule {
             super(SecurityScheme.class);
         }
 
+        private static String textOrNull(JsonNode node, String field) {
+            return node.has(field) ? node.get(field).asText() : null;
+        }
+
         @Override
         public SecurityScheme deserialize(JsonParser p, DeserializationContext ctxt)
                 throws IOException {
@@ -133,10 +137,6 @@ public final class AgentCardJacksonModule extends SimpleModule {
                 }
             }
             return null;
-        }
-
-        private static String textOrNull(JsonNode node, String field) {
-            return node.has(field) ? node.get(field).asText() : null;
         }
     }
 

@@ -81,6 +81,74 @@ class AgentCredentialService implements CredentialService {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private static String extractNestedValue(Map<String, Object> data, String path) {
+        if (path == null || path.isEmpty()) {
+            return null;
+        }
+        Object current = data;
+        for (String part : path.split("\\.")) {
+            if (!(current instanceof Map)) {
+                return null;
+            }
+            current = ((Map<String, Object>) current).get(part);
+            if (current == null) {
+                return null;
+            }
+        }
+        return current != null ? current.toString() : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> buildLoginBody(Map<String, Object> schemeCfg) {
+        Map<String, Object> body = new HashMap<>();
+        Object requestFields = schemeCfg.get("request_fields");
+        if (requestFields instanceof Map) {
+            for (var entry : ((Map<String, Object>) requestFields).entrySet()) {
+                String val = entry.getValue() != null ? entry.getValue().toString() : "";
+                body.put(entry.getKey(), CredentialCrypto.decryptIfNeeded(val));
+            }
+        } else {
+            String username = (String) schemeCfg.get("username");
+            String password = CredentialCrypto.decryptIfNeeded((String) schemeCfg.get("password"));
+            if (username == null || password == null) return body;
+            body.put(schemeCfg.getOrDefault("username_field", "username").toString(), username);
+            body.put(schemeCfg.getOrDefault("password_field", "password").toString(), password);
+        }
+        return body;
+    }
+
+    private static long toLong(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        if (value instanceof String) {
+            try {
+                return Long.parseLong((String) value);
+            } catch (NumberFormatException e) {
+                return 3600;
+            }
+        }
+        return 3600;
+    }
+
+    /**
+     * Mask sensitive fields (password, value, accessSession) for safe logging. Mirrors Python SDK's
+     * {@code _sanitize_body()}.
+     */
+    private static Map<String, Object> sanitizeBody(Map<String, Object> body) {
+        Map<String, Object> sanitized = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : body.entrySet()) {
+            String key = e.getKey().toLowerCase();
+            if (key.equals("password") || key.equals("value") || key.equals("accesssession")) {
+                sanitized.put(e.getKey(), "***");
+            } else {
+                sanitized.put(e.getKey(), e.getValue());
+            }
+        }
+        return sanitized;
+    }
+
     @Override
     public String getCredential(@NotNull String securitySchemeName, ClientCallContext context) {
         Map<String, Object> schemeCfg = schemeConfigs.get(securitySchemeName);
@@ -172,77 +240,9 @@ class AgentCredentialService implements CredentialService {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private static String extractNestedValue(Map<String, Object> data, String path) {
-        if (path == null || path.isEmpty()) {
-            return null;
-        }
-        Object current = data;
-        for (String part : path.split("\\.")) {
-            if (!(current instanceof Map)) {
-                return null;
-            }
-            current = ((Map<String, Object>) current).get(part);
-            if (current == null) {
-                return null;
-            }
-        }
-        return current != null ? current.toString() : null;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> buildLoginBody(Map<String, Object> schemeCfg) {
-        Map<String, Object> body = new HashMap<>();
-        Object requestFields = schemeCfg.get("request_fields");
-        if (requestFields instanceof Map) {
-            for (var entry : ((Map<String, Object>) requestFields).entrySet()) {
-                String val = entry.getValue() != null ? entry.getValue().toString() : "";
-                body.put(entry.getKey(), CredentialCrypto.decryptIfNeeded(val));
-            }
-        } else {
-            String username = (String) schemeCfg.get("username");
-            String password = CredentialCrypto.decryptIfNeeded((String) schemeCfg.get("password"));
-            if (username == null || password == null) return body;
-            body.put(schemeCfg.getOrDefault("username_field", "username").toString(), username);
-            body.put(schemeCfg.getOrDefault("password_field", "password").toString(), password);
-        }
-        return body;
-    }
-
-    private static long toLong(Object value) {
-        if (value instanceof Number) {
-            return ((Number) value).longValue();
-        }
-        if (value instanceof String) {
-            try {
-                return Long.parseLong((String) value);
-            } catch (NumberFormatException e) {
-                return 3600;
-            }
-        }
-        return 3600;
-    }
-
     private record TokenEntry(String token, long expiresAt) {
         boolean isExpired() {
             return System.currentTimeMillis() / 1000 >= expiresAt - 60;
         }
-    }
-
-    /**
-     * Mask sensitive fields (password, value, accessSession) for safe logging. Mirrors Python SDK's
-     * {@code _sanitize_body()}.
-     */
-    private static Map<String, Object> sanitizeBody(Map<String, Object> body) {
-        Map<String, Object> sanitized = new java.util.LinkedHashMap<>();
-        for (Map.Entry<String, Object> e : body.entrySet()) {
-            String key = e.getKey().toLowerCase();
-            if (key.equals("password") || key.equals("value") || key.equals("accesssession")) {
-                sanitized.put(e.getKey(), "***");
-            } else {
-                sanitized.put(e.getKey(), e.getValue());
-            }
-        }
-        return sanitized;
     }
 }

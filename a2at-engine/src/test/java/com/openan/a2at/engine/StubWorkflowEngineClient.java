@@ -19,7 +19,6 @@
 
 package com.openan.a2at.engine;
 
-import com.openan.a2at.engine.client.A2ATExtension;
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
@@ -34,33 +33,19 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Stub WorkflowEngineClient for testing. Records all sends and returns
- * canned responses. No network access.
+ * Stub WorkflowEngineClient for testing. Records all sends and returns canned responses. No network
+ * access.
  */
 public class StubWorkflowEngineClient implements WorkflowEngineClient {
 
-    public static final class SentMessage {
-        public final String agentName;
-        public final String message;
-        public final String contextId;
-        public final Map<String, Object> metadata;
-
-        public SentMessage(String agentName, String message, String contextId, Map<String, Object> metadata) {
-            this.agentName = agentName;
-            this.message = message;
-            this.contextId = contextId;
-            this.metadata = metadata;
-        }
-    }
-
     private final List<SentMessage> sent = Collections.synchronizedList(new ArrayList<>());
+    private final Map<String, String> cannedResponses = new HashMap<>();
+    private final List<String> agentNames = new ArrayList<>();
     private EventCallback eventCallback = new EventCallback();
     private ControlPoint controlPoint;
     private ExtensionCallback extensionCallback;
-    private final Map<String, String> cannedResponses = new HashMap<>();
     private String defaultResponse = "stub-response";
     private String defaultTaskState = "COMPLETED";
-    private final List<String> agentNames = new ArrayList<>();
 
     public StubWorkflowEngineClient(String... agentNames) {
         this.agentNames.addAll(List.of(agentNames));
@@ -87,13 +72,22 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
         sent.add(new SentMessage(agentName, message, contextId, metadata));
         String text = cannedResponses.getOrDefault(agentName, defaultResponse);
         if (eventCallback != null) {
-            eventCallback.onEvent("agent_request", Map.of("agent", agentName, "request", message, "metadata", metadata != null ? metadata : Map.of()));
+            eventCallback.onEvent(
+                    "agent_request",
+                    Map.of(
+                            "agent",
+                            agentName,
+                            "request",
+                            message,
+                            "metadata",
+                            metadata != null ? metadata : Map.of()));
         }
-        SendMessageResult result = SendMessageResult.builder()
-                .text(text)
-                .taskState(defaultTaskState)
-                .metadata(new HashMap<>())
-                .build();
+        SendMessageResult result =
+                SendMessageResult.builder()
+                        .text(text)
+                        .taskState(defaultTaskState)
+                        .metadata(new HashMap<>())
+                        .build();
         if (eventCallback != null) {
             eventCallback.onEvent("agent_response", Map.of("agent", agentName, "response", text));
         }
@@ -106,23 +100,12 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
     }
 
     @Override
-    public void setExtensionCallback(ExtensionCallback extensionCallback) {
-        this.extensionCallback = extensionCallback;
-    }
-
-    @Override
     public void setEventCallback(EventCallback callback) {
         this.eventCallback = callback != null ? callback : new EventCallback();
     }
 
     @Override
-    public void close() {
-    }
-
-    @Override
-    public List<String> getAgentNames() {
-        return new ArrayList<>(agentNames);
-    }
+    public void close() {}
 
     public List<SentMessage> getSentMessages() {
         return new ArrayList<>(sent);
@@ -130,5 +113,20 @@ public class StubWorkflowEngineClient implements WorkflowEngineClient {
 
     public int getSentCount() {
         return sent.size();
+    }
+
+    public static final class SentMessage {
+        public final String agentName;
+        public final String message;
+        public final String contextId;
+        public final Map<String, Object> metadata;
+
+        public SentMessage(
+                String agentName, String message, String contextId, Map<String, Object> metadata) {
+            this.agentName = agentName;
+            this.message = message;
+            this.contextId = contextId;
+            this.metadata = metadata;
+        }
     }
 }

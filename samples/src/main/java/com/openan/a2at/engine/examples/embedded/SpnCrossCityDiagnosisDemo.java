@@ -17,7 +17,7 @@
  *    under the License.
  */
 
-package com.openan.a2at.engine.examples;
+package com.openan.a2at.engine.examples.embedded;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openan.a2at.engine.client.A2ATransport;
@@ -26,6 +26,7 @@ import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
+import com.openan.a2at.engine.examples.agents.EnvResolver;
 import com.openan.a2at.engine.model.SendMessageResult;
 
 import org.a2aproject.sdk.spec.AgentCard;
@@ -111,7 +112,7 @@ public class SpnCrossCityDiagnosisDemo {
                         null,
                         WorkflowEngineClientConfig.builder()
                                 .sslVerify(false)
-                                .a2atEnvPath(StartAgentsServer.resolveEnvPath())
+                                .a2atEnvPath(EnvResolver.resolveEnvPath())
                                 .build());
         DefaultWorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(transport);
 

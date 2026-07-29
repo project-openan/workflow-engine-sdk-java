@@ -120,6 +120,104 @@ public class A2ATransport implements AutoCloseable {
                 a2atClient != null);
     }
 
+    public static String extractResponseText(Iterable<ClientEvent> events) {
+        StringBuilder text = new StringBuilder();
+        for (ClientEvent event : events) {
+            if (event instanceof TaskEvent te) extractTextFromTask(te.getTask(), text);
+            else if (event instanceof TaskUpdateEvent tue) {
+                extractTextFromTask(tue.getTask(), text);
+                if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae)
+                    extractTextFromArtifact(ae.artifact(), text);
+            } else if (event instanceof MessageEvent me)
+                extractTextFromMessage(me.getMessage(), text);
+        }
+        return text.toString();
+    }
+
+    // ------------------------------------------------------------------
+    // Accessors
+    // ------------------------------------------------------------------
+
+    public static void extractTextFromTask(Task task, StringBuilder sb) {
+        if (task.artifacts() != null)
+            for (Artifact a : task.artifacts()) extractTextFromArtifact(a, sb);
+    }
+
+    public static void extractTextFromArtifact(Artifact artifact, StringBuilder sb) {
+        for (Part<?> part : artifact.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
+    }
+
+    public static void extractTextFromMessage(Message message, StringBuilder sb) {
+        if (message == null) return;
+        for (Part<?> part : message.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
+    }
+
+    public static String extractResponseTaskState(Iterable<ClientEvent> events) {
+        String state = "";
+        for (ClientEvent event : events) {
+            if (event instanceof TaskEvent te) state = te.getTask().status().state().name();
+            else if (event instanceof TaskUpdateEvent tue) {
+                if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue)
+                    state = sue.status().state().name();
+            }
+        }
+        return state;
+    }
+
+    public static Map<String, Object> extractResponseMetadata(Iterable<ClientEvent> events) {
+        Map<String, Object> metadata = new HashMap<>();
+        for (ClientEvent event : events) {
+            if (event instanceof TaskEvent te) {
+                mergeTaskMetadata(te.getTask(), metadata);
+            } else if (event instanceof TaskUpdateEvent tue) {
+                mergeTaskMetadata(tue.getTask(), metadata);
+            }
+        }
+        return metadata;
+    }
+
+    // ------------------------------------------------------------------
+    // Core send via SDK runtime
+    // ------------------------------------------------------------------
+
+    public static void mergeTaskMetadata(Task task, Map<String, Object> metadata) {
+        if (task == null) return;
+        Map<String, Object> m = task.metadata();
+        if (m != null && !m.isEmpty()) metadata.putAll(m);
+        if (task.artifacts() != null) {
+            for (Artifact a : task.artifacts()) {
+                Map<String, Object> am = a.metadata();
+                if (am != null && !am.isEmpty()) metadata.putAll(am);
+            }
+        }
+    }
+
+    public static Task extractResponseTask(Iterable<ClientEvent> events) {
+        Task lastTask = null;
+        for (ClientEvent event : events) {
+            if (event instanceof TaskEvent te) lastTask = te.getTask();
+            else if (event instanceof TaskUpdateEvent tue) lastTask = tue.getTask();
+        }
+        return lastTask;
+    }
+
+    // ------------------------------------------------------------------
+    // Build helpers
+    // ------------------------------------------------------------------
+
+    public static List<String> extractExtensionUris(AgentCard agentCard) {
+        List<String> uris = new ArrayList<>();
+        var extensions = agentCard.capabilities().extensions();
+        if (extensions == null) {
+            return uris;
+        }
+        for (var ext : extensions) {
+            String uri = ext.uri();
+            if (!uri.isEmpty()) uris.add(uri);
+        }
+        return uris;
+    }
+
     private A2ATClient initA2atClient(String a2atEnvPath) {
         if (a2atEnvPath == null || a2atEnvPath.isEmpty()) {
             return null;
@@ -133,7 +231,7 @@ public class A2ATransport implements AutoCloseable {
     }
 
     // ------------------------------------------------------------------
-    // Accessors
+    // ClientEvent extraction (static helpers, shared by facades)
     // ------------------------------------------------------------------
 
     public AgentCard getCard(String agentName) {
@@ -161,10 +259,6 @@ public class A2ATransport implements AutoCloseable {
         }
         log.info("[Transport] Updated agent cards: {} agent(s)", cardMap.size());
     }
-
-    // ------------------------------------------------------------------
-    // Core send via SDK runtime
-    // ------------------------------------------------------------------
 
     /**
      * Send a message and collect the streaming events. The optional {@code eventSink} is invoked
@@ -325,10 +419,6 @@ public class A2ATransport implements AutoCloseable {
                         });
     }
 
-    // ------------------------------------------------------------------
-    // Build helpers
-    // ------------------------------------------------------------------
-
     private MessageSendParams buildMessageSendParams(
             String message, String contextId, Map<String, Object> metadata) {
         Message msg =
@@ -366,96 +456,6 @@ public class A2ATransport implements AutoCloseable {
             }
         }
         return new ClientCallContext(new HashMap<>(), headers);
-    }
-
-    // ------------------------------------------------------------------
-    // ClientEvent extraction (static helpers, shared by facades)
-    // ------------------------------------------------------------------
-
-    public static String extractResponseText(Iterable<ClientEvent> events) {
-        StringBuilder text = new StringBuilder();
-        for (ClientEvent event : events) {
-            if (event instanceof TaskEvent te) extractTextFromTask(te.getTask(), text);
-            else if (event instanceof TaskUpdateEvent tue) {
-                extractTextFromTask(tue.getTask(), text);
-                if (tue.getUpdateEvent() instanceof TaskArtifactUpdateEvent ae)
-                    extractTextFromArtifact(ae.artifact(), text);
-            } else if (event instanceof MessageEvent me)
-                extractTextFromMessage(me.getMessage(), text);
-        }
-        return text.toString();
-    }
-
-    public static void extractTextFromTask(Task task, StringBuilder sb) {
-        if (task.artifacts() != null)
-            for (Artifact a : task.artifacts()) extractTextFromArtifact(a, sb);
-    }
-
-    public static void extractTextFromArtifact(Artifact artifact, StringBuilder sb) {
-        for (Part<?> part : artifact.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
-    }
-
-    public static void extractTextFromMessage(Message message, StringBuilder sb) {
-        if (message == null) return;
-        for (Part<?> part : message.parts()) if (part instanceof TextPart tp) sb.append(tp.text());
-    }
-
-    public static String extractResponseTaskState(Iterable<ClientEvent> events) {
-        String state = "";
-        for (ClientEvent event : events) {
-            if (event instanceof TaskEvent te) state = te.getTask().status().state().name();
-            else if (event instanceof TaskUpdateEvent tue) {
-                if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue)
-                    state = sue.status().state().name();
-            }
-        }
-        return state;
-    }
-
-    public static Map<String, Object> extractResponseMetadata(Iterable<ClientEvent> events) {
-        Map<String, Object> metadata = new HashMap<>();
-        for (ClientEvent event : events) {
-            if (event instanceof TaskEvent te) {
-                mergeTaskMetadata(te.getTask(), metadata);
-            } else if (event instanceof TaskUpdateEvent tue) {
-                mergeTaskMetadata(tue.getTask(), metadata);
-            }
-        }
-        return metadata;
-    }
-
-    public static void mergeTaskMetadata(Task task, Map<String, Object> metadata) {
-        if (task == null) return;
-        Map<String, Object> m = task.metadata();
-        if (m != null && !m.isEmpty()) metadata.putAll(m);
-        if (task.artifacts() != null) {
-            for (Artifact a : task.artifacts()) {
-                Map<String, Object> am = a.metadata();
-                if (am != null && !am.isEmpty()) metadata.putAll(am);
-            }
-        }
-    }
-
-    public static Task extractResponseTask(Iterable<ClientEvent> events) {
-        Task lastTask = null;
-        for (ClientEvent event : events) {
-            if (event instanceof TaskEvent te) lastTask = te.getTask();
-            else if (event instanceof TaskUpdateEvent tue) lastTask = tue.getTask();
-        }
-        return lastTask;
-    }
-
-    public static List<String> extractExtensionUris(AgentCard agentCard) {
-        List<String> uris = new ArrayList<>();
-        var extensions = agentCard.capabilities().extensions();
-        if (extensions == null) {
-            return uris;
-        }
-        for (var ext : extensions) {
-            String uri = ext.uri();
-            if (!uri.isEmpty()) uris.add(uri);
-        }
-        return uris;
     }
 
     // ------------------------------------------------------------------
@@ -505,6 +505,12 @@ public class A2ATransport implements AutoCloseable {
         try {
             a2aClientRuntime.close();
         } catch (Exception ignored) {
+        }
+        asyncExecutor.shutdownNow();
+        try {
+            asyncExecutor.awaitTermination(2, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 }

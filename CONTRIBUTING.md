@@ -1,7 +1,6 @@
 # Contributing to a2at-engine-java
 
-Thank you for your interest in contributing! This document covers the
-contribution process and coding standards.
+Thank you for your interest in contributing! This document covers the contribution process and coding standards.
 
 ## Prerequisites
 
@@ -112,21 +111,21 @@ Every Java file must start with the Apache 2.0 license header:
    Signed-off-by: Your Name <your.email@example.com>
    ```
 6. Use conventional commit messages:
-   - `feat:` new feature
-   - `fix:` bug fix
-   - `docs:` documentation
-   - `refactor:` code restructuring
-   - `test:` test additions
-   - `chore:` build/config
+    - `feat:` new feature
+    - `fix:` bug fix
+    - `docs:` documentation
+    - `refactor:` code restructuring
+    - `test:` test additions
+    - `chore:` build/config
 
 ## Pull Request
 
 1. Ensure your branch is up to date with `main`
 2. Squash unrelated commits
 3. Write a clear PR description with:
-   - What changed and why
-   - Any breaking changes
-   - Test results
+    - What changed and why
+    - Any breaking changes
+    - Test results
 4. Link related issues
 
 ## Issue Reporting

@@ -47,6 +47,24 @@ class TaskTHandler implements ExtensionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(TaskTHandler.class);
 
+    private static String findTaskTUri(AgentCard agentCard) {
+        var extensions = agentCard.capabilities().extensions();
+        if (extensions == null) {
+            return null;
+        }
+        for (var ext : extensions) {
+            String uri = ext.uri();
+            if (uri.contains("Task-T")) {
+                return uri;
+            }
+        }
+        return null;
+    }
+
+    private static String getAgentName(AgentCard agentCard) {
+        return agentCard.name();
+    }
+
     @Override
     public String extensionKeyword() {
         return "Task-T";
@@ -113,23 +131,5 @@ class TaskTHandler implements ExtensionHandler {
             ExtensionCallback extensionCallback,
             EventCallback eventCallback) {
         return CompletableFuture.completedFuture(result);
-    }
-
-    private static String findTaskTUri(AgentCard agentCard) {
-        var extensions = agentCard.capabilities().extensions();
-        if (extensions == null) {
-            return null;
-        }
-        for (var ext : extensions) {
-            String uri = ext.uri();
-            if (uri.contains("Task-T")) {
-                return uri;
-            }
-        }
-        return null;
-    }
-
-    private static String getAgentName(AgentCard agentCard) {
-        return agentCard.name();
     }
 }

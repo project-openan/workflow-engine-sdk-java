@@ -78,9 +78,9 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 
-public class EmbeddedA2AServer implements AutoCloseable {
+public class JdkHttpA2AServer implements AutoCloseable {
 
-    private static final Logger log = LoggerFactory.getLogger(EmbeddedA2AServer.class);
+    private static final Logger log = LoggerFactory.getLogger(JdkHttpA2AServer.class);
 
     private static final ObjectMapper mapper = new ObjectMapper();
 
@@ -106,7 +106,7 @@ public class EmbeddedA2AServer implements AutoCloseable {
     private final String pathPrefix;
 
     @SuppressWarnings("unchecked")
-    public EmbeddedA2AServer(
+    public JdkHttpA2AServer(
             String host, int port, Map<String, Object> agentCard, AgentExecutor agentExecutor)
             throws IOException {
         this.agentCardMap = agentCard;
@@ -162,7 +162,7 @@ public class EmbeddedA2AServer implements AutoCloseable {
 
     private static SSLContext createSslContext() throws IOException {
         try (InputStream is =
-                EmbeddedA2AServer.class.getClassLoader().getResourceAsStream(KEYSTORE_RESOURCE)) {
+                JdkHttpA2AServer.class.getClassLoader().getResourceAsStream(KEYSTORE_RESOURCE)) {
             if (is == null) {
                 throw new IOException("Keystore not found on classpath: " + KEYSTORE_RESOURCE);
             }
@@ -176,6 +176,129 @@ public class EmbeddedA2AServer implements AutoCloseable {
             return ctx;
         } catch (Exception e) {
             throw new IOException("Failed to init SSL context: " + e.getMessage(), e);
+        }
+    }
+
+    private static String formatSse(long seq, String payload) {
+        String compact =
+                payload == null
+                        ? ""
+                        : payload.replace("\r\n", "\n")
+                                .replace('\r', '\n')
+                                .lines()
+                                .map(String::trim)
+                                .reduce("", String::concat);
+        return String.format(Locale.ROOT, "id:%d%n", seq) + "data:" + compact + "\n\n";
+    }
+
+    private static StreamResponse toStreamResponse(StreamingEventKind event) {
+        StreamResponse.Builder b = StreamResponse.newBuilder();
+        if (event instanceof Message m) {
+            b.setMessage(ProtoUtils.ToProto.message(m));
+            return b.build();
+        }
+        if (event instanceof Task t) {
+            b.setTask(ProtoUtils.ToProto.task(t));
+            return b.build();
+        }
+        if (event instanceof TaskStatusUpdateEvent e) {
+            b.setStatusUpdate(ProtoUtils.ToProto.taskStatusUpdateEvent(e));
+            return b.build();
+        }
+        if (event instanceof TaskArtifactUpdateEvent e) {
+            b.setArtifactUpdate(ProtoUtils.ToProto.taskArtifactUpdateEvent(e));
+            return b.build();
+        }
+        throw new IllegalArgumentException("Unsupported event: " + event);
+    }
+
+    private static RequestHandler extractRequestHandler(RestHandler restHandler) {
+        try {
+            var f = RestHandler.class.getDeclaredField("requestHandler");
+            f.setAccessible(true);
+            return (RequestHandler) f.get(restHandler);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to access request handler", e);
+        }
+    }
+
+    private static ServerCallContext buildCallContext(HttpExchange exchange) {
+        Map<String, String> headers = new LinkedHashMap<>();
+        exchange.getRequestHeaders()
+                .forEach((k, v) -> headers.put(k.toLowerCase(Locale.ROOT), String.join(",", v)));
+        String ext = firstHeader(headers, "A2A-Extensions", "X-A2A-Extensions");
+        Set<String> exts = ext.isBlank() ? Set.of() : Set.of(ext.split(","));
+        return new ServerCallContext(
+                null,
+                Map.of("headers", headers),
+                exts,
+                firstNullableHeader(headers, "A2A-Protocol-Version", "A2A-Version"));
+    }
+
+    private static String firstHeader(Map<String, String> h, String a, String b) {
+        String v = firstNullableHeader(h, a, b);
+        return v == null ? "" : v;
+    }
+
+    private static String firstNullableHeader(Map<String, String> h, String a, String b) {
+        String v = h.get(a.toLowerCase(Locale.ROOT));
+        return v != null ? v : h.get(b.toLowerCase(Locale.ROOT));
+    }
+
+    private static String readBody(HttpExchange exchange) throws IOException {
+        return new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+    }
+
+    private static void sendJson(HttpExchange exchange, int status, Object data)
+            throws IOException {
+        String json = data instanceof String ? (String) data : mapper.writeValueAsString(data);
+        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json");
+        exchange.sendResponseHeaders(status, bytes.length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(bytes);
+        }
+    }
+
+    private static AgentCard toTypedAgentCard(Map<String, Object> card) {
+        return cardMapper.convertValue(card, AgentCard.class);
+    }
+
+    private static boolean hasSecuritySchemes(Map<String, Object> card) {
+        return card.containsKey("securitySchemes")
+                && card.get("securitySchemes") instanceof Map
+                && !((Map<?, ?>) card.get("securitySchemes")).isEmpty()
+                && card.containsKey("securityRequirements");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String extractPathPrefix(Map<String, Object> agentCard) {
+        List<Map<String, Object>> interfaces =
+                (List<Map<String, Object>>)
+                        agentCard.getOrDefault("supportedInterfaces", List.of());
+        for (Map<String, Object> iface : interfaces) {
+            if ("HTTP+JSON".equalsIgnoreCase(String.valueOf(iface.get("protocolBinding")))) {
+                String url = String.valueOf(iface.getOrDefault("url", ""));
+                try {
+                    String path = java.net.URI.create(url).getPath();
+                    if (path != null && !path.isEmpty() && !"/".equals(path)) {
+                        return path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+                    }
+                } catch (Exception ignored) {
+                }
+                break;
+            }
+        }
+        return "";
+    }
+
+    private static void startEventBus(MainEventBusProcessor proc) {
+        try {
+            var m = MainEventBusProcessor.class.getDeclaredMethod("start");
+            m.setAccessible(true);
+            m.invoke(proc);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to start event bus", e);
         }
     }
 
@@ -355,129 +478,6 @@ public class EmbeddedA2AServer implements AutoCloseable {
             }
         } catch (A2AError e) {
             sendJson(exchange, 500, Map.of("error", e.getMessage()));
-        }
-    }
-
-    private static String formatSse(long seq, String payload) {
-        String compact =
-                payload == null
-                        ? ""
-                        : payload.replace("\r\n", "\n")
-                                .replace('\r', '\n')
-                                .lines()
-                                .map(String::trim)
-                                .reduce("", String::concat);
-        return String.format(Locale.ROOT, "id:%d%n", seq) + "data:" + compact + "\n\n";
-    }
-
-    private static StreamResponse toStreamResponse(StreamingEventKind event) {
-        StreamResponse.Builder b = StreamResponse.newBuilder();
-        if (event instanceof Message m) {
-            b.setMessage(ProtoUtils.ToProto.message(m));
-            return b.build();
-        }
-        if (event instanceof Task t) {
-            b.setTask(ProtoUtils.ToProto.task(t));
-            return b.build();
-        }
-        if (event instanceof TaskStatusUpdateEvent e) {
-            b.setStatusUpdate(ProtoUtils.ToProto.taskStatusUpdateEvent(e));
-            return b.build();
-        }
-        if (event instanceof TaskArtifactUpdateEvent e) {
-            b.setArtifactUpdate(ProtoUtils.ToProto.taskArtifactUpdateEvent(e));
-            return b.build();
-        }
-        throw new IllegalArgumentException("Unsupported event: " + event);
-    }
-
-    private static RequestHandler extractRequestHandler(RestHandler restHandler) {
-        try {
-            var f = RestHandler.class.getDeclaredField("requestHandler");
-            f.setAccessible(true);
-            return (RequestHandler) f.get(restHandler);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Failed to access request handler", e);
-        }
-    }
-
-    private static ServerCallContext buildCallContext(HttpExchange exchange) {
-        Map<String, String> headers = new LinkedHashMap<>();
-        exchange.getRequestHeaders()
-                .forEach((k, v) -> headers.put(k.toLowerCase(Locale.ROOT), String.join(",", v)));
-        String ext = firstHeader(headers, "A2A-Extensions", "X-A2A-Extensions");
-        Set<String> exts = ext.isBlank() ? Set.of() : Set.of(ext.split(","));
-        return new ServerCallContext(
-                null,
-                Map.of("headers", headers),
-                exts,
-                firstNullableHeader(headers, "A2A-Protocol-Version", "A2A-Version"));
-    }
-
-    private static String firstHeader(Map<String, String> h, String a, String b) {
-        String v = firstNullableHeader(h, a, b);
-        return v == null ? "" : v;
-    }
-
-    private static String firstNullableHeader(Map<String, String> h, String a, String b) {
-        String v = h.get(a.toLowerCase(Locale.ROOT));
-        return v != null ? v : h.get(b.toLowerCase(Locale.ROOT));
-    }
-
-    private static String readBody(HttpExchange exchange) throws IOException {
-        return new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-    }
-
-    private static void sendJson(HttpExchange exchange, int status, Object data)
-            throws IOException {
-        String json = data instanceof String ? (String) data : mapper.writeValueAsString(data);
-        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(status, bytes.length);
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(bytes);
-        }
-    }
-
-    private static AgentCard toTypedAgentCard(Map<String, Object> card) {
-        return cardMapper.convertValue(card, AgentCard.class);
-    }
-
-    private static boolean hasSecuritySchemes(Map<String, Object> card) {
-        return card.containsKey("securitySchemes")
-                && card.get("securitySchemes") instanceof Map
-                && !((Map<?, ?>) card.get("securitySchemes")).isEmpty()
-                && card.containsKey("securityRequirements");
-    }
-
-    @SuppressWarnings("unchecked")
-    private static String extractPathPrefix(Map<String, Object> agentCard) {
-        List<Map<String, Object>> interfaces =
-                (List<Map<String, Object>>)
-                        agentCard.getOrDefault("supportedInterfaces", List.of());
-        for (Map<String, Object> iface : interfaces) {
-            if ("HTTP+JSON".equalsIgnoreCase(String.valueOf(iface.get("protocolBinding")))) {
-                String url = String.valueOf(iface.getOrDefault("url", ""));
-                try {
-                    String path = java.net.URI.create(url).getPath();
-                    if (path != null && !path.isEmpty() && !"/".equals(path)) {
-                        return path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
-                    }
-                } catch (Exception ignored) {
-                }
-                break;
-            }
-        }
-        return "";
-    }
-
-    private static void startEventBus(MainEventBusProcessor proc) {
-        try {
-            var m = MainEventBusProcessor.class.getDeclaredMethod("start");
-            m.setAccessible(true);
-            m.invoke(proc);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Failed to start event bus", e);
         }
     }
 }

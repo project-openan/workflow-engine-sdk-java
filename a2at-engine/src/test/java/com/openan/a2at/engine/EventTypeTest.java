@@ -19,14 +19,13 @@
 
 package com.openan.a2at.engine;
 
-import com.openan.a2at.engine.control.EventType;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- * Verifies EventType constants match the Python SDK values.
- */
+import com.openan.a2at.engine.control.EventType;
+
+import org.junit.jupiter.api.Test;
+
+/** Verifies EventType constants match the Python SDK values. */
 class EventTypeTest {
 
     @Test

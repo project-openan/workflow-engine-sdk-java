@@ -45,6 +45,51 @@ class NegotiationTHandler implements ExtensionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(NegotiationTHandler.class);
 
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> extractNegotiationContext(Map<String, Object> metadata) {
+        if (metadata == null) {
+            return null;
+        }
+        for (var entry : metadata.entrySet()) {
+            if (entry.getKey().contains("DATA-NEGOTIATION-T") && entry.getValue() instanceof Map) {
+                return (Map<String, Object>) entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static String extractNegotiationText(Map<String, Object> metadata) {
+        if (metadata == null) {
+            return null;
+        }
+        for (var entry : metadata.entrySet()) {
+            if (entry.getKey().contains("NEGOTIATION-T")
+                    && !entry.getKey().contains("DATA-NEGOTIATION-T")
+                    && entry.getValue() instanceof String) {
+                return (String) entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static boolean supportsNegotiation(AgentCard agentCard) {
+        var extensions = agentCard.capabilities().extensions();
+        if (extensions == null) {
+            return false;
+        }
+        for (var ext : extensions) {
+            String uri = ext.uri();
+            if (uri.contains("NEGOTIATION-T")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String getAgentName(AgentCard agentCard) {
+        return agentCard.name();
+    }
+
     @Override
     public String extensionKeyword() {
         return "Negotiation-T";
@@ -132,50 +177,5 @@ class NegotiationTHandler implements ExtensionHandler {
         }
         result.setMetadata(metadata);
         return CompletableFuture.completedFuture(result);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> extractNegotiationContext(Map<String, Object> metadata) {
-        if (metadata == null) {
-            return null;
-        }
-        for (var entry : metadata.entrySet()) {
-            if (entry.getKey().contains("DATA-NEGOTIATION-T") && entry.getValue() instanceof Map) {
-                return (Map<String, Object>) entry.getValue();
-            }
-        }
-        return null;
-    }
-
-    private static String extractNegotiationText(Map<String, Object> metadata) {
-        if (metadata == null) {
-            return null;
-        }
-        for (var entry : metadata.entrySet()) {
-            if (entry.getKey().contains("NEGOTIATION-T")
-                    && !entry.getKey().contains("DATA-NEGOTIATION-T")
-                    && entry.getValue() instanceof String) {
-                return (String) entry.getValue();
-            }
-        }
-        return null;
-    }
-
-    private static boolean supportsNegotiation(AgentCard agentCard) {
-        var extensions = agentCard.capabilities().extensions();
-        if (extensions == null) {
-            return false;
-        }
-        for (var ext : extensions) {
-            String uri = ext.uri();
-            if (uri.contains("NEGOTIATION-T")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String getAgentName(AgentCard agentCard) {
-        return agentCard.name();
     }
 }

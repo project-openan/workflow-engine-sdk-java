@@ -8,14 +8,15 @@ A2A-T 工作流执行引擎是一个 Java SDK，用于基于 A2A 协议和 A2A-T
 
 ## 2. 环境要求
 
-| 要求 | 版本 |
-|---|---|
-| JDK | 17+ |
+| 要求  | 版本 |
+|-------|------|
+| JDK   | 17+  |
 | Maven | 3.6+ |
 
 ## 3. 引入依赖
 
 ```xml
+
 <dependency>
     <groupId>com.openan.a2at</groupId>
     <artifactId>a2at-engine</artifactId>
@@ -31,42 +32,42 @@ A2A-T 工作流执行引擎是一个 Java SDK，用于基于 A2A 协议和 A2A-T
 
 ```java
 Workflow workflow = Workflow.builder()
-    .name("故障诊断")
-    .steps(List.of(
-        WorkflowStep.builder()
-            .name("diagnose")
-            .subtasks(List.of(
-                Task.builder()
-                    .agent("SPN Domain Agent")
-                    .skill("diagnosis")
-                    .description("诊断故障")
-                    .build()))
-            .next(List.of(
-                JumpCondition.builder()
-                    .step("merge")
-                    .condition("success")
-                    .build()))
-            .layer(0)
-            .build(),
-        WorkflowStep.builder()
-            .name("merge")
-            .stepType(StepType.SELF_LOOP)   // 自环节点：工作台本地汇总，不发 A2A-T 给自己
-            .subtasks(List.of(
-                Task.builder()
-                    .agent("Transport Workbench Agent")
-                    .skill("aggregate")
-                    .description("汇总结果")
-                    .build()))
-            .next(List.of(
-                JumpCondition.builder()
-                    .step("end")
-                    .condition("success")
-                    .build()))
-            .layer(1)
-            .contextFrom(List.of("*"))
-            .build()
-    ))
-    .build();
+        .name("故障诊断")
+        .steps(List.of(
+                WorkflowStep.builder()
+                        .name("diagnose")
+                        .subtasks(List.of(
+                                Task.builder()
+                                        .agent("SPN Domain Agent")
+                                        .skill("diagnosis")
+                                        .description("诊断故障")
+                                        .build()))
+                        .next(List.of(
+                                JumpCondition.builder()
+                                        .step("merge")
+                                        .condition("success")
+                                        .build()))
+                        .layer(0)
+                        .build(),
+                WorkflowStep.builder()
+                        .name("merge")
+                        .stepType(StepType.SELF_LOOP)   // 自环节点：工作台本地汇总，不发 A2A-T 给自己
+                        .subtasks(List.of(
+                                Task.builder()
+                                        .agent("Transport Workbench Agent")
+                                        .skill("aggregate")
+                                        .description("汇总结果")
+                                        .build()))
+                        .next(List.of(
+                                JumpCondition.builder()
+                                        .step("end")
+                                        .condition("success")
+                                        .build()))
+                        .layer(1)
+                        .contextFrom(List.of("*"))
+                        .build()
+        ))
+        .build();
 ```
 
 ### 4.2 加载 AgentCard
@@ -74,9 +75,9 @@ Workflow workflow = Workflow.builder()
 ```java
 // 方式一：从 JSON 文件加载
 ObjectMapper mapper = new ObjectMapper()
-    .registerModule(new AgentCardJacksonModule());
+                .registerModule(new AgentCardJacksonModule());
 AgentCard card = mapper.readValue(
-    new File("agentcard/my_agent.json"), AgentCard.class);
+        new File("agentcard/my_agent.json"), AgentCard.class);
 
 // 方式二：从注册中心拉取
 RegistryClient registry = new RegistryClient("https://127.0.0.1:5001", false);
@@ -93,11 +94,11 @@ public class MyControlPoint extends DefaultControlPoint {
     public CompletableFuture<TaskResponse> onTask(
             TaskRequest request, WorkflowEngineClient engineClient) {
         return engineClient.sendMessage(
-                request.getAgentName(), request.getMessage())
-            .thenApply(r -> TaskResponse.builder()
-                .success(r.getText() != null && !r.getText().isEmpty())
-                .output(r.getText())
-                .build());
+                        request.getAgentName(), request.getMessage())
+                .thenApply(r -> TaskResponse.builder()
+                        .success(r.getText() != null && !r.getText().isEmpty())
+                        .output(r.getText())
+                        .build());
     }
 
     @Override
@@ -106,7 +107,7 @@ public class MyControlPoint extends DefaultControlPoint {
         // request.getMessage() 已包含上游步骤的执行结果上下文。
         String summary = summarizeLocally(request.getMessage());
         return CompletableFuture.completedFuture(
-            TaskResponse.builder().success(true).output(summary).build());
+                TaskResponse.builder().success(true).output(summary).build());
     }
 
     @Override
@@ -114,9 +115,9 @@ public class MyControlPoint extends DefaultControlPoint {
             String stepName, Map<String, Object> results,
             List<JumpCondition> conditions) {
         return CompletableFuture.completedFuture(
-            RouteDecision.builder()
-                .nextStep(conditions.get(0).getStep())
-                .build());
+                RouteDecision.builder()
+                        .nextStep(conditions.get(0).getStep())
+                        .build());
     }
 
     @Override
@@ -128,36 +129,38 @@ public class MyControlPoint extends DefaultControlPoint {
 }
 ```
 
-| 方法 | 何时调用 | 你需要做什么 |
-|---|---|---|
-| `onTask` | 步骤向其他智能体分派任务时 | 调用 `engineClient.sendMessage()` 发送消息，返回执行结果 |
-| `onSelfTask` | `SELF_LOOP` 步骤本地执行时 | 本地处理并返回结果（不发 A2A-T 消息） |
-| `onRoute` | 步骤完成后、决定下一步前 | 从候选分支中选择下一步 |
-| `onNegotiation` | 智能体返回 `INPUT_REQUIRED` 时 | 返回补充说明文本 |
-| `onAuthorization` | 智能体请求授权时（可选） | 返回 true/false |
-| `onNotification` | 智能体推送通知时（可选） | 处理通知内容 |
+| 方法              | 何时调用                       | 你需要做什么                                             |
+|-------------------|--------------------------------|----------------------------------------------------------|
+| `onTask`          | 步骤向其他智能体分派任务时     | 调用 `engineClient.sendMessage()` 发送消息，返回执行结果 |
+| `onSelfTask`      | `SELF_LOOP` 步骤本地执行时     | 本地处理并返回结果（不发 A2A-T 消息）                    |
+| `onRoute`         | 步骤完成后、决定下一步前       | 从候选分支中选择下一步                                   |
+| `onNegotiation`   | 智能体返回 `INPUT_REQUIRED` 时 | 返回补充说明文本                                         |
+| `onAuthorization` | 智能体请求授权时（可选）       | 返回 true/false                                          |
+| `onNotification`  | 智能体推送通知时（可选）       | 处理通知内容                                             |
 
 `onAuthorization` 和 `onNotification` 有默认实现（自动通过 / 空操作），`onNegotiation` 默认返回通用文本。只需覆盖你关心的方法。
 
-**自环节点（SelfLoop）**：当一个步骤是工作流执行智能体自身的任务（例如汇总多个智能体的诊断结果），把 `stepType` 设为 `SELF_LOOP`。引擎会调用 `onSelfTask` 本地处理，而不是通过 A2A-T 协议给智能体自己发消息。`onSelfTask` 不接收 `engineClient` 参数——从契约上保证自环任务不会误发 A2A-T。只有发给其他智能体的步骤才走 `onTask` + A2A-T 协议。
+**自环节点（SelfLoop）**：当一个步骤是工作流执行智能体自身的任务（例如汇总多个智能体的诊断结果），把 `stepType` 设为
+`SELF_LOOP`。引擎会调用 `onSelfTask` 本地处理，而不是通过 A2A-T 协议给智能体自己发消息。`onSelfTask` 不接收 `engineClient`
+参数——从契约上保证自环任务不会误发 A2A-T。只有发给其他智能体的步骤才走 `onTask` + A2A-T 协议。
 
 ### 4.4 执行
 
 ```java
 ExecutionResult result = ExecutePsop.builder()
-    .psop(workflow)
-    .agentCards(List.of(card1, card2))
-    .controlPoint(new MyControlPoint())
-    .runtimeIntent("SPN跨城专线故障诊断与抢通")
-    .lang("zh")
-    .a2atEnvPath(".env")
-    .credentialsConfigPath("credentials.json")
-    .sslVerify(false)
-    .onFinish((r, history) -> {
-        System.out.println("执行结果: " + r.isSuccess());
-    })
-    .execute()
-    .get(10, TimeUnit.MINUTES);
+        .psop(workflow)
+        .agentCards(List.of(card1, card2))
+        .controlPoint(new MyControlPoint())
+        .runtimeIntent("SPN跨城专线故障诊断与抢通")
+        .lang("zh")
+        .a2atEnvPath(".env")
+        .credentialsConfigPath("credentials.json")
+        .sslVerify(false)
+        .onFinish((r, history) -> {
+            System.out.println("执行结果: " + r.isSuccess());
+        })
+        .execute()
+        .get(10, TimeUnit.MINUTES);
 ```
 
 必填项：`psop`、`controlPoint`。其余配置项都有默认值。
@@ -215,12 +218,12 @@ A2AT_CRED_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 ```java
 WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
-    .authProvider((agentName, agentCard, headers) -> {
-        headers.put("Authorization", "Bearer " + mySsoClient.getToken(agentName));
-    })
-    .sslVerify(false)
-    .a2atEnvPath(".env")
-    .build();
+        .authProvider((agentName, agentCard, headers) -> {
+            headers.put("Authorization", "Bearer " + mySsoClient.getToken(agentName));
+        })
+        .sslVerify(false)
+        .a2atEnvPath(".env")
+        .build();
 ```
 
 每次发送消息时都会调用。如果同时配置了凭证文件和 `AuthProvider`，两者都生效。
@@ -258,10 +261,17 @@ AgentCard 通过 `capabilities.extensions` 声明扩展点：
     ]
   },
   "securitySchemes": {
-    "bearerAuth": { "type": "http", "scheme": "bearer" }
+    "bearerAuth": {
+      "type": "http",
+      "scheme": "bearer"
+    }
   },
   "securityRequirements": [
-    { "schemes": { "bearerAuth": [] } }
+    {
+      "schemes": {
+        "bearerAuth": []
+      }
+    }
   ],
   "supportedInterfaces": [
     {
@@ -281,11 +291,13 @@ AgentCard 通过 `capabilities.extensions` 声明扩展点：
 
 ### Task-T（自动）
 
-给智能体发消息时，引擎自动调用 A2A-T SDK 生成结构化任务提示词，放入消息 metadata。你在 `onTask` 里只需调用 `sendMessage()`，提示词生成是透明的。
+给智能体发消息时，引擎自动调用 A2A-T SDK 生成结构化任务提示词，放入消息 metadata。你在 `onTask` 里只需调用 `sendMessage()`
+，提示词生成是透明的。
 
 ### Negotiation-T（自动）
 
-智能体返回 `INPUT_REQUIRED` 时，引擎自动提取协商文本，调用你的 `onNegotiation()` 获取补充信息，然后发回后续消息。自动循环最多 `maxNegotiationRounds` 次（默认 3）。
+智能体返回 `INPUT_REQUIRED` 时，引擎自动提取协商文本，调用你的 `onNegotiation()` 获取补充信息，然后发回后续消息。自动循环最多
+`maxNegotiationRounds` 次（默认 3）。
 
 ### Authorization-T（前置下发）
 
@@ -293,10 +305,12 @@ AgentCard 通过 `capabilities.extensions` 声明扩展点：
 
 ```java
 ExtensionSender sender = new DefaultExtensionSender(transport);
-sender.sendAuthorization(
+sender.
+
+sendAuthorization(
     "SPN Domain Agent",
-    "Authorization-T pre-positioning",
-    "任务类型：新增授权，操作：业务抢通，操作类型：光模块更换，..."
+            "Authorization-T pre-positioning",
+            "任务类型：新增授权，操作：业务抢通，操作类型：光模块更换，..."
 );
 ```
 
@@ -309,8 +323,8 @@ sender.sendAuthorization(
 ```java
 sender.sendNotification(
     "SPN Domain Agent",
-    "Notification-T subscription",
-    "通知主题：service-recovery-execution-result，..."
+            "Notification-T subscription",
+            "通知主题：service-recovery-execution-result，..."
 );
 ```
 
@@ -323,7 +337,11 @@ sender.sendNotification(
 .sslVerify(false)
 
 // 生产环境：启用验证 + 自定义 CA 证书
-.sslVerify(true).caCertsPath("/path/to/ca-certs.pem")
+.
+
+sslVerify(true).
+
+caCertsPath("/path/to/ca-certs.pem")
 ```
 
 ## 9. 日志
@@ -331,10 +349,10 @@ sender.sendNotification(
 引擎设有专用 `PROTOCOL` 日志器，输出完整的协议层请求/响应报文（含 Header 和 Body）。在 `log4j2.properties` 中配置：
 
 ```properties
-logger.PROTOCOL.name = PROTOCOL
-logger.PROTOCOL.level = info
-logger.PROTOCOL.additivity = false
-logger.PROTOCOL.appenderRef = console
+logger.PROTOCOL.name=PROTOCOL
+logger.PROTOCOL.level=info
+logger.PROTOCOL.additivity=false
+logger.PROTOCOL.appenderRef=console
 ```
 
 设为 `debug` 可查看完整报文体。
@@ -348,33 +366,38 @@ EventCallback callback = new EventCallback() {
     @Override
     public void onEvent(String eventType, Map<String, Object> data) {
         switch (eventType) {
-        case EventType.STEP_START -> System.out.println("步骤开始: " + data.get("step"));
-        case EventType.AGENT_STATUS_UPDATE -> System.out.println(
-            data.get("agent") + " 状态: " + data.get("state"));
-        case EventType.NEGOTIATION_REQUEST -> System.out.println(
-            "协商请求来自 " + data.get("agent"));
-        case EventType.COMPLETE -> System.out.println("工作流执行完成");
+            case EventType.STEP_START -> System.out.println("步骤开始: " + data.get("step"));
+            case EventType.AGENT_STATUS_UPDATE -> System.out.println(
+                    data.get("agent") + " 状态: " + data.get("state"));
+            case EventType.NEGOTIATION_REQUEST -> System.out.println(
+                    "协商请求来自 " + data.get("agent"));
+            case EventType.COMPLETE -> System.out.println("工作流执行完成");
         }
     }
 };
 
-ExecutePsop.builder()
-    .eventCallback(callback)
-    // ...
+ExecutePsop.
+
+builder()
+    .
+
+eventCallback(callback)
+// ...
 ```
 
-常用事件类型：`STEP_START`、`STEP_COMPLETE`、`AGENT_REQUEST`、`AGENT_RESPONSE`、`NEGOTIATION_REQUEST`、`NEGOTIATION_RESOLVED`、`COMPLETE`、`ERROR`。
+常用事件类型：`STEP_START`、`STEP_COMPLETE`、`AGENT_REQUEST`、`AGENT_RESPONSE`、`NEGOTIATION_REQUEST`、`NEGOTIATION_RESOLVED`、
+`COMPLETE`、`ERROR`。
 
 ## 11. 从编排中心加载工作流
 
 ```java
 // 按意图搜索
 List<WorkflowSearchResult> results = LoadPsop.search(
-    "https://127.0.0.1:5001", "SPN跨城专线故障诊断", 5, null, false);
+                "https://127.0.0.1:5001", "SPN跨城专线故障诊断", 5, null, false);
 
 // 按 ID 加载完整工作流
 Workflow workflow = LoadPsop.load(
-    "https://127.0.0.1:5001", results.get(0).getWorkflowId(), null, false);
+        "https://127.0.0.1:5001", results.get(0).getWorkflowId(), null, false);
 ```
 
 ## 12. 自定义扩展
@@ -411,24 +434,28 @@ public class MyExtensionHandler implements ExtensionHandler {
 
 ```java
 WorkflowEngineClientConfig.builder()
-    .customHandlers(List.of(new MyExtensionHandler()))
-    .build();
+    .
+
+customHandlers(List.of(new MyExtensionHandler()))
+        .
+
+build();
 ```
 
 ## 13. 你需要使用的接口一览
 
-| 接口/类 | 用途 |
-|---|---|
-| `ExecutePsop.Builder` | 工作流执行入口 |
-| `ControlPoint` / `DefaultControlPoint` | 业务决策实现（onTask、onSelfTask、onRoute、onNegotiation 等） |
-| `WorkflowEngineClient` / `DefaultWorkflowEngineClient` | 工作流发送（sendMessage、认证、扩展） |
-| `ExtensionSender` / `DefaultExtensionSender` | 一次性前置（sendAuthorization、sendNotification） |
-| `A2ATransport` | 共享通信层（httpx runtime、认证、SSE 消费） |
-| `WorkflowEngineClientConfig` | 配置（SSL、认证、A2A-T、协商轮数、自定义 Handler） |
-| `AuthProvider` | 自定义认证 |
-| `ExtensionHandler` | 自定义扩展 |
-| `EventCallback` / `EventType` | 事件回调 |
-| `LoadPsop` / `RegistryClient` | 工作流加载 / AgentCard 获取 |
-| `Workflow` / `WorkflowStep` / `Task` / `JumpCondition` | 工作流定义 |
-| `ExecutionResult` | 执行结果 |
-| `SendMessageResult` / `TaskResponse` | 消息/任务响应 |
+| 接口/类                                                | 用途                                                          |
+|--------------------------------------------------------|---------------------------------------------------------------|
+| `ExecutePsop.Builder`                                  | 工作流执行入口                                                |
+| `ControlPoint` / `DefaultControlPoint`                 | 业务决策实现（onTask、onSelfTask、onRoute、onNegotiation 等） |
+| `WorkflowEngineClient` / `DefaultWorkflowEngineClient` | 工作流发送（sendMessage、认证、扩展）                         |
+| `ExtensionSender` / `DefaultExtensionSender`           | 一次性前置（sendAuthorization、sendNotification）             |
+| `A2ATransport`                                         | 共享通信层（httpx runtime、认证、SSE 消费）                   |
+| `WorkflowEngineClientConfig`                           | 配置（SSL、认证、A2A-T、协商轮数、自定义 Handler）            |
+| `AuthProvider`                                         | 自定义认证                                                    |
+| `ExtensionHandler`                                     | 自定义扩展                                                    |
+| `EventCallback` / `EventType`                          | 事件回调                                                      |
+| `LoadPsop` / `RegistryClient`                          | 工作流加载 / AgentCard 获取                                   |
+| `Workflow` / `WorkflowStep` / `Task` / `JumpCondition` | 工作流定义                                                    |
+| `ExecutionResult`                                      | 执行结果                                                      |
+| `SendMessageResult` / `TaskResponse`                   | 消息/任务响应                                                 |

@@ -23,8 +23,6 @@ import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.model.SendMessageResult;
 
-import org.a2aproject.sdk.spec.AgentCard;
-
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -71,21 +69,7 @@ public interface WorkflowEngineClient {
 
     void setControlPoint(ControlPoint controlPoint);
 
-    void setExtensionCallback(com.openan.a2at.engine.control.ExtensionCallback extensionCallback);
-
     void setEventCallback(EventCallback callback);
 
     void close();
-
-    java.util.List<String> getAgentNames();
-
-    /** Update the agent card map (e.g. after fetching new cards). */
-    default void updateAgentCards(java.util.List<AgentCard> agentCards) {
-        // Default no-op; implementations override
-    }
-
-    /** Register a custom extension handler. */
-    default void registerHandler(ExtensionHandler handler) {
-        // Default no-op; implementations override
-    }
 }

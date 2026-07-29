@@ -30,10 +30,6 @@ public enum StepType {
         this.value = value;
     }
 
-    public String getValue() {
-        return value;
-    }
-
     public static StepType fromValue(String v) {
         if (v == null) {
             return ALL_SUCCESS;
@@ -44,5 +40,9 @@ public enum StepType {
             }
         }
         return ALL_SUCCESS;
+    }
+
+    public String getValue() {
+        return value;
     }
 }
