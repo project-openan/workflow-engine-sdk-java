@@ -33,12 +33,24 @@
         <a2a.java.sdk.version>1.0.0.Beta1</a2a.java.sdk.version>
         <a2a.t.sdk.version>1.0.0</a2a.t.sdk.version>
         <lombok.version>1.18.38</lombok.version>
-        <jackson.version>2.20.1</jackson.version>
+        <jackson.version>2.20.2</jackson.version>
         <slf4j.version>2.0.17</slf4j.version>
         <junit.version>5.10.2</junit.version>
         <log4j2.version>2.24.3</log4j2.version>
         <spring-boot.version>3.3.9</spring-boot.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <pluginManagement>

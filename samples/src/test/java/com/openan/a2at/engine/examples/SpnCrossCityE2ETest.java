@@ -14,7 +14,7 @@ import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity1Executor;
 import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity2Executor;
 import com.openan.a2at.engine.examples.agents.WorkbenchControlPoint;
-import com.openan.a2at.engine.examples.server.EmbeddedA2AServer;
+import com.openan.a2at.engine.examples.server.JdkHttpA2AServer;
 import com.openan.a2at.engine.model.ExecutionResult;
 import com.openan.a2at.engine.model.JumpCondition;
 import com.openan.a2at.engine.model.StepType;
@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * End-to-end business integration test for the SPN cross-city diagnosis workflow. Starts two real
- * SPN agents (EmbeddedA2AServer + A2A-T protocol over HTTPS+SSE), pre-positions Authorization-T and
+ * SPN agents (JdkHttpA2AServer + A2A-T protocol over HTTPS+SSE), pre-positions Authorization-T and
  * Notification-T, runs a 3-step workflow (diagnose x2 + SelfLoop merge), and asserts the full
  * business path: negotiation -> diagnosis -> whitelist self-recovery -> Notification-T report ->
  * local merge (no A2A-T to self).
@@ -48,7 +48,7 @@ class SpnCrossCityE2ETest {
     private static final ObjectMapper mapper =
             new ObjectMapper().registerModule(new AgentCardJacksonModule());
 
-    private final List<EmbeddedA2AServer> servers = new ArrayList<>();
+    private final List<JdkHttpA2AServer> servers = new ArrayList<>();
     private DefaultWorkflowEngineClient client;
     private ExtensionSender sender;
     private int port1;
@@ -105,14 +105,14 @@ class SpnCrossCityE2ETest {
         port2 = port1 + 1;
         AgentCard c1 = cardFor("SPN Domain Agent City1", port1);
         AgentCard c2 = cardFor("SPN Domain Agent City2", port2);
-        EmbeddedA2AServer s1 =
-                new EmbeddedA2AServer(
+        JdkHttpA2AServer s1 =
+                new JdkHttpA2AServer(
                         "127.0.0.1",
                         port1,
                         mapper.convertValue(c1, Map.class),
                         new SpnDomainAgentCity1Executor());
-        EmbeddedA2AServer s2 =
-                new EmbeddedA2AServer(
+        JdkHttpA2AServer s2 =
+                new JdkHttpA2AServer(
                         "127.0.0.1",
                         port2,
                         mapper.convertValue(c2, Map.class),

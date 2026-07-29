@@ -27,7 +27,7 @@ import com.openan.a2at.engine.client.AgentCardJacksonModule;
 import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
 import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity1Executor;
-import com.openan.a2at.engine.examples.server.EmbeddedA2AServer;
+import com.openan.a2at.engine.examples.server.JdkHttpA2AServer;
 import com.openan.a2at.engine.model.SendMessageResult;
 
 import org.a2aproject.sdk.spec.AgentCard;
@@ -51,7 +51,7 @@ class EmbeddedA2AServerTest {
     private static final ObjectMapper mapper =
             new ObjectMapper().registerModule(new AgentCardJacksonModule());
     private static final String AGENT_NAME = "Test Agent";
-    private EmbeddedA2AServer server;
+    private JdkHttpA2AServer server;
     private DefaultWorkflowEngineClient client;
     private int port;
 
@@ -134,7 +134,7 @@ class EmbeddedA2AServerTest {
                                                 "https://127.0.0.1:" + port,
                                                 "tenant",
                                                 "")));
-        server = new EmbeddedA2AServer("127.0.0.1", port, card, new SpnDomainAgentCity1Executor());
+        server = new JdkHttpA2AServer("127.0.0.1", port, card, new SpnDomainAgentCity1Executor());
         server.start();
         Thread.sleep(500);
         A2ATransport transport =
