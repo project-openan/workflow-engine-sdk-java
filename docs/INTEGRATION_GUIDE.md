@@ -217,6 +217,55 @@ For agents requiring authentication, provide a JSON credentials file:
 - Plaintext values (no `enc:` prefix) are also accepted
 - Tokens are cached and refreshed automatically
 
+### 5.2.1 Credential Encryption and Key Management
+
+Passwords in the credentials file support encrypted storage to avoid plaintext exposure.
+
+**Generate a key**
+
+```bash
+openssl rand -hex 32
+```
+
+Example output:
+
+```
+4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+```
+
+Write the key to the `.env` file:
+
+```
+A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+```
+
+**Encrypt a password**
+
+```bash
+# Option 1: set env var first
+set A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123"
+
+# Option 2: pass key as second argument
+java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+```
+
+Output:
+
+```
+enc:uHQcTeKZMVNRM9Ga:o5vm4weRozBXBs04phrLq7j7+/yRVyDsrw==
+```
+
+Paste the output into the `value` field of the credentials JSON.
+
+**Rotating the key**
+
+1. Generate a new key: `openssl rand -hex 32`
+2. Update `A2AT_CRED_KEY` in `.env`
+3. Re-encrypt all passwords: `java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "plaintext" new-key`
+4. Update the `enc:...` results in the credentials JSON file
+
+> The `.env` file should not be committed to version control. Add it to `.gitignore`.
 ### 5.3 Custom Authentication
 
 When AgentCard has no securitySchemes or uses a non-standard auth mechanism, implement `AuthProvider`:

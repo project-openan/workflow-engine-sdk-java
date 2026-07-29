@@ -212,6 +212,55 @@ A2AT_CRED_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 - 也接受明文密码（不加 `enc:` 前缀）
 - Token 自动缓存和刷新
 
+### 5.2.1 凭证加密与密钥管理
+
+凭证文件中的密码支持加密存储，避免明文泄露。
+
+**生成密钥**
+
+```bash
+openssl rand -hex 32
+```
+
+输出示例：
+
+```
+4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+```
+
+将生成的密钥写入 `.env` 文件：
+
+```
+A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+```
+
+**加密密码**
+
+```bash
+# 方式一：先设置环境变量
+set A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123"
+
+# 方式二：密钥作为第二个参数
+java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+```
+
+输出：
+
+```
+enc:uHQcTeKZMVNRM9Ga:o5vm4weRozBXBs04phrLq7j7+/yRVyDsrw==
+```
+
+将输出结果填入凭证 JSON 的 `value` 字段。
+
+**更换密钥**
+
+1. 生成新密钥：`openssl rand -hex 32`
+2. 更新 `.env` 中的 `A2AT_CRED_KEY`
+3. 用新密钥重新加密所有密码：`java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "明文密码" 新密钥`
+4. 将新的 `enc:...` 结果更新到凭证 JSON 文件
+
+> `.env` 文件不应提交到版本库，建议加入 `.gitignore`。
 ### 5.3 自定义认证
 
 当 AgentCard 没有声明 securitySchemes，或使用非标准认证方式时，实现 `AuthProvider`：
