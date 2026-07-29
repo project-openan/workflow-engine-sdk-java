@@ -162,6 +162,7 @@ public class SpringSpnDemo {
             return result.getText();
         } finally {
             client.close();
+            transport.close();
         }
     }
 

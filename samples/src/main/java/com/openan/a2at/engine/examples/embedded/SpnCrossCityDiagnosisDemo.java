@@ -163,6 +163,7 @@ public class SpnCrossCityDiagnosisDemo {
         SendMessageResult result = engineClient.sendMessage(WB_AGENT_NAME, taskText).join();
         log.info("[SelfTrigger] Task state: {}", result.getTaskState());
         engineClient.close();
+        transport.close();
         return result.getText();
     }
 }

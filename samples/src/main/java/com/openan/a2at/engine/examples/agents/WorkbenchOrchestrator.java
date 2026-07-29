@@ -133,8 +133,9 @@ public class WorkbenchOrchestrator {
                                 .a2atEnvPath(a2atEnvPath)
                                 .credentialsConfigPath(credentialsPath)
                                 .build());
-        WorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(transport);
-        ExtensionSender extensionSender = new DefaultExtensionSender(transport);
+        try {
+            WorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(transport);
+            ExtensionSender extensionSender = new DefaultExtensionSender(transport);
 
         log.info("[Orchestrator] Step 4: Pre-position extensions");
         new ExtensionPrePositioner().prePosition(extensionSender, agentCards);
@@ -165,6 +166,9 @@ public class WorkbenchOrchestrator {
                         .execute()
                         .join();
         return buildResultText(result);
+        } finally {
+            transport.close();
+        }
     }
 
     private List<AgentCard> loadAgentCards() {
