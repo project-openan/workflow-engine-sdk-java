@@ -1,5 +1,9 @@
 # Notification-T / Authorization-T 设计分析
 
+> **已归档。** 本历史分析已整合到 [DESIGN.md](DESIGN.md) 的第 4 节 (A2A-T 扩展模型) 和第 7 节 (交互时序)。下方描述的前置预定位流程现在位于 `ExtensionSender`（见 DESIGN.md "共享传输层与双门面"），不再在 `WorkflowEngineClient` 上。仅保留供参考。
+
+---
+
 > 本文分析 Notification-T 和 Authorization-T 的设计选型，提出长连接 SSE 方案，
 > 并记录已确认的关键设计决策。
 

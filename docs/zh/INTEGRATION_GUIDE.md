@@ -20,7 +20,7 @@ A2A-T 工作流执行引擎是一个 Java SDK，用于基于 A2A 协议和 A2A-T
 <dependency>
     <groupId>com.openan.a2at</groupId>
     <artifactId>a2at-engine</artifactId>
-    <version>0.3.0</version>
+<version>1.0.0</version>
 </dependency>
 ```
 
@@ -135,10 +135,8 @@ public class MyControlPoint extends DefaultControlPoint {
 | `onSelfTask`      | `SELF_LOOP` 步骤本地执行时     | 本地处理并返回结果（不发 A2A-T 消息）                    |
 | `onRoute`         | 步骤完成后、决定下一步前       | 从候选分支中选择下一步                                   |
 | `onNegotiation`   | 智能体返回 `INPUT_REQUIRED` 时 | 返回补充说明文本                                         |
-| `onAuthorization` | 智能体请求授权时（可选）       | 返回 true/false                                          |
-| `onNotification`  | 智能体推送通知时（可选）       | 处理通知内容                                             |
 
-`onAuthorization` 和 `onNotification` 有默认实现（自动通过 / 空操作），`onNegotiation` 默认返回通用文本。只需覆盖你关心的方法。
+`onNegotiation` 默认返回通用文本。只需覆盖你关心的方法。授权和通知的响应钩子 (`onAuthorization` / `onNotification`) 位于 `ExtensionCallback` 接口，不在 `ControlPoint` 上。如需自定义授权审批或通知处理，实现 `ExtensionCallback` 并通过 `engineClient.setExtensionCallback()` 挂载。
 
 **自环节点（SelfLoop）**：当一个步骤是工作流执行智能体自身的任务（例如汇总多个智能体的诊断结果），把 `stepType` 设为
 `SELF_LOOP`。引擎会调用 `onSelfTask` 本地处理，而不是通过 A2A-T 协议给智能体自己发消息。`onSelfTask` 不接收 `engineClient`
@@ -425,7 +423,24 @@ sender.sendNotification(
 );
 ```
 
-`A2ATExtension.NOTIFICATION_T` 打开长连接 SSE 流，后续抢通结果通过该响应流返回。SPN 智能体通过通知通道上报抢通结果。
+`A2ATExtension.NOTIFICATION_T` 打开长连接 SSE 流。如需接收后续抢通结果，传入第四个参数 `Consumer<Map<String, Object>>` 回调：
+
+```java
+sender.sendNotification(
+    "SPN Domain Agent",
+            "Notification-T subscription",
+            "通知主题：service-recovery-execution-result，...",
+    event -> {
+        // event 包含 agent, text, metadata, state
+        Object text = event.get("text");
+        if (text != null) {
+            System.out.println("抢通结果: " + text);
+        }
+    }
+);
+```
+
+不传回调（null）时后续事件被丢弃。SPN 智能体通过通知通道上报抢通结果。
 
 ## 8. HTTPS 配置
 

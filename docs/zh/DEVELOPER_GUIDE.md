@@ -56,6 +56,7 @@ public class MyControlPoint implements ControlPoint {
 
 `onAuthorization` 和 `onNotification` 有默认实现。
 `onNegotiation` 有默认实现，返回通用澄清文本。
+`onNegotiation` 有默认实现，返回通用澄清文本。授权和通知的响应钩子 (`onAuthorization` / `onNotification`) 位于 `ExtensionCallback` 接口，不在 `ControlPoint` 上。
 
 ## 4. 通过 Builder 执行（推荐）
 

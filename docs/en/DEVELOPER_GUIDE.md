@@ -58,6 +58,8 @@ public class MyControlPoint implements ControlPoint {
 
 `onAuthorization` and `onNotification` have default implementations.
 `onNegotiation` has a default that returns a generic clarification.
+`onNegotiation` has a default that returns a generic clarification. Authorization and notification
+reactive hooks (`onAuthorization` / `onNotification`) live on the `ExtensionCallback` interface, not on `ControlPoint`.
 
 ## 4. Execute via Builder (recommended)
 

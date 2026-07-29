@@ -22,7 +22,7 @@ Negotiation-T auto-loop, authentication, TLS). You focus on business decisions o
 <dependency>
     <groupId>com.openan.a2at</groupId>
     <artifactId>a2at-engine</artifactId>
-    <version>0.3.0</version>
+<version>1.0.0</version>
 </dependency>
 ```
 
@@ -138,11 +138,11 @@ public class MyControlPoint extends DefaultControlPoint {
 | `onSelfTask`      | A `SELF_LOOP` step runs locally           | Handle locally, return result (no A2A-T message) |
 | `onRoute`         | After step completes, before next step    | Pick the next step from candidates               |
 | `onNegotiation`   | Agent returns `INPUT_REQUIRED`            | Return clarification text                        |
-| `onAuthorization` | Agent requests authorization (optional)   | Return true/false                                |
-| `onNotification`  | Agent pushes notification (optional)      | Handle notification                              |
 
-`onAuthorization` and `onNotification` have default implementations (auto-approve / no-op). `onNegotiation` defaults to
-a generic clarification. Override only what you need.
+`onNegotiation` defaults to a generic clarification. Override only what you need. Authorization and notification
+reactive hooks (`onAuthorization` / `onNotification`) live on the `ExtensionCallback` interface, not on `ControlPoint`.
+To customize authorization approval or notification handling, implement `ExtensionCallback` and attach it via
+`engineClient.setExtensionCallback()`.
 
 **Self-loop steps (SelfLoop)**: When a step is the workflow-executing agent's own task (e.g. merging multiple agents'
 diagnostic results), set `stepType` to `SELF_LOOP`. The engine calls `onSelfTask` locally instead of sending an A2A-T
@@ -433,8 +433,26 @@ sender.sendNotification(
 );
 ```
 
-`A2ATExtension.NOTIFICATION_T` opens a long-lived SSE stream; later recovery results flow back through that response
-stream. The SPN agent reports recovery results through the notification channel.
+`A2ATExtension.NOTIFICATION_T` opens a long-lived SSE stream. To receive subsequent recovery results, pass a
+`Consumer<Map<String, Object>>` callback as the fourth parameter:
+
+```java
+sender.sendNotification(
+    "SPN Domain Agent",
+            "Notification-T subscription",
+            "Topic: service-recovery-execution-result, ...",
+    event -> {
+        // event contains agent, text, metadata, state
+        Object text = event.get("text");
+        if (text != null) {
+            System.out.println("Recovery result: " + text);
+        }
+    }
+);
+```
+
+Without a callback (null), subsequent events are dropped. The SPN agent reports recovery results through the
+notification channel.
 
 ## 8. HTTPS Configuration
 

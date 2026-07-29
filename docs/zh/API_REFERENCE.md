@@ -123,6 +123,11 @@ public interface ExtensionSender {
     // 便捷方法：Notification-T（长连接 SSE）
     CompletableFuture<SendMessageResult> sendNotification(
             String agentName, String instruction, String naturalLanguageInput);
+
+    // 便捷方法：Notification-T（长连接 SSE + 事件回调）
+    CompletableFuture<SendMessageResult> sendNotification(
+            String agentName, String instruction,
+            String naturalLanguageInput, Consumer<Map<String, Object>> eventCallback);
 }
 ```
 
@@ -132,6 +137,7 @@ public interface ExtensionSender {
 | `instruction`          | `String`        | 简短指令文本（成为 `parts[].text`） |
 | `naturalLanguageInput` | `String`        | SDK 提示词生成的自然语言输入        |
 | `extension`            | `A2ATExtension` | 扩展枚举（勿硬编码 URI）            |
+| `eventCallback`        | `Consumer<Map<String, Object>>` | 可选 SSE 事件回调（`sendNotification` 专用）。OMC 后续推送的抢通结果通过此回调实时接收，回调 Map 含 `agent`、`text`、`metadata`、`state`。不传（null）时后续事件被丢弃 |
 
 metadata 值由 A2A-T SDK 生成；SDK 不可用时回退为原始自然语言输入。
 
@@ -237,14 +243,6 @@ public interface ControlPoint {
             String stepName, Map<String, Object> results,
             List<JumpCondition> conditions);
 
-    // 授权审批决策。默认：自动通过。
-    default CompletableFuture<Boolean> onAuthorization(
-            String agentName, Map<String, Object> authRequest);
-
-    // 处理通知。默认：空操作。
-    default CompletableFuture<Void> onNotification(
-            String agentName, Map<String, Object> notification);
-
     // 提供协商补充信息。默认：返回通用文本。
     default CompletableFuture<String> onNegotiation(
             String agentName, String negotiationText,
@@ -257,8 +255,6 @@ public interface ControlPoint {
 | `onTask`          | 步骤向其他智能体分派任务时             | `TaskResponse`（成功 + 输出） |
 | `onSelfTask`      | `SELF_LOOP` 步骤本地执行（不走 A2A-T） | `TaskResponse`（成功 + 输出） |
 | `onRoute`         | 步骤完成后、下一步前                   | `RouteDecision`（nextStep）   |
-| `onAuthorization` | 智能体请求授权时                       | `Boolean`（true=通过）        |
-| `onNotification`  | 智能体推送通知时                       | `Void`                        |
 | `onNegotiation`   | 智能体返回 `INPUT_REQUIRED` 时         | `String` 补充信息文本         |
 
 ### DefaultControlPoint
@@ -268,11 +264,50 @@ public interface ControlPoint {
 - `onTask`：调用 `sendMessage()`，返回 success/output
 - `onSelfTask`：原样回传任务消息（本地逻辑请覆盖实现）
 - `onRoute`：选第一个非终止分支
-- `onAuthorization`：自动通过
-- `onNotification`：记录日志并返回
 - `onNegotiation`：返回通用补充信息
 
 继承此类，只需覆盖需要自定义的方法。
+
+### ExtensionCallback
+
+响应式钩子接口，用于处理智能体推送的 A2A-T 扩展数据。与 `ControlPoint` 分离：`ControlPoint` 驱动工作流前进（由执行器调用），`ExtensionCallback` 响应对端主动推送的授权请求和通知（由扩展处理器调用）。
+
+```java
+public abstract class ExtensionCallback {
+    // 授权审批。默认：自动通过。
+    CompletableFuture<Boolean> onAuthorization(
+            String agentName, Map<String, Object> authRequest);
+
+    // 处理通知。默认：空操作。
+    CompletableFuture<Void> onNotification(
+            String agentName, Map<String, Object> notification);
+}
+```
+
+| 方法              | 触发时机                               | 返回值                        |
+|-------------------|----------------------------------------|-------------------------------|
+| `onAuthorization` | 智能体在 Task-T 响应中携带 Authorization-T | `Boolean`（true=通过）        |
+| `onNotification`  | 智能体在 Task-T 响应中携带 Notification-T | `Void`                        |
+
+挂载方式：
+
+```java
+engineClient.setExtensionCallback(new ExtensionCallback() {
+    @Override
+    public CompletableFuture<Boolean> onAuthorization(
+            String agentName, Map<String, Object> authRequest) {
+        return CompletableFuture.completedFuture(true);
+    }
+
+    @Override
+    public CompletableFuture<Void> onNotification(
+            String agentName, Map<String, Object> notification) {
+        return CompletableFuture.completedFuture(null);
+    }
+});
+```
+
+> 注意：通过 `ExtensionSender.sendNotification` 建立的 SSE 长连接，其后续推送的抢通结果通过回调 `Consumer<Map<String, Object>>` 接收，不经过 `onNotification`。后者仅在智能体于 `sendMessage` 响应中主动附带 Notification-T 时触发。
 
 ### EventCallback
 
