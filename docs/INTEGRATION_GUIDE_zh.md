@@ -261,22 +261,70 @@ enc:uHQcTeKZMVNRM9Ga:o5vm4weRozBXBs04phrLq7j7+/yRVyDsrw==
 4. 将新的 `enc:...` 结果更新到凭证 JSON 文件
 
 > `.env` 文件不应提交到版本库，建议加入 `.gitignore`。
-### 5.3 自定义认证
+### 5.3 自定义认证（AuthProvider）
 
-当 AgentCard 没有声明 securitySchemes，或使用非标准认证方式时，实现 `AuthProvider`：
+当 AgentCard 没有声明 `securitySchemes`，或使用非标准认证方式时，实现 `AuthProvider` 接口。接口只有一个方法：
 
 ```java
+public interface AuthProvider {
+    void applyAuth(String agentName, AgentCard agentCard, Map<String, String> headers);
+}
+```
+
+每次发消息前都会调用 `applyAuth`，实现方往 `headers` 里塞认证头即可。
+
+**场景 1：企业 SSO / 外部 Token 服务**
+
+```java
+public class SsoAuthProvider implements AuthProvider {
+    private final SsoClient ssoClient;
+
+    public SsoAuthProvider(SsoClient ssoClient) {
+        this.ssoClient = ssoClient;
+    }
+
+    @Override
+    public void applyAuth(String agentName, AgentCard agentCard, Map<String, String> headers) {
+        String token = ssoClient.getToken(agentName);
+        headers.put("Authorization", "Bearer " + token);
+    }
+}
+
+// 注册
 WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
-        .authProvider((agentName, agentCard, headers) -> {
-            headers.put("Authorization", "Bearer " + mySsoClient.getToken(agentName));
-        })
+        .authProvider(new SsoAuthProvider(mySsoClient))
         .sslVerify(false)
         .a2atEnvPath(".env")
         .build();
 ```
 
-每次发送消息时都会调用。如果同时配置了凭证文件和 `AuthProvider`，两者都生效。
+**场景 2：AgentCard 没声明 securitySchemes，但服务端要求认证**
 
+```java
+WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
+        .authProvider((agentName, agentCard, headers) -> {
+            headers.put("X-API-Key", "static-api-key-value");
+        })
+        .build();
+```
+
+**场景 3：自定义 Header 名称（非标准 Authorization）**
+
+```java
+WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
+        .authProvider((agentName, agentCard, headers) -> {
+            String token = refreshTokenIfNeeded(agentName);
+            headers.put("X-Auth-Token", token);
+            headers.put("X-Tenant-Id", "tenant-001");
+        })
+        .build();
+```
+
+**注意事项：**
+
+- `applyAuth` 每次发消息都会调用，内部可自行实现 token 缓存和刷新逻辑
+- 如果同时配了凭证文件和 `AuthProvider`，两者都生效：`AuthProvider` 先执行，凭证文件的认证后执行
+- 认证失败时（如 token 获取异常），抛出的异常会传播到 `send()` 方法，请求会被拦截，不会发出
 ## 6. AgentCard 定义
 
 AgentCard 通过 `capabilities.extensions` 声明扩展点：

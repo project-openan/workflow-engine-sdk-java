@@ -266,23 +266,70 @@ Paste the output into the `value` field of the credentials JSON.
 4. Update the `enc:...` results in the credentials JSON file
 
 > The `.env` file should not be committed to version control. Add it to `.gitignore`.
-### 5.3 Custom Authentication
+### 5.3 Custom Authentication (AuthProvider)
 
-When AgentCard has no securitySchemes or uses a non-standard auth mechanism, implement `AuthProvider`:
+When the AgentCard has no `securitySchemes`, or uses a non-standard auth mechanism, implement the `AuthProvider` interface. It has a single method:
 
 ```java
+public interface AuthProvider {
+    void applyAuth(String agentName, AgentCard agentCard, Map<String, String> headers);
+}
+```
+
+`applyAuth` is called before every message send. The implementation adds auth headers to the mutable `headers` map.
+
+**Scenario 1: Enterprise SSO / External Token Service**
+
+```java
+public class SsoAuthProvider implements AuthProvider {
+    private final SsoClient ssoClient;
+
+    public SsoAuthProvider(SsoClient ssoClient) {
+        this.ssoClient = ssoClient;
+    }
+
+    @Override
+    public void applyAuth(String agentName, AgentCard agentCard, Map<String, String> headers) {
+        String token = ssoClient.getToken(agentName);
+        headers.put("Authorization", "Bearer " + token);
+    }
+}
+
+// Register
 WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
-        .authProvider((agentName, agentCard, headers) -> {
-            headers.put("Authorization", "Bearer " + mySsoClient.getToken(agentName));
-        })
+        .authProvider(new SsoAuthProvider(mySsoClient))
         .sslVerify(false)
         .a2atEnvPath(".env")
         .build();
 ```
 
-Called for every message send. If both a credentials file and `AuthProvider`
-are configured, both take effect.
+**Scenario 2: AgentCard has no securitySchemes, but server requires auth**
 
+```java
+WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
+        .authProvider((agentName, agentCard, headers) -> {
+            headers.put("X-API-Key", "static-api-key-value");
+        })
+        .build();
+```
+
+**Scenario 3: Custom header name (non-standard Authorization)**
+
+```java
+WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
+        .authProvider((agentName, agentCard, headers) -> {
+            String token = refreshTokenIfNeeded(agentName);
+            headers.put("X-Auth-Token", token);
+            headers.put("X-Tenant-Id", "tenant-001");
+        })
+        .build();
+```
+
+**Notes:**
+
+- `applyAuth` is called on every message send; implement token caching/refresh logic inside
+- If both a credentials file and `AuthProvider` are configured, both run: `AuthProvider` first, credentials-based auth second
+- On auth failure (e.g. token retrieval throws), the exception propagates to `send()` and the request is blocked
 ## 6. AgentCard Definition
 
 AgentCards declare extensions via `capabilities.extensions`:
