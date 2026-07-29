@@ -20,11 +20,11 @@
 package com.openan.a2at.engine.client;
 
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+
 import org.a2aproject.sdk.spec.APIKeySecurityScheme;
 import org.a2aproject.sdk.spec.HTTPAuthSecurityScheme;
 import org.a2aproject.sdk.spec.MutualTLSSecurityScheme;
@@ -36,38 +36,41 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * Jackson module that teaches Jackson how to deserialize the
- * {@link SecurityScheme} interface by inspecting the oneOf key
- * (e.g. "httpAuthSecurityScheme", "apiKeySecurityScheme").
+ * Jackson module that teaches Jackson how to deserialize the {@link SecurityScheme} interface by
+ * inspecting the oneOf key (e.g. "httpAuthSecurityScheme", "apiKeySecurityScheme").
  *
- * <p>The A2A-T AgentCard JSON uses a discriminated oneOf structure for
- * security schemes: each scheme object has exactly one key that
- * identifies the concrete type. This module maps those keys to the
- * SDK's concrete SecurityScheme record implementations.
+ * <p>The A2A-T AgentCard JSON uses a discriminated oneOf structure for security schemes: each
+ * scheme object has exactly one key that identifies the concrete type. This module maps those keys
+ * to the SDK's concrete SecurityScheme record implementations.
  *
  * <p>Required fields (validated before passing to SDK constructors):
+ *
  * <ul>
- *   <li>httpAuthSecurityScheme: scheme (must not be null)</li>
- *   <li>apiKeySecurityScheme: name (must not be null)</li>
- *   <li>openIdConnectSecurityScheme: openIdConnectUrl (must not be null)</li>
+ *   <li>httpAuthSecurityScheme: scheme (must not be null)
+ *   <li>apiKeySecurityScheme: name (must not be null)
+ *   <li>openIdConnectSecurityScheme: openIdConnectUrl (must not be null)
  * </ul>
+ *
  * Optional fields (bearerFormat, description, oauth2MetadataUrl) accept null.
  */
 public final class AgentCardJacksonModule extends SimpleModule {
 
     public AgentCardJacksonModule() {
         addDeserializer(SecurityScheme.class, new SecuritySchemeDeserializer());
-        addDeserializer(org.a2aproject.sdk.spec.SecurityRequirement.class, new SecurityRequirementDeserializer());
+        addDeserializer(
+                org.a2aproject.sdk.spec.SecurityRequirement.class,
+                new SecurityRequirementDeserializer());
     }
 
     public static final class SecuritySchemeDeserializer extends StdDeserializer<SecurityScheme> {
 
-        private static final Map<String, String> TYPE_KEYS = Map.of(
-                "httpAuthSecurityScheme", "httpAuthSecurityScheme",
-                "apiKeySecurityScheme", "apiKeySecurityScheme",
-                "oauth2SecurityScheme", "oauth2SecurityScheme",
-                "openIdConnectSecurityScheme", "openIdConnectSecurityScheme",
-                "mtlsSecurityScheme", "mtlsSecurityScheme");
+        private static final Map<String, String> TYPE_KEYS =
+                Map.of(
+                        "httpAuthSecurityScheme", "httpAuthSecurityScheme",
+                        "apiKeySecurityScheme", "apiKeySecurityScheme",
+                        "oauth2SecurityScheme", "oauth2SecurityScheme",
+                        "openIdConnectSecurityScheme", "openIdConnectSecurityScheme",
+                        "mtlsSecurityScheme", "mtlsSecurityScheme");
 
         public SecuritySchemeDeserializer() {
             super(SecurityScheme.class);
@@ -75,7 +78,7 @@ public final class AgentCardJacksonModule extends SimpleModule {
 
         @Override
         public SecurityScheme deserialize(JsonParser p, DeserializationContext ctxt)
-                throws IOException, JsonProcessingException {
+                throws IOException {
             JsonNode node = p.getCodec().readTree(p);
             for (var entry : TYPE_KEYS.entrySet()) {
                 if (node.has(entry.getKey())) {
@@ -84,7 +87,8 @@ public final class AgentCardJacksonModule extends SimpleModule {
                         case "httpAuthSecurityScheme" -> {
                             String scheme = textOrNull(inner, "scheme");
                             if (scheme == null) {
-                                throw ctxt.instantiationException(HTTPAuthSecurityScheme.class,
+                                throw ctxt.instantiationException(
+                                        HTTPAuthSecurityScheme.class,
                                         "httpAuthSecurityScheme: 'scheme' field is required");
                             }
                             yield new HTTPAuthSecurityScheme(
@@ -95,31 +99,34 @@ public final class AgentCardJacksonModule extends SimpleModule {
                         case "apiKeySecurityScheme" -> {
                             String name = textOrNull(inner, "name");
                             if (name == null) {
-                                throw ctxt.instantiationException(APIKeySecurityScheme.class,
+                                throw ctxt.instantiationException(
+                                        APIKeySecurityScheme.class,
                                         "apiKeySecurityScheme: 'name' field is required");
                             }
                             yield new APIKeySecurityScheme(
                                     inner.has("in") && inner.get("in").isTextual()
-                                            ? APIKeySecurityScheme.Location.valueOf(inner.get("in").asText().toUpperCase())
+                                            ? APIKeySecurityScheme.Location.valueOf(
+                                                    inner.get("in").asText().toUpperCase())
                                             : null,
                                     name,
                                     textOrNull(inner, "description"));
                         }
-                        case "mtlsSecurityScheme" -> new MutualTLSSecurityScheme(
-                                textOrNull(inner, "description"));
-                        case "oauth2SecurityScheme" -> new OAuth2SecurityScheme(
-                                null,
-                                textOrNull(inner, "description"),
-                                textOrNull(inner, "oauth2MetadataUrl"));
+                        case "mtlsSecurityScheme" ->
+                                new MutualTLSSecurityScheme(textOrNull(inner, "description"));
+                        case "oauth2SecurityScheme" ->
+                                new OAuth2SecurityScheme(
+                                        null,
+                                        textOrNull(inner, "description"),
+                                        textOrNull(inner, "oauth2MetadataUrl"));
                         case "openIdConnectSecurityScheme" -> {
                             String url = textOrNull(inner, "openIdConnectUrl");
                             if (url == null) {
-                                throw ctxt.instantiationException(OpenIdConnectSecurityScheme.class,
+                                throw ctxt.instantiationException(
+                                        OpenIdConnectSecurityScheme.class,
                                         "openIdConnectSecurityScheme: 'openIdConnectUrl' field is required");
                             }
                             yield new OpenIdConnectSecurityScheme(
-                                    url,
-                                    textOrNull(inner, "description"));
+                                    url, textOrNull(inner, "description"));
                         }
                         default -> null;
                     };
@@ -134,9 +141,8 @@ public final class AgentCardJacksonModule extends SimpleModule {
     }
 
     /**
-     * Deserializes SecurityRequirement from JSON like:
-     *   {"schemes": {"bearerAuth": {}}}
-     * The SDK type is Map<String, List<String>>, so empty objects become empty lists.
+     * Deserializes SecurityRequirement from JSON like: {"schemes": {"bearerAuth": {}}} The SDK type
+     * is Map<String, List<String>>, so empty objects become empty lists.
      */
     public static final class SecurityRequirementDeserializer
             extends StdDeserializer<org.a2aproject.sdk.spec.SecurityRequirement> {

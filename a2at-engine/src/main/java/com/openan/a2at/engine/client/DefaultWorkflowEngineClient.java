@@ -19,21 +19,20 @@
 
 package com.openan.a2at.engine.client;
 
-import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.ControlPoint;
+import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.SendMessageResult;
+
 import org.a2aproject.sdk.client.ClientEvent;
 import org.a2aproject.sdk.client.MessageEvent;
 import org.a2aproject.sdk.client.TaskUpdateEvent;
-import org.a2aproject.sdk.spec.Artifact;
-import org.a2aproject.sdk.spec.Message;
 import org.a2aproject.sdk.spec.AgentCard;
+import org.a2aproject.sdk.spec.Message;
 import org.a2aproject.sdk.spec.TaskStatusUpdateEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,14 +41,13 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Workflow-execution send facade built on a shared {@link A2ATransport}.
  *
- * <p>Single responsibility: the workflow execution send path. Owns the
- * Task-T/Negotiation-T extension handler chain, the Negotiation-T
- * auto-loop, the global EventCallback, and the ControlPoint/
- * ExtensionCallback wiring. All wire-level work (client runtime, auth,
- * SSE event extraction) delegates to the transport.
+ * <p>Single responsibility: the workflow execution send path. Owns the Task-T/Negotiation-T
+ * extension handler chain, the Negotiation-T auto-loop, the global EventCallback, and the
+ * ControlPoint/ ExtensionCallback wiring. All wire-level work (client runtime, auth, SSE event
+ * extraction) delegates to the transport.
  *
- * <p>One-shot pre-positioning sends (Authorization-T / Notification-T)
- * are a separate concern and live on {@link DefaultExtensionSender}.
+ * <p>One-shot pre-positioning sends (Authorization-T / Notification-T) are a separate concern and
+ * live on {@link DefaultExtensionSender}.
  */
 public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCloseable {
 
@@ -62,8 +60,10 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private ControlPoint controlPoint;
     private com.openan.a2at.engine.control.ExtensionCallback extensionCallback;
 
-    public DefaultWorkflowEngineClient(A2ATransport transport, int maxNegotiationRounds,
-                                       List<ExtensionHandler> customHandlers) {
+    public DefaultWorkflowEngineClient(
+            A2ATransport transport,
+            int maxNegotiationRounds,
+            List<ExtensionHandler> customHandlers) {
         this.transport = transport;
         this.extensionRegistry = new ExtensionRegistry();
         if (customHandlers != null) {
@@ -72,8 +72,10 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
             }
         }
         this.maxNegotiationRounds = maxNegotiationRounds;
-        log.info("[EngineClient] Initialized over transport ({} agent(s)), maxNeg={}",
-                transport.getAgentNames().size(), maxNegotiationRounds);
+        log.info(
+                "[EngineClient] Initialized over transport ({} agent(s)), maxNeg={}",
+                transport.getAgentNames().size(),
+                maxNegotiationRounds);
     }
 
     public DefaultWorkflowEngineClient(A2ATransport transport) {
@@ -90,7 +92,8 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     }
 
     @Override
-    public void setExtensionCallback(com.openan.a2at.engine.control.ExtensionCallback extensionCallback) {
+    public void setExtensionCallback(
+            com.openan.a2at.engine.control.ExtensionCallback extensionCallback) {
         this.extensionCallback = extensionCallback;
     }
 
@@ -128,21 +131,39 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         AgentCard agentCard = transport.getCard(agentName);
         if (agentCard == null) {
             log.error("[EngineClient] Agent not found: {}", agentName);
-            return CompletableFuture.failedFuture(new RuntimeException("Agent not found: " + agentName));
+            return CompletableFuture.failedFuture(
+                    new RuntimeException("Agent not found: " + agentName));
         }
         log.info("[EngineClient] send_message to {}: {} chars", agentName, message.length());
         return runBeforeSendHandlers(agentCard, message, metadata)
-                .thenCompose(processedMetadata -> {
-                    emit(EventType.AGENT_REQUEST, Map.of(
-                            "agent", agentName,
-                            "request", message,
-                            "metadata", processedMetadata != null ? processedMetadata : Map.of()));
-                    String ctx = contextId != null ? contextId : transport.getContextId();
-                    return transport.send(agentCard, agentName, message, ctx, processedMetadata,
-                                    event -> forwardIntermediateEvent(event, agentName))
-                            .thenCompose(result -> runAfterReceiveHandlers(agentCard, result))
-                            .thenCompose(result -> autoNegotiate(agentCard, agentName, message, ctx, result, 1));
-                });
+                .thenCompose(
+                        processedMetadata -> {
+                            emit(
+                                    EventType.AGENT_REQUEST,
+                                    Map.of(
+                                            "agent", agentName,
+                                            "request", message,
+                                            "metadata",
+                                                    processedMetadata != null
+                                                            ? processedMetadata
+                                                            : Map.of()));
+                            String ctx = contextId != null ? contextId : transport.getContextId();
+                            return transport
+                                    .send(
+                                            agentCard,
+                                            agentName,
+                                            message,
+                                            ctx,
+                                            processedMetadata,
+                                            event -> forwardIntermediateEvent(event, agentName))
+                                    .thenCompose(
+                                            result -> runAfterReceiveHandlers(agentCard, result))
+                                    .thenCompose(
+                                            result ->
+                                                    autoNegotiate(
+                                                            agentCard, agentName, message, ctx,
+                                                            result, 1));
+                        });
     }
 
     // ------------------------------------------------------------------
@@ -150,43 +171,104 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     // ------------------------------------------------------------------
 
     private CompletableFuture<SendMessageResult> autoNegotiate(
-            AgentCard agentCard, String agentName, String originalMessage,
-            String contextId, SendMessageResult result, int round) {
+            AgentCard agentCard,
+            String agentName,
+            String originalMessage,
+            String contextId,
+            SendMessageResult result,
+            int round) {
         if (!isNegotiationNeeded(result) || round > maxNegotiationRounds) {
-            emit(EventType.AGENT_RESPONSE, Map.of("agent", agentName, "response", result.getText()));
+            emit(
+                    EventType.AGENT_RESPONSE,
+                    Map.of("agent", agentName, "response", result.getText()));
             return CompletableFuture.completedFuture(result);
         }
-        Map<String, Object> negMeta = result.getMetadata() != null ? result.getMetadata() : new HashMap<>();
+        Map<String, Object> negMeta =
+                result.getMetadata() != null ? result.getMetadata() : new HashMap<>();
         String negText = negMeta.getOrDefault("negotiation_message", "").toString();
         log.info("[Negotiation] Round {} for '{}': {}", round, agentName, negText);
-        emit(EventType.NEGOTIATION_REQUEST, Map.of("agent", agentName, "round", round, "concern", negText));
+        emit(
+                EventType.NEGOTIATION_REQUEST,
+                Map.of("agent", agentName, "round", round, "concern", negText));
         CompletableFuture<String> clarFuture;
         if (controlPoint != null) {
             clarFuture = controlPoint.onNegotiation(agentName, negText, negMeta);
         } else {
-            clarFuture = CompletableFuture.completedFuture("Please proceed with the original task using available information.");
+            clarFuture =
+                    CompletableFuture.completedFuture(
+                            "Please proceed with the original task using available information.");
         }
-        return clarFuture.thenCompose(clarification -> {
-            if (clarification == null || clarification.isEmpty()) {
-                emit(EventType.NEGOTIATION_FAILED, Map.of("agent", agentName, "round", round, "reason", "no clarification"));
-                emit(EventType.AGENT_RESPONSE, Map.of("agent", agentName, "response", result.getText()));
-                return CompletableFuture.completedFuture(result);
-            }
-            log.info("[Negotiation] Clarification for '{}' round {}: {}", agentName, round, clarification);
-            emit(EventType.NEGOTIATION_RESOLVED, Map.of("agent", agentName, "round", round, "clarification", clarification));
-            String followUp = "[NEGOTIATION_RESOLUTION]\nThe engine has reviewed your negotiation request and provides the following clarification:\n\n" + clarification + "\n\n---\nOriginal Task:\n" + originalMessage + "\n\nPlease re-execute the task based on the clarification above.";
-            Map<String, Object> followUpMeta = new HashMap<>();
-            followUpMeta.put("https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",
-                    "## Data Return Confirmation\n" + clarification + "\n");
-            return runBeforeSendHandlers(agentCard, followUp, followUpMeta)
-                    .thenCompose(meta -> {
-                        String ctx = contextId != null ? contextId : transport.getContextId();
-                        return transport.send(agentCard, agentName, followUp, ctx, meta,
-                                        event -> forwardIntermediateEvent(event, agentName))
-                                .thenCompose(r -> runAfterReceiveHandlers(agentCard, r))
-                                .thenCompose(r -> autoNegotiate(agentCard, agentName, originalMessage, contextId, r, round + 1));
-                    });
-        });
+        return clarFuture.thenCompose(
+                clarification -> {
+                    if (clarification == null || clarification.isEmpty()) {
+                        emit(
+                                EventType.NEGOTIATION_FAILED,
+                                Map.of(
+                                        "agent",
+                                        agentName,
+                                        "round",
+                                        round,
+                                        "reason",
+                                        "no clarification"));
+                        emit(
+                                EventType.AGENT_RESPONSE,
+                                Map.of("agent", agentName, "response", result.getText()));
+                        return CompletableFuture.completedFuture(result);
+                    }
+                    log.info(
+                            "[Negotiation] Clarification for '{}' round {}: {}",
+                            agentName,
+                            round,
+                            clarification);
+                    emit(
+                            EventType.NEGOTIATION_RESOLVED,
+                            Map.of(
+                                    "agent",
+                                    agentName,
+                                    "round",
+                                    round,
+                                    "clarification",
+                                    clarification));
+                    String followUp =
+                            "[NEGOTIATION_RESOLUTION]\nThe engine has reviewed your negotiation request and provides the following clarification:\n\n"
+                                    + clarification
+                                    + "\n\n---\nOriginal Task:\n"
+                                    + originalMessage
+                                    + "\n\nPlease re-execute the task based on the clarification above.";
+                    Map<String, Object> followUpMeta = new HashMap<>();
+                    followUpMeta.put(
+                            "https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T",
+                            "## Data Return Confirmation\n" + clarification + "\n");
+                    return runBeforeSendHandlers(agentCard, followUp, followUpMeta)
+                            .thenCompose(
+                                    meta -> {
+                                        String ctx =
+                                                contextId != null
+                                                        ? contextId
+                                                        : transport.getContextId();
+                                        return transport
+                                                .send(
+                                                        agentCard,
+                                                        agentName,
+                                                        followUp,
+                                                        ctx,
+                                                        meta,
+                                                        event ->
+                                                                forwardIntermediateEvent(
+                                                                        event, agentName))
+                                                .thenCompose(
+                                                        r -> runAfterReceiveHandlers(agentCard, r))
+                                                .thenCompose(
+                                                        r ->
+                                                                autoNegotiate(
+                                                                        agentCard,
+                                                                        agentName,
+                                                                        originalMessage,
+                                                                        contextId,
+                                                                        r,
+                                                                        round + 1));
+                                    });
+                });
     }
 
     private static boolean isNegotiationNeeded(SendMessageResult result) {
@@ -199,22 +281,41 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
 
     private CompletableFuture<Map<String, Object>> runBeforeSendHandlers(
             AgentCard agentCard, String message, Map<String, Object> presetMetadata) {
-        Map<String, Object> metadata = presetMetadata != null ? new HashMap<>(presetMetadata) : new HashMap<>();
+        Map<String, Object> metadata =
+                presetMetadata != null ? new HashMap<>(presetMetadata) : new HashMap<>();
         List<String> extUris = A2ATransport.extractExtensionUris(agentCard);
         List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
         CompletableFuture<Map<String, Object>> future = CompletableFuture.completedFuture(metadata);
         for (ExtensionHandler handler : handlers) {
-            future = future.thenCompose(m -> handler.beforeSend(agentCard, message, m, transport.getA2atClient(), controlPoint));
+            future =
+                    future.thenCompose(
+                            m ->
+                                    handler.beforeSend(
+                                            agentCard,
+                                            message,
+                                            m,
+                                            transport.getA2atClient(),
+                                            controlPoint));
         }
         return future;
     }
 
-    private CompletableFuture<SendMessageResult> runAfterReceiveHandlers(AgentCard agentCard, SendMessageResult result) {
+    private CompletableFuture<SendMessageResult> runAfterReceiveHandlers(
+            AgentCard agentCard, SendMessageResult result) {
         List<String> extUris = A2ATransport.extractExtensionUris(agentCard);
         List<ExtensionHandler> handlers = extensionRegistry.getHandlersForExtensions(extUris);
         CompletableFuture<SendMessageResult> future = CompletableFuture.completedFuture(result);
         for (ExtensionHandler handler : handlers) {
-            future = future.thenCompose(r -> handler.afterReceive(agentCard, r, transport.getA2atClient(), controlPoint, extensionCallback, eventCallback));
+            future =
+                    future.thenCompose(
+                            r ->
+                                    handler.afterReceive(
+                                            agentCard,
+                                            r,
+                                            transport.getA2atClient(),
+                                            controlPoint,
+                                            extensionCallback,
+                                            eventCallback));
         }
         return future;
     }
@@ -234,10 +335,16 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 data.put("state", state);
                 data.put("is_final", sue.isFinal());
                 if (!statusText.isEmpty()) data.put("text", statusText.toString());
-                if (sue.metadata() != null && !sue.metadata().isEmpty()) data.put("metadata", sue.metadata());
-                log.info("[EngineClient] Agent {} status update: {} (final={})", agentName, state, sue.isFinal());
+                if (sue.metadata() != null && !sue.metadata().isEmpty())
+                    data.put("metadata", sue.metadata());
+                log.info(
+                        "[EngineClient] Agent {} status update: {} (final={})",
+                        agentName,
+                        state,
+                        sue.isFinal());
                 emit(EventType.AGENT_STATUS_UPDATE, data);
-            } else if (tue.getUpdateEvent() instanceof org.a2aproject.sdk.spec.TaskArtifactUpdateEvent ae) {
+            } else if (tue.getUpdateEvent()
+                    instanceof org.a2aproject.sdk.spec.TaskArtifactUpdateEvent ae) {
                 StringBuilder text = new StringBuilder();
                 A2ATransport.extractTextFromArtifact(ae.artifact(), text);
                 Map<String, Object> data = new HashMap<>();
@@ -247,8 +354,13 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                 data.put("append", ae.append());
                 data.put("last_chunk", ae.lastChunk());
                 if (!text.isEmpty()) data.put("text", text.toString());
-                if (ae.metadata() != null && !ae.metadata().isEmpty()) data.put("metadata", ae.metadata());
-                log.info("[EngineClient] Agent {} artifact update: {} ({})", agentName, ae.artifact().name(), ae.artifact().artifactId());
+                if (ae.metadata() != null && !ae.metadata().isEmpty())
+                    data.put("metadata", ae.metadata());
+                log.info(
+                        "[EngineClient] Agent {} artifact update: {} ({})",
+                        agentName,
+                        ae.artifact().name(),
+                        ae.artifact().artifactId());
                 emit(EventType.AGENT_ARTIFACT_UPDATE, data);
             }
         } else if (event instanceof MessageEvent me) {

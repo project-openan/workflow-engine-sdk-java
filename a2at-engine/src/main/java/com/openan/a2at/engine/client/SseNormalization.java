@@ -20,6 +20,7 @@
 package com.openan.a2at.engine.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,33 +30,30 @@ import java.util.Set;
 /**
  * SSE response normalization for non-standard agent responses.
  *
- * <p>Mirrors the Python SDK's {@code sse_normalization}. Some A2A agents
- * return bare Task or Message objects instead of properly wrapped SSE
- * envelopes. This utility coerces such responses into the expected shape.
+ * <p>Mirrors the Python SDK's {@code sse_normalization}. Some A2A agents return bare Task or
+ * Message objects instead of properly wrapped SSE envelopes. This utility coerces such responses
+ * into the expected shape.
  *
- * <p>Unlike the Python version (which monkey-patches protobuf's Parse),
- * the Java version provides a standalone static method that the
- * DefaultWorkflowEngineClient calls after deserializing each response.
+ * <p>Unlike the Python version (which monkey-patches protobuf's Parse), the Java version provides a
+ * standalone static method that the DefaultWorkflowEngineClient calls after deserializing each
+ * response.
  */
 final class SseNormalization {
 
     private static final Logger log = LoggerFactory.getLogger(SseNormalization.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    private static final Set<String> STREAM_RESPONSE_KEYS = Set.of(
-            "task", "message", "statusUpdate", "artifactUpdate"
-    );
+    private static final Set<String> STREAM_RESPONSE_KEYS =
+            Set.of("task", "message", "statusUpdate", "artifactUpdate");
 
-    private SseNormalization() {
-    }
+    private SseNormalization() {}
 
     /**
      * Coerce a non-SSE response map into a StreamResponse-shaped map.
      *
-     * <p>If the data already has StreamResponse keys, it is returned as-is.
-     * If it looks like a bare Task, it is wrapped in a {@code "task"} key.
-     * If it looks like an Artifact update, it is wrapped in
-     * {@code "artifactUpdate"}.
+     * <p>If the data already has StreamResponse keys, it is returned as-is. If it looks like a bare
+     * Task, it is wrapped in a {@code "task"} key. If it looks like an Artifact update, it is
+     * wrapped in {@code "artifactUpdate"}.
      *
      * @param data the raw response as a map
      * @return normalized map

@@ -19,12 +19,14 @@
 
 package com.openan.a2at.engine.client;
 
-import com.openan.a2at.engine.model.SendMessageResult;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.ExtensionCallback;
-import org.a2aproject.sdk.spec.AgentCard;
+import com.openan.a2at.engine.model.SendMessageResult;
+
 import net.openan.a2at.sdk.client.A2ATClient;
+
+import org.a2aproject.sdk.spec.AgentCard;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -32,32 +34,29 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Extension handler for A2A-T extensions (SDK-internal).
  *
- * <p>The in-workflow handler chain registers Task-T and Negotiation-T.
- * Task-T generates the structured task prompt on send; Negotiation-T
- * extracts the negotiation context on receive and feeds the auto-loop.
+ * <p>The in-workflow handler chain registers Task-T and Negotiation-T. Task-T generates the
+ * structured task prompt on send; Negotiation-T extracts the negotiation context on receive and
+ * feeds the auto-loop.
  *
- * <p>Authorization-T / Notification-T are pre-positioning operations
- * (one-shot, via {@link ExtensionSender#sendExtensionMessage}), so they are
- * not part of this in-workflow chain. Reactive hooks for agent-pushed
- * Authorization-T / Notification-T data, when handlers for those types are
+ * <p>Authorization-T / Notification-T are pre-positioning operations (one-shot, via {@link
+ * ExtensionSender#sendExtensionMessage}), so they are not part of this in-workflow chain. Reactive
+ * hooks for agent-pushed Authorization-T / Notification-T data, when handlers for those types are
  * registered manually, delegate to {@link ExtensionCallback}.
  */
 public interface ExtensionHandler {
 
-    /**
-     * The extension keyword (e.g. "Task-T", "Negotiation-T").
-     */
+    /** The extension keyword (e.g. "Task-T", "Negotiation-T"). */
     String extensionKeyword();
 
     /**
-     * Called before sending a message to an agent.
-     * May modify the metadata (e.g. inject Task-T prompt).
+     * Called before sending a message to an agent. May modify the metadata (e.g. inject Task-T
+     * prompt).
      *
-     * @param agentCard     the agent's card as a map
-     * @param messageText   the message being sent
-     * @param metadata      current metadata (mutable)
-     * @param a2atClient    optional A2ATClient (may be null)
-     * @param controlPoint  optional ControlPoint (may be null)
+     * @param agentCard the agent's card as a map
+     * @param messageText the message being sent
+     * @param metadata current metadata (mutable)
+     * @param a2atClient optional A2ATClient (may be null)
+     * @param controlPoint optional ControlPoint (may be null)
      * @return updated metadata
      */
     CompletableFuture<Map<String, Object>> beforeSend(
@@ -65,19 +64,18 @@ public interface ExtensionHandler {
             String messageText,
             Map<String, Object> metadata,
             A2ATClient a2atClient,
-            ControlPoint controlPoint
-    );
+            ControlPoint controlPoint);
 
     /**
-     * Called after receiving a response from an agent.
-     * May inspect/modify the result (e.g. handle negotiation, authorization).
+     * Called after receiving a response from an agent. May inspect/modify the result (e.g. handle
+     * negotiation, authorization).
      *
-     * @param agentCard      the agent's card as a map
-     * @param result         the received result
-     * @param a2atClient     optional A2ATClient (may be null)
-     * @param controlPoint   optional ControlPoint (may be null)
+     * @param agentCard the agent's card as a map
+     * @param result the received result
+     * @param a2atClient optional A2ATClient (may be null)
+     * @param controlPoint optional ControlPoint (may be null)
      * @param extensionCallback optional ExtensionCallback (may be null)
-     * @param eventCallback  optional event callback (may be null)
+     * @param eventCallback optional event callback (may be null)
      * @return updated result
      */
     CompletableFuture<SendMessageResult> afterReceive(
@@ -86,6 +84,5 @@ public interface ExtensionHandler {
             A2ATClient a2atClient,
             ControlPoint controlPoint,
             ExtensionCallback extensionCallback,
-            EventCallback eventCallback
-    );
+            EventCallback eventCallback);
 }

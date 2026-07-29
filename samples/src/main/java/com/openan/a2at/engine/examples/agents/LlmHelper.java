@@ -24,6 +24,7 @@ import net.openan.a2at.sdk.llm.LLMClientConfig;
 import net.openan.a2at.sdk.llm.LLMClientFactory;
 import net.openan.a2at.sdk.llm.LLMConfigLoader;
 import net.openan.a2at.sdk.llm.LLMResponse;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,22 +34,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Thin LLM helper shared by the sample agents and the workbench control point.
- * Loads the A2A-T .env once and builds the OpenAI-compatible (deepseek)
- * client via LLMClientFactory. Every call asks for a strict JSON object with
- * a single "text" field, so output is parseable for both diagnosis prose and
- * route decisions. All call sites MUST pass a deterministic fallback: when
- * the .env is absent, the client fails to init, or the network call errors,
- * the helper returns null and the caller uses its fallback. This keeps the
- * deterministic unit tests green while the demo drives the real model.
+ * Thin LLM helper shared by the sample agents and the workbench control point. Loads the A2A-T .env
+ * once and builds the OpenAI-compatible (deepseek) client via LLMClientFactory. Every call asks for
+ * a strict JSON object with a single "text" field, so output is parseable for both diagnosis prose
+ * and route decisions. All call sites MUST pass a deterministic fallback: when the .env is absent,
+ * the client fails to init, or the network call errors, the helper returns null and the caller uses
+ * its fallback. This keeps the deterministic unit tests green while the demo drives the real model.
  */
 public final class LlmHelper {
 
     private static final Logger log = LoggerFactory.getLogger(LlmHelper.class);
     private static volatile LLMClient shared;
 
-    private LlmHelper() {
-    }
+    private LlmHelper() {}
 
     public static String text(String envPath, String system, String user, String fallback) {
         LLMClient client = client(envPath);
@@ -84,8 +82,7 @@ public final class LlmHelper {
     }
 
     private static LLMClient client(String envPath) {
-        if (envPath == null || envPath.isBlank()
-                || Boolean.getBoolean("a2at.llm.disabled")) {
+        if (envPath == null || envPath.isBlank() || Boolean.getBoolean("a2at.llm.disabled")) {
             return null;
         }
         if (shared != null) {
@@ -98,11 +95,16 @@ public final class LlmHelper {
             try {
                 LLMClientConfig config = LLMConfigLoader.load(Path.of(envPath));
                 shared = LLMClientFactory.create(config.provider(), config);
-                log.info("[LlmHelper] LLM client ready: provider={}, model={}, baseUrl={}",
-                        config.provider(), config.model(), config.baseUrl());
+                log.info(
+                        "[LlmHelper] LLM client ready: provider={}, model={}, baseUrl={}",
+                        config.provider(),
+                        config.model(),
+                        config.baseUrl());
                 return shared;
             } catch (Throwable t) {
-                log.warn("[LlmHelper] LLM client init failed (extensions will fall back): {}", t.getMessage());
+                log.warn(
+                        "[LlmHelper] LLM client init failed (extensions will fall back): {}",
+                        t.getMessage());
                 return null;
             }
         }
@@ -121,8 +123,8 @@ public final class LlmHelper {
         }
         String json = trimmed.substring(start, end + 1);
         try {
-            Map<String, Object> parsed = new com.fasterxml.jackson.databind.ObjectMapper()
-                    .readValue(json, Map.class);
+            Map<String, Object> parsed =
+                    new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, Map.class);
             Object text = parsed.get("text");
             return text != null ? text.toString() : null;
         } catch (Exception e) {

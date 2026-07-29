@@ -20,9 +20,11 @@
 package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.model.SendMessageResult;
+
 import net.openan.a2at.sdk.client.A2ATClient;
-import net.openan.a2at.sdk.client.model.PromptGenerationResult;
 import net.openan.a2at.sdk.client.model.PromptGenerationFailure;
+import net.openan.a2at.sdk.client.model.PromptGenerationResult;
+
 import org.a2aproject.sdk.spec.AgentCard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,50 +35,55 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Default {@link ExtensionSender} built on a shared {@link A2ATransport}.
  *
- * <p>Owns extension prompt-generation dispatch (Task-T via the A2A-T SDK;
- * Negotiation-T / Authorization-T / Notification-T reserved for future SDK
- * support). All wire-level work delegates to the transport.
+ * <p>Owns extension prompt-generation dispatch (Task-T via the A2A-T SDK; Negotiation-T /
+ * Authorization-T / Notification-T reserved for future SDK support). All wire-level work delegates
+ * to the transport.
  */
-public class DefaultExtensionSender implements ExtensionSender, AutoCloseable {
+public record DefaultExtensionSender(A2ATransport transport)
+        implements ExtensionSender, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultExtensionSender.class);
 
-    private final A2ATransport transport;
-
-    public DefaultExtensionSender(A2ATransport transport) {
-        this.transport = transport;
-    }
-
-    public A2ATransport getTransport() {
-        return transport;
-    }
-
     @Override
     public CompletableFuture<SendMessageResult> sendExtensionMessage(
-            String agentName, String instruction,
-            String naturalLanguageInput, A2ATExtension extension) {
+            String agentName,
+            String instruction,
+            String naturalLanguageInput,
+            A2ATExtension extension) {
         AgentCard agentCard = transport.getCard(agentName);
         if (agentCard == null) {
             log.error("[ExtensionSender] Agent not found: {}", agentName);
-            return CompletableFuture.failedFuture(new RuntimeException("Agent not found: " + agentName));
+            return CompletableFuture.failedFuture(
+                    new RuntimeException("Agent not found: " + agentName));
         }
         String metadataValue = generateExtensionPrompt(extension, naturalLanguageInput);
         if (metadataValue == null || metadataValue.isEmpty()) {
             metadataValue = naturalLanguageInput;
-            log.info("[ExtensionSender] SDK prompt generation unavailable for {} ({}), using input as metadata",
-                    agentName, extension.displayName());
+            log.info(
+                    "[ExtensionSender] SDK prompt generation unavailable for {} ({}), using input as metadata",
+                    agentName,
+                    extension.displayName());
         }
-        log.info("[ExtensionSender] sendExtensionMessage to {}: extension={}, metadataValue={} chars",
-                agentName, extension.displayName(), metadataValue.length());
+        log.info(
+                "[ExtensionSender] sendExtensionMessage to {}: extension={}, metadataValue={} chars",
+                agentName,
+                extension.displayName(),
+                metadataValue.length());
         Map<String, Object> metadata = Map.of(extension.uri(), metadataValue);
         if (extension == A2ATExtension.NOTIFICATION_T) {
-            return transport.sendNotificationStream(agentCard, agentName, instruction, transport.getContextId(), metadata, null);
+            return transport.sendNotificationStream(
+                    agentCard, agentName, instruction, transport.getContextId(), metadata, null);
         }
-        return transport.send(agentCard, agentName, instruction, transport.getContextId(), metadata, null)
-                .thenApply(result -> {
-                    log.info("[ExtensionSender] Extension response from {}: state={}", agentName, result.getTaskState());
-                    return result;
-                });
+        return transport
+                .send(agentCard, agentName, instruction, transport.getContextId(), metadata, null)
+                .thenApply(
+                        result -> {
+                            log.info(
+                                    "[ExtensionSender] Extension response from {}: state={}",
+                                    agentName,
+                                    result.getTaskState());
+                            return result;
+                        });
     }
 
     // ------------------------------------------------------------------
@@ -110,7 +117,8 @@ public class DefaultExtensionSender implements ExtensionSender, AutoCloseable {
                 return result.promptText();
             }
             PromptGenerationFailure f = result.failure();
-            log.warn("[ExtensionSender] SDK Task-T prompt generation failed: code={}, stage={}, message={}",
+            log.warn(
+                    "[ExtensionSender] SDK Task-T prompt generation failed: code={}, stage={}, message={}",
                     f != null ? f.code() : "unknown",
                     f != null ? f.stage() : "unknown",
                     f != null ? f.message() : "unknown");

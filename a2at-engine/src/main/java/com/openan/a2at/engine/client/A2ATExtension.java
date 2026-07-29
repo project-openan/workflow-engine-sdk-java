@@ -22,21 +22,20 @@ package com.openan.a2at.engine.client;
 /**
  * A2A-T extension types supported by the workflow execution engine.
  *
- * <p>Each enum constant encapsulates the full extension URI so callers
- * never need to hardcode URI strings. Use these with
- * {@link WorkflowEngineClient#sendExtensionMessage}.
+ * <p>Each enum constant encapsulates the full extension URI so callers never need to hardcode URI
+ * strings. Use these with {@link WorkflowEngineClient#sendExtensionMessage}.
  *
  * <p>The engine handles these extensions automatically:
+ *
  * <ul>
- *   <li>{@link #TASK_T} - structured task prompt generation (in-workflow)</li>
- *   <li>{@link #NEGOTIATION_T} - negotiation auto-loop (in-workflow)</li>
- *   <li>{@link #AUTHORIZATION_T} - whitelist pre-positioning (before workflow)</li>
- *   <li>{@link #NOTIFICATION_T} - result subscription pre-positioning (before workflow)</li>
+ *   <li>{@link #TASK_T} - structured task prompt generation (in-workflow)
+ *   <li>{@link #NEGOTIATION_T} - negotiation auto-loop (in-workflow)
+ *   <li>{@link #AUTHORIZATION_T} - whitelist pre-positioning (before workflow)
+ *   <li>{@link #NOTIFICATION_T} - result subscription pre-positioning (before workflow)
  * </ul>
  *
- * <p>{@code DATA-NEGOTIATION-T/v1} is intentionally absent -- it is an
- * SDK-internal metadata key for negotiation context, not a user-declared
- * extension.
+ * <p>{@code DATA-NEGOTIATION-T/v1} is intentionally absent -- it is an SDK-internal metadata key
+ * for negotiation context, not a user-declared extension.
  */
 public enum A2ATExtension {
 
@@ -44,13 +43,16 @@ public enum A2ATExtension {
     TASK_T("https://projects.tmforum.org/a2aproject/telecommunication/extensions/Task-T/v1"),
 
     /** Negotiation text exchange. Handled automatically via auto-loop. */
-    NEGOTIATION_T("https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T"),
+    NEGOTIATION_T(
+            "https://projects.tmforum.org/a2aproject/telecommunication/extensions/NEGOTIATION-T"),
 
     /** Authorization whitelist. Pre-positioned before workflow starts. */
-    AUTHORIZATION_T("https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1"),
+    AUTHORIZATION_T(
+            "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1"),
 
     /** Result notification subscription. Pre-positioned before workflow starts. */
-    NOTIFICATION_T("https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1");
+    NOTIFICATION_T(
+            "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Notification-T/v1");
 
     private final String uri;
 

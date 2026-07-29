@@ -22,30 +22,30 @@ package com.openan.a2at.engine.client;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.crypto.Cipher;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
 /**
  * AES-GCM credential encryption/decryption utility.
  *
- * <p>Supports encrypted values in credential config files using the
- * {@code enc:} prefix. The encryption key is read from the
- * {@code A2AT_CRED_KEY} environment variable (32-byte hex string).
+ * <p>Supports encrypted values in credential config files using the {@code enc:} prefix. The
+ * encryption key is read from the {@code A2AT_CRED_KEY} environment variable (32-byte hex string).
  *
  * <p>Usage in credentials JSON:
+ *
  * <pre>{@code
  * {
  *   "value": "enc:<base64-iv>:<base64-ciphertext>"
  * }
  * }</pre>
  *
- * <p>To generate an encrypted value, use the {@link #encrypt} method
- * with the same key. Plaintext values (no {@code enc:} prefix) are
- * returned as-is for backward compatibility.
+ * <p>To generate an encrypted value, use the {@link #encrypt} method with the same key. Plaintext
+ * values (no {@code enc:} prefix) are returned as-is for backward compatibility.
  */
 public final class CredentialCrypto {
 
@@ -56,12 +56,11 @@ public final class CredentialCrypto {
     private static final int GCM_TAG_LENGTH = 128;
     private static final int IV_LENGTH = 12;
 
-    private CredentialCrypto() {
-    }
+    private CredentialCrypto() {}
 
     /**
-     * Decrypt a credential value if it has the {@code enc:} prefix.
-     * Values without the prefix are returned as-is (plaintext fallback).
+     * Decrypt a credential value if it has the {@code enc:} prefix. Values without the prefix are
+     * returned as-is (plaintext fallback).
      *
      * @param value the raw value from config (may be {@code enc:...} or plaintext)
      * @return decrypted plaintext, or the original value if not encrypted
@@ -72,21 +71,26 @@ public final class CredentialCrypto {
         }
         String keyHex = resolveKey();
         if (keyHex == null || keyHex.isBlank()) {
-            log.warn("[CredentialCrypto] Encrypted value found but {} not set (env var or system property), using as-is", ENV_KEY);
+            log.warn(
+                    "[CredentialCrypto] Encrypted value found but {} not set (env var or system property), using as-is",
+                    ENV_KEY);
             return value;
         }
         try {
             String encoded = value.substring(PREFIX.length());
             String[] parts = encoded.split(":", 2);
             if (parts.length != 2) {
-                log.error("[CredentialCrypto] Invalid encrypted format, expected enc:<iv>:<ciphertext>");
+                log.error(
+                        "[CredentialCrypto] Invalid encrypted format, expected enc:<iv>:<ciphertext>");
                 return value;
             }
             byte[] iv = Base64.getDecoder().decode(parts[0]);
             byte[] cipherText = Base64.getDecoder().decode(parts[1]);
             byte[] keyBytes = hexToBytes(keyHex);
             Cipher cipher = Cipher.getInstance(ALGORITHM);
-            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(keyBytes, "AES"),
+            cipher.init(
+                    Cipher.DECRYPT_MODE,
+                    new SecretKeySpec(keyBytes, "AES"),
                     new GCMParameterSpec(GCM_TAG_LENGTH, iv));
             byte[] plainBytes = cipher.doFinal(cipherText);
             return new String(plainBytes, StandardCharsets.UTF_8);
@@ -97,8 +101,8 @@ public final class CredentialCrypto {
     }
 
     /**
-     * Encrypt a plaintext value using AES-GCM with the key from
-     * the {@code A2AT_CRED_KEY} environment variable.
+     * Encrypt a plaintext value using AES-GCM with the key from the {@code A2AT_CRED_KEY}
+     * environment variable.
      *
      * @param plaintext the value to encrypt
      * @return encrypted string in format {@code enc:<base64-iv>:<base64-ciphertext>}
@@ -114,19 +118,23 @@ public final class CredentialCrypto {
             byte[] iv = new byte[IV_LENGTH];
             new SecureRandom().nextBytes(iv);
             Cipher cipher = Cipher.getInstance(ALGORITHM);
-            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyBytes, "AES"),
+            cipher.init(
+                    Cipher.ENCRYPT_MODE,
+                    new SecretKeySpec(keyBytes, "AES"),
                     new GCMParameterSpec(GCM_TAG_LENGTH, iv));
             byte[] cipherText = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
-            return PREFIX + Base64.getEncoder().encodeToString(iv)
-                    + ":" + Base64.getEncoder().encodeToString(cipherText);
+            return PREFIX
+                    + Base64.getEncoder().encodeToString(iv)
+                    + ":"
+                    + Base64.getEncoder().encodeToString(cipherText);
         } catch (Exception e) {
             throw new RuntimeException("Encryption failed: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Resolve the encryption key from OS environment variable first,
-     * then from system property (set by {@code .env} file loader).
+     * Resolve the encryption key from OS environment variable first, then from system property (set
+     * by {@code .env} file loader).
      *
      * @return the hex key string, or null if not found
      */
@@ -142,8 +150,10 @@ public final class CredentialCrypto {
         int len = hex.length();
         byte[] data = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
-                    + Character.digit(hex.charAt(i + 1), 16));
+            data[i / 2] =
+                    (byte)
+                            ((Character.digit(hex.charAt(i), 16) << 4)
+                                    + Character.digit(hex.charAt(i + 1), 16));
         }
         return data;
     }

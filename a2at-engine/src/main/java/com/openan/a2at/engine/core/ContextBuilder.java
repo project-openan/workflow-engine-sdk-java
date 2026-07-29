@@ -21,6 +21,10 @@ package com.openan.a2at.engine.core;
 
 import com.openan.a2at.engine.model.Workflow;
 import com.openan.a2at.engine.model.WorkflowStep;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -29,8 +33,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Context assembly from upstream step outputs. Mirrors Python ContextBuilder. */
 class ContextBuilder {
@@ -72,7 +74,9 @@ class ContextBuilder {
             for (WorkflowStep s : workflow.getSteps()) {
                 if (s.getNext() != null) {
                     for (var jc : s.getNext()) {
-                        if (jc.getStep().equals(current) && !s.getName().equals(current) && !ancestors.contains(s.getName())) {
+                        if (jc.getStep().equals(current)
+                                && !s.getName().equals(current)
+                                && !ancestors.contains(s.getName())) {
                             ancestors.add(s.getName());
                             queue.add(s.getName());
                             break;
@@ -117,7 +121,10 @@ class ContextBuilder {
         for (var entry : refPairs) {
             parts.add("### " + entry.getKey() + " Results\n");
             for (var taskEntry : entry.getValue().entrySet()) {
-                String text = taskEntry.getValue() instanceof String ? (String) taskEntry.getValue() : String.valueOf(taskEntry.getValue());
+                String text =
+                        taskEntry.getValue() instanceof String
+                                ? (String) taskEntry.getValue()
+                                : String.valueOf(taskEntry.getValue());
                 parts.add("**Task**: " + taskEntry.getKey() + "\n**Output**: " + text + "\n\n");
             }
         }
@@ -131,9 +138,9 @@ class ContextBuilder {
         if ("en".equals(lang)) {
             langHint = "\n\nPlease respond in English.";
         }
-       if ("zh".equals(lang)) {
-           langHint = "\n\n请用中文回复。";
-       }
+        if ("zh".equals(lang)) {
+            langHint = "\n\n请用中文回复。";
+        }
         if (contextMessage != null && !contextMessage.isEmpty()) {
             return contextMessage + "\n\n## Current Task\n" + taskDescription + langHint;
         }

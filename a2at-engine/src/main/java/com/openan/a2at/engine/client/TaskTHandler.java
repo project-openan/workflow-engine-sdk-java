@@ -19,28 +19,29 @@
 
 package com.openan.a2at.engine.client;
 
-import com.openan.a2at.engine.model.SendMessageResult;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.ExtensionCallback;
+import com.openan.a2at.engine.model.SendMessageResult;
+
 import net.openan.a2at.sdk.client.A2ATClient;
-import net.openan.a2at.sdk.client.model.PromptGenerationResult;
 import net.openan.a2at.sdk.client.model.PromptGenerationFailure;
+import net.openan.a2at.sdk.client.model.PromptGenerationResult;
+
 import org.a2aproject.sdk.spec.AgentCard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * Task-T extension handler.
  *
- * <p>Mirrors the Python SDK's {@code TaskTHandler}. When an AgentCard
- * declares the Task-T extension, this handler calls the A2ATClient to
- * generate a structured task prompt and injects it into the message metadata.
+ * <p>Mirrors the Python SDK's {@code TaskTHandler}. When an AgentCard declares the Task-T
+ * extension, this handler calls the A2ATClient to generate a structured task prompt and injects it
+ * into the message metadata.
  */
 class TaskTHandler implements ExtensionHandler {
 
@@ -57,8 +58,7 @@ class TaskTHandler implements ExtensionHandler {
             String messageText,
             Map<String, Object> metadata,
             A2ATClient a2atClient,
-            ControlPoint controlPoint
-    ) {
+            ControlPoint controlPoint) {
         if (a2atClient == null) {
             return CompletableFuture.completedFuture(metadata);
         }
@@ -83,12 +83,16 @@ class TaskTHandler implements ExtensionHandler {
                 String promptText = promptResult.promptText();
                 if (promptText != null && !promptText.isEmpty()) {
                     result.put(taskTUri, promptText);
-                    log.info("[Task-T] Generated prompt for '{}': {} chars", getAgentName(agentCard), promptText.length());
+                    log.info(
+                            "[Task-T] Generated prompt for '{}': {} chars",
+                            getAgentName(agentCard),
+                            promptText.length());
                     log.debug("[Task-T] Prompt content: [{}]", promptText);
                 }
             } else {
                 PromptGenerationFailure f = promptResult.failure();
-                log.warn("[Task-T] Prompt generation failed for '{}': code={}, stage={}, message={}",
+                log.warn(
+                        "[Task-T] Prompt generation failed for '{}': code={}, stage={}, message={}",
                         getAgentName(agentCard),
                         f != null ? f.code() : "unknown",
                         f != null ? f.stage() : "unknown",
@@ -107,8 +111,7 @@ class TaskTHandler implements ExtensionHandler {
             A2ATClient a2atClient,
             ControlPoint controlPoint,
             ExtensionCallback extensionCallback,
-            EventCallback eventCallback
-    ) {
+            EventCallback eventCallback) {
         return CompletableFuture.completedFuture(result);
     }
 

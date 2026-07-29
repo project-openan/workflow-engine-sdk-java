@@ -20,21 +20,23 @@
 package com.openan.a2at.engine.client;
 
 import org.a2aproject.sdk.spec.AgentCard;
+
 import java.util.Map;
 
 /**
- * Custom authentication provider for injecting auth headers into outgoing
- * A2A messages.
+ * Custom authentication provider for injecting auth headers into outgoing A2A messages.
  *
- * <p>Implement this interface when the agent's authentication is not covered
- * by the credentials file or the AgentCard's security schemes. For example:
+ * <p>Implement this interface when the agent's authentication is not covered by the credentials
+ * file or the AgentCard's security schemes. For example:
+ *
  * <ul>
- *   <li>The AgentCard has no securitySchemes but the server still requires auth</li>
- *   <li>The auth mechanism is not one of the A2A standard types (Bearer, API key, OAuth2)</li>
- *   <li>Auth tokens come from an external identity provider (e.g. corporate SSO)</li>
+ *   <li>The AgentCard has no securitySchemes but the server still requires auth
+ *   <li>The auth mechanism is not one of the A2A standard types (Bearer, API key, OAuth2)
+ *   <li>Auth tokens come from an external identity provider (e.g. corporate SSO)
  * </ul>
  *
  * <p>Register via {@link WorkflowEngineClientConfig.Builder#authProvider}:
+ *
  * <pre>{@code
  * WorkflowEngineClientConfig.builder()
  *     .authProvider((agentName, agentCard, headers) -> {
@@ -44,10 +46,9 @@ import java.util.Map;
  *     .build();
  * }</pre>
  *
- * <p>The provider is called for every message send, regardless of whether
- * the AgentCard declares security schemes. If both a credentials file and
- * a custom AuthProvider are configured, both run and may add headers to
- * the same map (custom provider runs first, credentials-based auth second).
+ * <p>The provider is called for every message send, regardless of whether the AgentCard declares
+ * security schemes. If both a credentials file and a custom AuthProvider are configured, both run
+ * and may add headers to the same map (custom provider runs first, credentials-based auth second).
  */
 public interface AuthProvider {
 
@@ -56,7 +57,7 @@ public interface AuthProvider {
      *
      * @param agentName the target agent name (matches AgentCard.name)
      * @param agentCard the agent's card (securitySchemes may be null or empty)
-     * @param headers  mutable header map to add auth headers to
+     * @param headers mutable header map to add auth headers to
      */
     void applyAuth(String agentName, AgentCard agentCard, Map<String, String> headers);
 }

@@ -34,28 +34,31 @@ import java.util.Map;
 /**
  * Transport Workbench Agent - the orchestrator.
  *
- * <p>Single responsibility: <b>agent server I/O</b>. Receives a Task-T from
- * the upper layer, delegates the full orchestration pipeline to
- * {@link WorkbenchOrchestrator}, and returns the result. This class does
- * NOT contain workflow logic, pre-positioning, or negotiation strategy --
+ * <p>Single responsibility: <b>agent server I/O</b>. Receives a Task-T from the upper layer,
+ * delegates the full orchestration pipeline to {@link WorkbenchOrchestrator}, and returns the
+ * result. This class does NOT contain workflow logic, pre-positioning, or negotiation strategy --
  * those live in dedicated classes.
  */
 public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
-    private static final Logger log = LoggerFactory.getLogger(TransportWorkbenchAgentExecutor.class);
+    private static final Logger log =
+            LoggerFactory.getLogger(TransportWorkbenchAgentExecutor.class);
 
     private final String orchUrl;
     private final String credentialsPath;
     private final boolean sslVerify;
     private final String a2atEnvPath;
 
-    public TransportWorkbenchAgentExecutor(String registryUrl, String orchUrl,
-                                           String credentialsPath, boolean sslVerify) {
+    public TransportWorkbenchAgentExecutor(
+            String registryUrl, String orchUrl, String credentialsPath, boolean sslVerify) {
         this(registryUrl, orchUrl, credentialsPath, sslVerify, null);
     }
 
-    public TransportWorkbenchAgentExecutor(String registryUrl, String orchUrl,
-                                           String credentialsPath, boolean sslVerify,
-                                           String a2atEnvPath) {
+    public TransportWorkbenchAgentExecutor(
+            String registryUrl,
+            String orchUrl,
+            String credentialsPath,
+            boolean sslVerify,
+            String a2atEnvPath) {
         this.orchUrl = orchUrl;
         this.credentialsPath = credentialsPath;
         this.sslVerify = sslVerify;
@@ -71,11 +74,14 @@ public class TransportWorkbenchAgentExecutor extends BaseAgentExecutor {
         emitter.submit(buildStatusMessage(contextId, taskId, "Task received"));
         emitter.startWork(buildStatusMessage(contextId, taskId, "Processing"));
         try {
-            String result = new WorkbenchOrchestrator(orchUrl, credentialsPath, sslVerify, a2atEnvPath).run(input);
+            String result =
+                    new WorkbenchOrchestrator(orchUrl, credentialsPath, sslVerify, a2atEnvPath)
+                            .run(input);
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put(NegotiationUtils.TASK_PROMPT_KEY, result);
             List<Part<?>> parts = List.of(new TextPart("跨城故障协同诊断汇总结果"));
-            emitter.addArtifact(parts, "result", "cross-city-diagnosis-summary", metadata, false, true);
+            emitter.addArtifact(
+                    parts, "result", "cross-city-diagnosis-summary", metadata, false, true);
             emitter.complete(buildStatusMessage(contextId, taskId, "Completed"));
             log.info("[Workbench] Task completed");
         } catch (Exception e) {

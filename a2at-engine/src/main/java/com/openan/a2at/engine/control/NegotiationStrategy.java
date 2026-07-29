@@ -25,27 +25,24 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Strategy for generating negotiation clarifications.
  *
- * <p>Single responsibility: when an agent returns INPUT_REQUIRED
- * (Negotiation-T), produce the clarification text to send back. This is a
- * <b>separate concern</b> from workflow orchestration (task dispatch,
- * routing). Users who need custom negotiation logic (LLM-based
- * clarification, DAG-predecessor forwarding, etc.) implement this
- * interface and inject it into {@link DefaultControlPoint} rather than
- * mixing negotiation policy into their ControlPoint class.
+ * <p>Single responsibility: when an agent returns INPUT_REQUIRED (Negotiation-T), produce the
+ * clarification text to send back. This is a <b>separate concern</b> from workflow orchestration
+ * (task dispatch, routing). Users who need custom negotiation logic (LLM-based clarification,
+ * DAG-predecessor forwarding, etc.) implement this interface and inject it into {@link
+ * DefaultControlPoint} rather than mixing negotiation policy into their ControlPoint class.
  *
- * <p>The SDK's {@link ControlPoint#onNegotiation} remains the entry point
- * for the auto-negotiation loop; {@link DefaultControlPoint} delegates to
- * an injected strategy by default. Users may still override
- * {@code onNegotiation} directly when a full strategy object is overkill.
+ * <p>The SDK's {@link ControlPoint#onNegotiation} remains the entry point for the auto-negotiation
+ * loop; {@link DefaultControlPoint} delegates to an injected strategy by default. Users may still
+ * override {@code onNegotiation} directly when a full strategy object is overkill.
  */
 public interface NegotiationStrategy {
 
     /**
      * Generate a clarification for the given negotiation request.
      *
-     * @param agentName       the agent requesting negotiation
+     * @param agentName the agent requesting negotiation
      * @param negotiationText the concern/question raised by the agent
-     * @param receiveResult   the raw negotiation context (may be null/empty)
+     * @param receiveResult the raw negotiation context (may be null/empty)
      * @return future completing with the clarification text
      */
     CompletableFuture<String> resolve(

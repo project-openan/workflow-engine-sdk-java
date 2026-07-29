@@ -26,13 +26,14 @@ public enum TaskStatus {
     FAILED("failed");
 
     private final String value;
+
     TaskStatus(String value) {
         this.value = value;
     }
 
     /**
-     * Returns the lowercase string value, matching the Python SDK.
-     * Used in {@code task_status_changed} events for cross-SDK consistency.
+     * Returns the lowercase string value, matching the Python SDK. Used in {@code
+     * task_status_changed} events for cross-SDK consistency.
      */
     public String getValue() {
         return value;

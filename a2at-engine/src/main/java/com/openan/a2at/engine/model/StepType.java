@@ -25,6 +25,7 @@ public enum StepType {
     SELF_LOOP("SelfLoop");
 
     private final String value;
+
     StepType(String value) {
         this.value = value;
     }

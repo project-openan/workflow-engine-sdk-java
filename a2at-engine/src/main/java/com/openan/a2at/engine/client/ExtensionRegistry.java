@@ -30,11 +30,10 @@ import java.util.Map;
 /**
  * Registry of A2A-T extension handlers.
  *
- * <p>The workflow engine only handles Task-T (task prompt generation)
- * and Negotiation-T (auto negotiation loop). Authorization-T and
- * Notification-T are pre-positioning operations done once before the
- * workflow starts (see {@link WorkflowEngineClient#sendExtensionMessage}),
- * so they are NOT part of the workflow's extension handler chain.
+ * <p>The workflow engine only handles Task-T (task prompt generation) and Negotiation-T (auto
+ * negotiation loop). Authorization-T and Notification-T are pre-positioning operations done once
+ * before the workflow starts (see {@link WorkflowEngineClient#sendExtensionMessage}), so they are
+ * NOT part of the workflow's extension handler chain.
  */
 class ExtensionRegistry {
 
@@ -70,7 +69,8 @@ class ExtensionRegistry {
             for (Map.Entry<String, ExtensionHandler> entry : handlers.entrySet()) {
                 // Case-insensitive: URIs commonly use uppercase (NEGOTIATION-T)
                 // while the handler keyword uses mixed case (Negotiation-T).
-                if (uri.toLowerCase().contains(entry.getKey().toLowerCase()) && !seen.contains(entry.getKey())) {
+                if (uri.toLowerCase().contains(entry.getKey().toLowerCase())
+                        && !seen.contains(entry.getKey())) {
                     matched.add(entry.getValue());
                     seen.add(entry.getKey());
                     break;

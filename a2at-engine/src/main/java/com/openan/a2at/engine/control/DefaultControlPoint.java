@@ -21,6 +21,7 @@ package com.openan.a2at.engine.control;
 
 import com.openan.a2at.engine.client.WorkflowEngineClient;
 import com.openan.a2at.engine.model.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,9 +32,8 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Default ControlPoint with single-responsibility methods.
  *
- * <p>Negotiation-T auto-loop delegates to an injected
- * {@link NegotiationStrategy} (or returns a generic clarification if none
- * is provided). Override onNegotiation directly when a full strategy
+ * <p>Negotiation-T auto-loop delegates to an injected {@link NegotiationStrategy} (or returns a
+ * generic clarification if none is provided). Override onNegotiation directly when a full strategy
  * object is unnecessary.
  */
 public class DefaultControlPoint implements ControlPoint {
@@ -52,33 +52,51 @@ public class DefaultControlPoint implements ControlPoint {
     @Override
     public CompletableFuture<TaskResponse> onTask(
             TaskRequest request, WorkflowEngineClient engineClient) {
-        log.info("[DefaultCP] onTask: agent={}, step={}", request.getAgentName(), request.getStepName());
-        return engineClient.sendMessage(request.getAgentName(), request.getMessage())
-                .thenApply(r -> {
-                    boolean success = r.getText() != null && !r.getText().isEmpty();
-                    log.info("[DefaultCP] Response from {}: {} chars, success={}",
-                            request.getAgentName(),
-                            r.getText() != null ? r.getText().length() : 0, success);
-                    return TaskResponse.builder().success(success).output(r.getText()).build();
-                })
-                .exceptionally(e -> {
-                    log.error("[DefaultCP] Task failed for {}: {}", request.getAgentName(), e.getMessage());
-                    return TaskResponse.builder().success(false).error("Agent call failed: " + e.getMessage()).build();
-                });
+        log.info(
+                "[DefaultCP] onTask: agent={}, step={}",
+                request.getAgentName(),
+                request.getStepName());
+        return engineClient
+                .sendMessage(request.getAgentName(), request.getMessage())
+                .thenApply(
+                        r -> {
+                            boolean success = r.getText() != null && !r.getText().isEmpty();
+                            log.info(
+                                    "[DefaultCP] Response from {}: {} chars, success={}",
+                                    request.getAgentName(),
+                                    r.getText() != null ? r.getText().length() : 0,
+                                    success);
+                            return TaskResponse.builder()
+                                    .success(success)
+                                    .output(r.getText())
+                                    .build();
+                        })
+                .exceptionally(
+                        e -> {
+                            log.error(
+                                    "[DefaultCP] Task failed for {}: {}",
+                                    request.getAgentName(),
+                                    e.getMessage());
+                            return TaskResponse.builder()
+                                    .success(false)
+                                    .error("Agent call failed: " + e.getMessage())
+                                    .build();
+                        });
     }
 
     @Override
     public CompletableFuture<TaskResponse> onSelfTask(TaskRequest request) {
-        log.info("[DefaultCP] onSelfTask: step={}, agent={} (local, no A2A-T)",
-                request.getStepName(), request.getAgentName());
+        log.info(
+                "[DefaultCP] onSelfTask: step={}, agent={} (local, no A2A-T)",
+                request.getStepName(),
+                request.getAgentName());
         return CompletableFuture.completedFuture(
                 TaskResponse.builder().success(true).output(request.getMessage()).build());
     }
 
     @Override
     public CompletableFuture<RouteDecision> onRoute(
-            String stepName, Map<String, Object> results,
-            List<JumpCondition> conditions) {
+            String stepName, Map<String, Object> results, List<JumpCondition> conditions) {
         String nextStep = conditions.get(0).getStep();
         for (JumpCondition jc : conditions) {
             String step = jc.getStep();
@@ -89,18 +107,20 @@ public class DefaultControlPoint implements ControlPoint {
         }
         log.info("[DefaultCP] onRoute: {} -> {}", stepName, nextStep);
         return CompletableFuture.completedFuture(
-                RouteDecision.builder().nextStep(nextStep).reason("default: first non-terminal branch").build());
+                RouteDecision.builder()
+                        .nextStep(nextStep)
+                        .reason("default: first non-terminal branch")
+                        .build());
     }
 
     @Override
     public CompletableFuture<String> onNegotiation(
-            String agentName, String negotiationText,
-            Map<String, Object> receiveResult) {
+            String agentName, String negotiationText, Map<String, Object> receiveResult) {
         if (negotiationStrategy != null) {
             return negotiationStrategy.resolve(agentName, negotiationText, receiveResult);
         }
         log.info("[DefaultCP] onNegotiation: agent={}, concern={}", agentName, negotiationText);
         return CompletableFuture.completedFuture(
                 "Please proceed with the original task using available information.");
-   }
+    }
 }

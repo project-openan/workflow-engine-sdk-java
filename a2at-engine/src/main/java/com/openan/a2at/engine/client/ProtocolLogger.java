@@ -21,9 +21,10 @@ package com.openan.a2at.engine.client;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+
 import org.a2aproject.sdk.client.ClientEvent;
 import org.a2aproject.sdk.client.MessageEvent;
 import org.a2aproject.sdk.client.TaskEvent;
@@ -38,48 +39,56 @@ import java.time.OffsetDateTime;
 import java.util.Map;
 
 /**
- * Logs complete A2A protocol messages (headers + body) for protocol-level
- * verification against real network captures. Uses a dedicated "PROTOCOL"
- * logger so output can be independently enabled or suppressed via logging
- * configuration.
+ * Logs complete A2A protocol messages (headers + body) for protocol-level verification against real
+ * network captures. Uses a dedicated "PROTOCOL" logger so output can be independently enabled or
+ * suppressed via logging configuration.
  *
- * <p>Request side: serializes {@link MessageSendParams} to pretty-printed
- * JSON and logs all headers from {@code ClientCallContext}.
+ * <p>Request side: serializes {@link MessageSendParams} to pretty-printed JSON and logs all headers
+ * from {@code ClientCallContext}.
  *
- * <p>Response side: serializes each {@link ClientEvent} payload (Task,
- * TaskStatusUpdateEvent, TaskArtifactUpdateEvent, Message) to JSON.
+ * <p>Response side: serializes each {@link ClientEvent} payload (Task, TaskStatusUpdateEvent,
+ * TaskArtifactUpdateEvent, Message) to JSON.
  */
 final class ProtocolLogger {
 
     private static final Logger log = LoggerFactory.getLogger("PROTOCOL");
 
-    private static final ObjectMapper mapper = new ObjectMapper()
-            .enable(SerializationFeature.INDENT_OUTPUT)
-            .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
-            .setSerializationInclusion(JsonInclude.Include.NON_NULL)
-            .registerModule(new SimpleModule()
-                    .addSerializer(OffsetDateTime.class, ToStringSerializer.instance));
+    private static final ObjectMapper mapper =
+            new ObjectMapper()
+                    .enable(SerializationFeature.INDENT_OUTPUT)
+                    .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+                    .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+                    .registerModule(
+                            new SimpleModule()
+                                    .addSerializer(
+                                            OffsetDateTime.class, ToStringSerializer.instance));
 
-    private ProtocolLogger() {
-    }
+    private ProtocolLogger() {}
 
     /**
      * Log the full request (headers + body) before sending to an agent.
      *
      * @param agentName target agent display name
-     * @param endpoint  agent URL
-     * @param params    the message send parameters (protocol body)
-     * @param headers   HTTP headers from ClientCallContext
+     * @param endpoint agent URL
+     * @param params the message send parameters (protocol body)
+     * @param headers HTTP headers from ClientCallContext
      */
-    static void logRequest(String agentName, String endpoint,
-                           MessageSendParams params, Map<String, String> headers) {
+    static void logRequest(
+            String agentName,
+            String endpoint,
+            MessageSendParams params,
+            Map<String, String> headers) {
         if (!log.isInfoEnabled()) {
             return;
         }
         try {
             String bodyJson = mapper.writeValueAsString(params);
-            log.info(">>> [{}] REQUEST to {}\n=== Headers ===\n{}\n=== Body ===\n{}",
-                    agentName, endpoint, formatHeaders(headers), bodyJson);
+            log.info(
+                    ">>> [{}] REQUEST to {}\n=== Headers ===\n{}\n=== Body ===\n{}",
+                    agentName,
+                    endpoint,
+                    formatHeaders(headers),
+                    bodyJson);
         } catch (Exception e) {
             log.warn(">>> [{}] Failed to serialize request: {}", agentName, e.getMessage());
         }
@@ -89,7 +98,7 @@ final class ProtocolLogger {
      * Log each response event (full payload) received from an agent.
      *
      * @param agentName source agent display name
-     * @param event     the received client event
+     * @param event the received client event
      */
     static void logResponseEvent(String agentName, ClientEvent event) {
         if (!log.isInfoEnabled()) {
@@ -99,22 +108,20 @@ final class ProtocolLogger {
             Object payload = extractPayload(event);
             String eventType = event.getClass().getSimpleName();
             if (payload == null) {
-                log.info("<<< [{}] RESPONSE [{}]: (no serializable payload)",
-                        agentName, eventType);
+                log.info("<<< [{}] RESPONSE [{}]: (no serializable payload)", agentName, eventType);
                 return;
             }
             String json = mapper.writeValueAsString(payload);
             log.info("<<< [{}] RESPONSE [{}]\n{}", agentName, eventType, json);
         } catch (Exception e) {
-            log.warn("<<< [{}] Failed to serialize response event: {}",
-                    agentName, e.getMessage());
+            log.warn("<<< [{}] Failed to serialize response event: {}", agentName, e.getMessage());
         }
     }
 
     /**
-     * Extract the serializable protocol payload from a ClientEvent.
-     * Returns the inner SDK spec object (Task, TaskStatusUpdateEvent,
-     * TaskArtifactUpdateEvent, or Message) rather than the event wrapper.
+     * Extract the serializable protocol payload from a ClientEvent. Returns the inner SDK spec
+     * object (Task, TaskStatusUpdateEvent, TaskArtifactUpdateEvent, or Message) rather than the
+     * event wrapper.
      */
     private static Object extractPayload(ClientEvent event) {
         if (event instanceof TaskEvent te) {
@@ -135,9 +142,7 @@ final class ProtocolLogger {
         return null;
     }
 
-    /**
-     * Format headers map as "Key: Value" lines for readable logging.
-     */
+    /** Format headers map as "Key: Value" lines for readable logging. */
     private static String formatHeaders(Map<String, String> headers) {
         if (headers == null || headers.isEmpty()) {
             return "(none)";

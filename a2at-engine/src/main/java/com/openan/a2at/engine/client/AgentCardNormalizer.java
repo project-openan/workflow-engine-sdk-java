@@ -20,6 +20,7 @@
 package com.openan.a2at.engine.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,15 +30,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * AgentCard normalization -- converts OpenAPI-style security scheme
- * notation to a format compatible with the a2a-java-sdk AgentCard record.
+ * AgentCard normalization -- converts OpenAPI-style security scheme notation to a format compatible
+ * with the a2a-java-sdk AgentCard record.
  *
- * <p>Mirrors the Python SDK's {@code agentcard_normalizer.normalize_agent_dict()}.
- * Handles two input formats:
+ * <p>Mirrors the Python SDK's {@code agentcard_normalizer.normalize_agent_dict()}. Handles two
+ * input formats:
+ *
  * <ol>
- *   <li>Already-correct format (from registry center) -- normalization is a no-op.</li>
- *   <li>OpenAPI-style (flat {@code scheme} field, list-style
- *       {@code securityRequirements}) -- converted to structured format.</li>
+ *   <li>Already-correct format (from registry center) -- normalization is a no-op.
+ *   <li>OpenAPI-style (flat {@code scheme} field, list-style {@code securityRequirements}) --
+ *       converted to structured format.
  * </ol>
  */
 public final class AgentCardNormalizer {
@@ -45,14 +47,15 @@ public final class AgentCardNormalizer {
     private static final Logger log = LoggerFactory.getLogger(AgentCardNormalizer.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    private static final List<String> PROTO_ONEOF_KEYS = List.of(
-            "httpAuthSecurityScheme", "apiKeySecurityScheme",
-            "oauth2SecurityScheme", "openIdConnectSecurityScheme",
-            "mtlsSecurityScheme"
-    );
+    private static final List<String> PROTO_ONEOF_KEYS =
+            List.of(
+                    "httpAuthSecurityScheme",
+                    "apiKeySecurityScheme",
+                    "oauth2SecurityScheme",
+                    "openIdConnectSecurityScheme",
+                    "mtlsSecurityScheme");
 
-    private AgentCardNormalizer() {
-    }
+    private AgentCardNormalizer() {}
 
     /**
      * Normalize an AgentCard map to a compatible format.
@@ -71,13 +74,16 @@ public final class AgentCardNormalizer {
             result.put("securitySchemes", normalizeSecuritySchemes(result.get("securitySchemes")));
         }
         if (result.containsKey("securityRequirements")) {
-            result.put("securityRequirements", normalizeSecurityRequirements(result.get("securityRequirements")));
+            result.put(
+                    "securityRequirements",
+                    normalizeSecurityRequirements(result.get("securityRequirements")));
         }
         // Auto-populate securityRequirements from securitySchemes if missing
         Object secSchemes = result.get("securitySchemes");
-        if (secSchemes instanceof Map && !((Map<?, ?>) secSchemes).isEmpty()
+        if (secSchemes instanceof Map
+                && !((Map<?, ?>) secSchemes).isEmpty()
                 && !(result.get("securityRequirements") instanceof List
-                     && !((List<?>) result.get("securityRequirements")).isEmpty())) {
+                        && !((List<?>) result.get("securityRequirements")).isEmpty())) {
             List<String> names = new ArrayList<>(((Map<String, Object>) secSchemes).keySet());
             List<Map<String, Object>> reqs = new ArrayList<>();
             Map<String, Object> schemesMap = new LinkedHashMap<>();
@@ -163,7 +169,8 @@ public final class AgentCardNormalizer {
         return result;
     }
 
-    private static void copyIfPresent(Map<String, Object> src, Map<String, Object> dst, String... keys) {
+    private static void copyIfPresent(
+            Map<String, Object> src, Map<String, Object> dst, String... keys) {
         for (String key : keys) {
             if (src.containsKey(key)) {
                 String dstKey = keys.length > 1 ? keys[1] : key;

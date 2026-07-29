@@ -34,12 +34,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Injects A2A extension URIs into HTTP headers - but only the extensions
- * that are actually present in the current message's metadata.
+ * Injects A2A extension URIs into HTTP headers - but only the extensions that are actually present
+ * in the current message's metadata.
  *
- * <p>Sets the {@code A2A-Extensions} header so the remote agent knows which
- * extensions this specific message uses. Extensions declared on the AgentCard
- * but not present in the message metadata are not included.
+ * <p>Sets the {@code A2A-Extensions} header so the remote agent knows which extensions this
+ * specific message uses. Extensions declared on the AgentCard but not present in the message
+ * metadata are not included.
  */
 class ExtensionInterceptor extends ClientCallInterceptor {
 
@@ -60,8 +60,7 @@ class ExtensionInterceptor extends ClientCallInterceptor {
             Object payload,
             @NotNull Map<String, String> headers,
             AgentCard agentCard,
-            ClientCallContext context
-    ) {
+            ClientCallContext context) {
         // Only advertise extensions that are actually present in this message's metadata
         Set<String> activeExtensions = filterActiveExtensions(payload);
         if (activeExtensions.isEmpty()) {
@@ -85,9 +84,7 @@ class ExtensionInterceptor extends ClientCallInterceptor {
         return new PayloadAndHeaders(payload, newHeaders);
     }
 
-    /**
-     * Return only the extension URIs that appear as keys in the message metadata.
-     */
+    /** Return only the extension URIs that appear as keys in the message metadata. */
     private Set<String> filterActiveExtensions(Object payload) {
         if (!(payload instanceof Map<?, ?> meta)) {
             return Set.of();

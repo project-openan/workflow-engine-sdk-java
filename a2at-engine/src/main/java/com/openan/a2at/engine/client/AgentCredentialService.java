@@ -18,12 +18,15 @@
  */
 
 package com.openan.a2at.engine.client;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext;
 import org.a2aproject.sdk.client.transport.spi.interceptors.auth.CredentialService;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -33,15 +36,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-
-
 /**
  * Obtains Bearer tokens via login endpoints for agents requiring authentication.
  *
- * <p>Mirrors the Python SDK's {@code AgentCredentialService}. Caches tokens
- * with a configurable TTL and refreshes them before expiry.
+ * <p>Mirrors the Python SDK's {@code AgentCredentialService}. Caches tokens with a configurable TTL
+ * and refreshes them before expiry.
  */
-
 class AgentCredentialService implements CredentialService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentCredentialService.class);
@@ -56,30 +56,32 @@ class AgentCredentialService implements CredentialService {
 
     private final Map<String, TokenEntry> tokenCache = new ConcurrentHashMap<>();
 
-    public AgentCredentialService(String agentName, Map<String, Map<String, Object>> schemeConfigs) {
+    public AgentCredentialService(
+            String agentName, Map<String, Map<String, Object>> schemeConfigs) {
         this(agentName, schemeConfigs, null);
     }
 
-    public AgentCredentialService(String agentName, Map<String, Map<String, Object>> schemeConfigs,
-                                  HttpClient httpClient) {
+    public AgentCredentialService(
+            String agentName,
+            Map<String, Map<String, Object>> schemeConfigs,
+            HttpClient httpClient) {
         this.agentName = agentName;
         this.schemeConfigs = schemeConfigs != null ? schemeConfigs : Map.of();
         if (httpClient != null) {
             this.httpClient = httpClient;
         } else {
-            HttpClient.Builder b = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(30))
-                    .followRedirects(HttpClient.Redirect.ALWAYS);
+            HttpClient.Builder b =
+                    HttpClient.newBuilder()
+                            .connectTimeout(Duration.ofSeconds(30))
+                            .followRedirects(HttpClient.Redirect.ALWAYS);
 
             // Disable TLS verification (mirrors Python's verify=False for login endpoints)
             b.sslContext(SslContextFactory.createTrustAll());
             this.httpClient = b.build();
-
         }
     }
 
     @Override
-
     public String getCredential(@NotNull String securitySchemeName, ClientCallContext context) {
         Map<String, Object> schemeCfg = schemeConfigs.get(securitySchemeName);
         if (schemeCfg == null) {
@@ -97,12 +99,13 @@ class AgentCredentialService implements CredentialService {
         String token = login(schemeCfg);
         if (token != null) {
             long ttl = toLong(schemeCfg.get("token_ttl"));
-            tokenCache.put(securitySchemeName, new TokenEntry(token, System.currentTimeMillis() / 1000 + ttl));
+            tokenCache.put(
+                    securitySchemeName,
+                    new TokenEntry(token, System.currentTimeMillis() / 1000 + ttl));
             log.info("[Auth] Login succeeded: agent={}, scheme={}", agentName, securitySchemeName);
         }
 
         return token;
-
     }
 
     private String login(Map<String, Object> schemeCfg) {
@@ -116,7 +119,12 @@ class AgentCredentialService implements CredentialService {
         String tokenField = schemeCfg.getOrDefault("token_field", "accessSession").toString();
         Map<String, Object> body = buildLoginBody(schemeCfg);
         try {
-            log.info("[Auth] Login attempt: agent={}, method={}, url={}, params={}", agentName, method, loginUrl, sanitizeBody(body));
+            log.info(
+                    "[Auth] Login attempt: agent={}, method={}, url={}, params={}",
+                    agentName,
+                    method,
+                    loginUrl,
+                    sanitizeBody(body));
             HttpRequest.BodyPublisher bodyPublisher;
             if ("application/x-www-form-urlencoded".equals(contentType)) {
                 StringBuilder form = new StringBuilder();
@@ -128,15 +136,18 @@ class AgentCredentialService implements CredentialService {
                 }
                 bodyPublisher = HttpRequest.BodyPublishers.ofString(form.toString());
             } else {
-                bodyPublisher = HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body));
+                bodyPublisher =
+                        HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body));
             }
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(loginUrl))
-                    .header("Content-Type", contentType)
-                    .method(method, bodyPublisher)
-                    .timeout(Duration.ofSeconds(30))
-                    .build();
-            HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpRequest request =
+                    HttpRequest.newBuilder()
+                            .uri(URI.create(loginUrl))
+                            .header("Content-Type", contentType)
+                            .method(method, bodyPublisher)
+                            .timeout(Duration.ofSeconds(30))
+                            .build();
+            HttpResponse<String> resp =
+                    httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() >= 400) {
                 log.error("[Auth] Login failed: agent={}, status={}", agentName, resp.statusCode());
                 return null;
@@ -144,18 +155,24 @@ class AgentCredentialService implements CredentialService {
             Map<String, Object> data = mapper.readValue(resp.body(), Map.class);
             String token = extractNestedValue(data, tokenField);
             if (token == null) {
-                token = (String) data.getOrDefault("accessSession",
-                        data.getOrDefault("access_token", data.get("token")));
+                token =
+                        (String)
+                                data.getOrDefault(
+                                        "accessSession",
+                                        data.getOrDefault("access_token", data.get("token")));
             }
             return token;
         } catch (Exception e) {
-            log.error("[Auth] Login failed: agent={}, url={}, error={}", agentName, loginUrl, e.getMessage());
+            log.error(
+                    "[Auth] Login failed: agent={}, url={}, error={}",
+                    agentName,
+                    loginUrl,
+                    e.getMessage());
             return null;
         }
     }
 
     @SuppressWarnings("unchecked")
-
     private static String extractNestedValue(Map<String, Object> data, String path) {
         if (path == null || path.isEmpty()) {
             return null;
@@ -213,10 +230,9 @@ class AgentCredentialService implements CredentialService {
     }
 
     /**
-     * Mask sensitive fields (password, value, accessSession) for safe logging.
-     * Mirrors Python SDK's {@code _sanitize_body()}.
+     * Mask sensitive fields (password, value, accessSession) for safe logging. Mirrors Python SDK's
+     * {@code _sanitize_body()}.
      */
-
     private static Map<String, Object> sanitizeBody(Map<String, Object> body) {
         Map<String, Object> sanitized = new java.util.LinkedHashMap<>();
         for (Map.Entry<String, Object> e : body.entrySet()) {

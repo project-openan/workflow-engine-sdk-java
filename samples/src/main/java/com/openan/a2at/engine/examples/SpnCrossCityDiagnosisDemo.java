@@ -19,15 +19,16 @@
 
 package com.openan.a2at.engine.examples;
 
-import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openan.a2at.engine.client.A2ATransport;
-import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
-import org.a2aproject.sdk.spec.AgentCard;
 import com.openan.a2at.engine.client.AgentCardJacksonModule;
+import com.openan.a2at.engine.client.DefaultWorkflowEngineClient;
+import com.openan.a2at.engine.client.WorkflowEngineClientConfig;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
 import com.openan.a2at.engine.model.SendMessageResult;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.a2aproject.sdk.spec.AgentCard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,23 +39,23 @@ import java.util.concurrent.TimeUnit;
 /**
  * SPN cross-city fault diagnosis demo entry point.
  *
- * <p>Starts all 3 A2A agents (via {@link StartAgentsServer}) in a background
- * thread, waits for them to bind, then uses {@link DefaultWorkflowEngineClient}
- * to send a Task-T message to the Workbench Agent. The client internally
- * handles A2A-T protocol: Task-T prompt generation, SSE streaming response
- * parsing, negotiation auto-loop, etc.
+ * <p>Starts all 3 A2A agents (via {@link StartAgentsServer}) in a background thread, waits for them
+ * to bind, then uses {@link DefaultWorkflowEngineClient} to send a Task-T message to the Workbench
+ * Agent. The client internally handles A2A-T protocol: Task-T prompt generation, SSE streaming
+ * response parsing, negotiation auto-loop, etc.
  *
  * <p>Architecture:
+ *
  * <ul>
- *   <li>Transport Workbench Agent (port 26337) - orchestrator + merge</li>
- *   <li>SPN Domain Agent City1 (port 26335) - Yuedong OMC, has fault</li>
- *   <li>SPN Domain Agent City2 (port 26336) - Yuexi OMC, normal</li>
+ *   <li>Transport Workbench Agent (port 26337) - orchestrator + merge
+ *   <li>SPN Domain Agent City1 (port 26335) - Yuedong OMC, has fault
+ *   <li>SPN Domain Agent City2 (port 26336) - Yuexi OMC, normal
  * </ul>
  */
 public class SpnCrossCityDiagnosisDemo {
     private static final Logger log = LoggerFactory.getLogger(SpnCrossCityDiagnosisDemo.class);
-    private static final ObjectMapper mapper = new ObjectMapper()
-            .registerModule(new AgentCardJacksonModule());
+    private static final ObjectMapper mapper =
+            new ObjectMapper().registerModule(new AgentCardJacksonModule());
 
     private static final String AGENT_CARD_RESOURCE = "agentcard/transport_workbench_agent.json";
     private static final String WB_AGENT_NAME = "Transport Workbench Agent";
@@ -72,14 +73,11 @@ public class SpnCrossCityDiagnosisDemo {
         TimeUnit.SECONDS.sleep(AGENT_STARTUP_WAIT_SECONDS);
 
         log.info("=== Step 2: Send Task-T to Workbench Agent ===");
-        String taskText = "SPN跨城专线故障诊断："
-                + "客户A粤东-粤西间SPN专线中断，"
-                + "请协同两地市OMC并行诊断，"
-                + "汇总分析确定故障在哪个地市";
+        String taskText = "SPN跨城专线故障诊断：" + "客户A粤东-粤西间SPN专线中断，" + "请协同两地市OMC并行诊断，" + "汇总分析确定故障在哪个地市";
         log.info("Sending task: {}", taskText);
         String response = sendTaskToWorkbench(taskText);
         log.info("=== Workbench Agent Response ===");
-       if (response != null) {
+        if (response != null) {
             log.info("Response ({} chars):\n{}", response.length(), response);
         } else {
             log.warn("Response was null");
@@ -95,49 +93,70 @@ public class SpnCrossCityDiagnosisDemo {
     /**
      * Send a Task-T message to the Workbench Agent via the workflow engine client.
      *
-     * <p>Uses {@link DefaultWorkflowEngineClient} which internally handles:
-     * A2A REST message:stream, SSE response parsing (statusUpdate/artifactUpdate),
-     * Task-T prompt generation, and negotiation auto-loop.
+     * <p>Uses {@link DefaultWorkflowEngineClient} which internally handles: A2A REST
+     * message:stream, SSE response parsing (statusUpdate/artifactUpdate), Task-T prompt generation,
+     * and negotiation auto-loop.
      */
     private static String sendTaskToWorkbench(String taskText) throws Exception {
-        String cardPath = SpnCrossCityDiagnosisDemo.class.getClassLoader()
-                .getResource(AGENT_CARD_RESOURCE).getPath();
+        String cardPath =
+                SpnCrossCityDiagnosisDemo.class
+                        .getClassLoader()
+                        .getResource(AGENT_CARD_RESOURCE)
+                        .getPath();
         AgentCard agentCard = mapper.readValue(new java.io.File(cardPath), AgentCard.class);
 
-        A2ATransport transport = new A2ATransport(
-                List.of(agentCard), null,
-                WorkflowEngineClientConfig.builder()
-                        .sslVerify(false)
-                        .a2atEnvPath(StartAgentsServer.resolveEnvPath())
-                        .build());
+        A2ATransport transport =
+                new A2ATransport(
+                        List.of(agentCard),
+                        null,
+                        WorkflowEngineClientConfig.builder()
+                                .sslVerify(false)
+                                .a2atEnvPath(StartAgentsServer.resolveEnvPath())
+                                .build());
         DefaultWorkflowEngineClient engineClient = new DefaultWorkflowEngineClient(transport);
 
-        engineClient.setEventCallback(new EventCallback() {
-            @Override
-            public void onEvent(String type, Map<String, Object> data) {
-                switch (type) {
-                    case EventType.AGENT_STATUS_UPDATE ->
-                        log.info("  >> [STATUS] agent={}, state={}, final={}",
-                                data.get("agent"), data.get("state"), data.get("is_final"));
-                    case EventType.AGENT_ARTIFACT_UPDATE ->
-                        log.info("  >> [ARTIFACT] agent={}, name={}, text={}",
-                                data.get("agent"), data.get("artifact_name"),
-                                data.get("text"));
-                    case EventType.AGENT_MESSAGE_EVENT ->
-                        log.info("  >> [MESSAGE] agent={}, text={}",
-                                data.get("agent"), data.get("text"));
-                    case EventType.AGENT_REQUEST ->
-                        log.info("  >> [REQUEST] agent={}, {} chars",
-                                data.get("agent"),
-                                data.get("request") != null ? String.valueOf(data.get("request")).length() : 0);
-                    case EventType.AGENT_RESPONSE ->
-                        log.info("  >> [RESPONSE] agent={}, response={}",
-                                data.get("agent"),
-                                data.get("response") != null ? data.get("response") : "(empty)");
-                    default -> { /* other event types not shown in this demo */ }
-                }
-            }
-        });
+        engineClient.setEventCallback(
+                new EventCallback() {
+                    @Override
+                    public void onEvent(String type, Map<String, Object> data) {
+                        switch (type) {
+                            case EventType.AGENT_STATUS_UPDATE ->
+                                    log.info(
+                                            "  >> [STATUS] agent={}, state={}, final={}",
+                                            data.get("agent"),
+                                            data.get("state"),
+                                            data.get("is_final"));
+                            case EventType.AGENT_ARTIFACT_UPDATE ->
+                                    log.info(
+                                            "  >> [ARTIFACT] agent={}, name={}, text={}",
+                                            data.get("agent"),
+                                            data.get("artifact_name"),
+                                            data.get("text"));
+                            case EventType.AGENT_MESSAGE_EVENT ->
+                                    log.info(
+                                            "  >> [MESSAGE] agent={}, text={}",
+                                            data.get("agent"),
+                                            data.get("text"));
+                            case EventType.AGENT_REQUEST ->
+                                    log.info(
+                                            "  >> [REQUEST] agent={}, {} chars",
+                                            data.get("agent"),
+                                            data.get("request") != null
+                                                    ? String.valueOf(data.get("request")).length()
+                                                    : 0);
+                            case EventType.AGENT_RESPONSE ->
+                                    log.info(
+                                            "  >> [RESPONSE] agent={}, response={}",
+                                            data.get("agent"),
+                                            data.get("response") != null
+                                                    ? data.get("response")
+                                                    : "(empty)");
+                            default -> {
+                                /* other event types not shown in this demo */
+                            }
+                        }
+                    }
+                });
 
         // sendMessage handles A2A-T protocol internally
         SendMessageResult result = engineClient.sendMessage(WB_AGENT_NAME, taskText).join();
@@ -145,5 +164,4 @@ public class SpnCrossCityDiagnosisDemo {
         engineClient.close();
         return result.getText();
     }
-
 }

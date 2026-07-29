@@ -29,8 +29,8 @@ import java.util.UUID;
 /**
  * Shared base class for sample agent executors.
  *
- * <p>Provides common utilities for text extraction and status message
- * construction that all agent executors need.
+ * <p>Provides common utilities for text extraction and status message construction that all agent
+ * executors need.
  */
 public abstract class BaseAgentExecutor implements AgentExecutor {
 

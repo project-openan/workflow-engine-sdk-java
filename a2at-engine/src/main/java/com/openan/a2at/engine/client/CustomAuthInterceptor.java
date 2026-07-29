@@ -33,9 +33,9 @@ import java.util.Map;
 /**
  * Auth interceptor supporting custom header names (non-Bearer Authorization).
  *
- * <p>Mirrors the Python SDK's {@code CustomAuthInterceptor}. Some agents
- * require tokens in custom headers (e.g. {@code X-API-Key}) or with custom
- * prefixes (e.g. {@code Token} instead of {@code Bearer}).
+ * <p>Mirrors the Python SDK's {@code CustomAuthInterceptor}. Some agents require tokens in custom
+ * headers (e.g. {@code X-API-Key}) or with custom prefixes (e.g. {@code Token} instead of {@code
+ * Bearer}).
  */
 class CustomAuthInterceptor extends ClientCallInterceptor {
 
@@ -44,8 +44,9 @@ class CustomAuthInterceptor extends ClientCallInterceptor {
     private final AgentCredentialService credentialService;
     private final Map<String, Map<String, Object>> schemeConfigs;
 
-    public CustomAuthInterceptor(AgentCredentialService credentialService,
-                                 Map<String, Map<String, Object>> schemeConfigs) {
+    public CustomAuthInterceptor(
+            AgentCredentialService credentialService,
+            Map<String, Map<String, Object>> schemeConfigs) {
         this.credentialService = credentialService;
         this.schemeConfigs = schemeConfigs != null ? schemeConfigs : Map.of();
     }
@@ -57,8 +58,7 @@ class CustomAuthInterceptor extends ClientCallInterceptor {
             Object payload,
             @NotNull Map<String, String> headers,
             AgentCard agentCard,
-            ClientCallContext context
-    ) {
+            ClientCallContext context) {
         if (agentCard == null
                 || agentCard.securityRequirements() == null
                 || agentCard.securityRequirements().isEmpty()

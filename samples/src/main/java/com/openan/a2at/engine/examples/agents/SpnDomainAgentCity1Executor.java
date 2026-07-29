@@ -20,39 +20,34 @@
 package com.openan.a2at.engine.examples.agents;
 
 import com.openan.a2at.engine.examples.StartAgentsServer;
+
 import org.a2aproject.sdk.server.agentexecution.RequestContext;
 import org.a2aproject.sdk.server.tasks.AgentEmitter;
-import org.a2aproject.sdk.spec.TaskState;
-import org.a2aproject.sdk.spec.Part;
-import org.a2aproject.sdk.spec.TextPart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * SPN Domain Agent for City1 (Eastern Guangdong / Yuedong OMC).
  *
- * <p>Server-side negotiation-capable (extends {@link NegotiationBaseAgentExecutor}):
- * on a new task it replies INPUT_REQUIRED to start a Negotiation-T round, and on
- * the follow-up it runs the diagnosis/recovery business. Yuedong side has a
- * FAULT (port Down, optical power -28dBm). Diagnosis/recovery text is
- * LLM-generated (deepseek) when the A2A-T .env is configured, else deterministic.
- * Authorization-T and Notification-T are pre-positioned before the workflow
- * starts, so this agent no longer injects them in response metadata.
+ * <p>Server-side negotiation-capable (extends {@link NegotiationBaseAgentExecutor}): on a new task
+ * it replies INPUT_REQUIRED to start a Negotiation-T round, and on the follow-up it runs the
+ * diagnosis/recovery business. Yuedong side has a FAULT (port Down, optical power -28dBm).
+ * Diagnosis/recovery text is LLM-generated (deepseek) when the A2A-T .env is configured, else
+ * deterministic. Authorization-T and Notification-T are pre-positioned before the workflow starts,
+ * so this agent no longer injects them in response metadata.
  */
 public class SpnDomainAgentCity1Executor extends NegotiationBaseAgentExecutor {
     private static final Logger log = LoggerFactory.getLogger(SpnDomainAgentCity1Executor.class);
 
     private static final String FAULT_DIAGNOSIS_RESULT =
             "诊断结果：粤东城市OMC诊断结果 - 端口Down，光功率-28dBm(低于阈值)，存在故障。\n"
-            + "修复方案：更换粤东OMC端口光模块，恢复端口Down状态。此修复方案需授权后执行（授权已预置）。\n"
-            + "故障根因：粤东OMC端口光模块故障。";
+                    + "修复方案：更换粤东OMC端口光模块，恢复端口Down状态。此修复方案需授权后执行（授权已预置）。\n"
+                    + "故障根因：粤东OMC端口光模块故障。";
 
-    private static final String RECOVERY_RESULT =
-            "粤东OMC端口光模块已更换，端口恢复Up，专线业务恢复正常。";
+    private static final String RECOVERY_RESULT = "粤东OMC端口光模块已更换，端口恢复Up，专线业务恢复正常。";
 
     @Override
     protected boolean needsNegotiation(String input) {
@@ -64,31 +59,38 @@ public class SpnDomainAgentCity1Executor extends NegotiationBaseAgentExecutor {
         return StartAgentsServer.resolveEnvPath();
     }
 
-   @Override
-   protected String executeBusiness(RequestContext ctx, AgentEmitter emitter, String input) {
+    @Override
+    protected String executeBusiness(RequestContext ctx, AgentEmitter emitter, String input) {
         String diagnosisResult = llmDiagnosisResult(input, FAULT_DIAGNOSIS_RESULT);
         String recoveryResult = selfTriggerRecovery(ctx, diagnosisResult);
         return diagnosisResult + "\n\n" + recoveryResult;
     }
+
     /**
-     * After diagnosis, check the pre-positioned Authorization-T whitelist policy.
-     * If the repair action matches the whitelist, execute recovery and return
-     * the result (reported as Notification-T metadata by the base class). If not
-     * in whitelist, return a refusal message.
+     * After diagnosis, check the pre-positioned Authorization-T whitelist policy. If the repair
+     * action matches the whitelist, execute recovery and return the result (reported as
+     * Notification-T metadata by the base class). If not in whitelist, return a refusal message.
      */
     private String selfTriggerRecovery(RequestContext ctx, String diagnosisResult) {
         String policy = getAuthorizationPolicy();
-        boolean inWhitelist = policy != null && !policy.isEmpty()
-                && (policy.contains("业务抢通") || policy.contains("光模块") || policy.contains("授权"));
+        boolean inWhitelist =
+                policy != null
+                        && !policy.isEmpty()
+                        && (policy.contains("业务抢通")
+                                || policy.contains("光模块")
+                                || policy.contains("授权"));
         if (inWhitelist) {
             log.info("[SPN-Domain-Agent] Fault in whitelist, self-triggering recovery");
             String recoveryResult = llmRecoveryResult(diagnosisResult, RECOVERY_RESULT);
-            log.info("[SPN-Domain-Agent] Recovery result reported via Notification-T: {}", recoveryResult);
+            log.info(
+                    "[SPN-Domain-Agent] Recovery result reported via Notification-T: {}",
+                    recoveryResult);
             return recoveryResult;
         }
         log.info("[SPN-Domain-Agent] Fault not in whitelist, refusing recovery");
         return "操作不在白名单内，拒绝执行抢通。";
     }
+
     @Override
     protected String defaultNegotiationText() {
         return "粤东OMC诊断需要确认客户专线故障的详细端口信息后再执行，请补充。";

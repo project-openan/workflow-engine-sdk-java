@@ -22,11 +22,10 @@ package com.openan.a2at.engine.control;
 /**
  * Execution event type constants.
  *
- * <p>Stable string values delivered to {@link EventCallback#onEvent}.
- * Grouped by origin: runner lifecycle, executor step/task events, agent
- * traffic from the engine client, and A2A-T extension handler events.
- * Values are plain strings so direct comparison
- * ({@code "step_start".equals(eventType)}) works alongside the constants.
+ * <p>Stable string values delivered to {@link EventCallback#onEvent}. Grouped by origin: runner
+ * lifecycle, executor step/task events, agent traffic from the engine client, and A2A-T extension
+ * handler events. Values are plain strings so direct comparison ({@code
+ * "step_start".equals(eventType)}) works alongside the constants.
  */
 public final class EventType {
     // Runner lifecycle (ExecutePsop)

@@ -19,10 +19,10 @@
 
 package com.openan.a2at.engine.model;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
@@ -30,6 +30,5 @@ import lombok.Builder;
 @Builder
 public class RouteDecision {
     private String nextStep;
-    @Builder.Default
-    private String reason = "";
+    @Builder.Default private String reason = "";
 }

@@ -21,16 +21,14 @@ package com.openan.a2at.engine.client;
 
 import lombok.Getter;
 
-import lombok.Getter;
-
 import java.util.List;
 import java.util.Map;
 
 /**
  * Configuration for DefaultWorkflowEngineClient.
  *
- * <p>Mirrors the Python SDK's {@code WorkflowEngineClient.__init__} parameters.
- * Use the builder to create an instance.
+ * <p>Mirrors the Python SDK's {@code WorkflowEngineClient.__init__} parameters. Use the builder to
+ * create an instance.
  */
 @Getter
 public class WorkflowEngineClientConfig {

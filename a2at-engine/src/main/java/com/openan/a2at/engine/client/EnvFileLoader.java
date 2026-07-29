@@ -28,24 +28,22 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Loads key-value pairs from a {@code .env} file and sets them as system
- * properties (only if not already present in the OS environment).
+ * Loads key-value pairs from a {@code .env} file and sets them as system properties (only if not
+ * already present in the OS environment).
  *
- * <p>This bridges the gap between the A2A-T SDK's internal {@code .env}
- * loading and engine components that use {@link System#getenv} or
- * {@link System#getProperty} to read configuration values like
- * {@code A2AT_CRED_KEY}.
+ * <p>This bridges the gap between the A2A-T SDK's internal {@code .env} loading and engine
+ * components that use {@link System#getenv} or {@link System#getProperty} to read configuration
+ * values like {@code A2AT_CRED_KEY}.
  */
 final class EnvFileLoader {
 
     private static final Logger log = LoggerFactory.getLogger(EnvFileLoader.class);
 
-    private EnvFileLoader() {
-    }
+    private EnvFileLoader() {}
 
     /**
-     * Parse a {@code .env} file and set each key as a system property,
-     * unless the key already exists as an OS environment variable.
+     * Parse a {@code .env} file and set each key as a system property, unless the key already
+     * exists as an OS environment variable.
      *
      * @param envFilePath path to the {@code .env} file
      */
@@ -89,7 +87,10 @@ final class EnvFileLoader {
             count++;
         }
         if (count > 0) {
-            log.info("[EnvLoader] Loaded {} property(ies) from {} into system properties", count, envFilePath);
+            log.info(
+                    "[EnvLoader] Loaded {} property(ies) from {} into system properties",
+                    count,
+                    envFilePath);
         }
     }
 }

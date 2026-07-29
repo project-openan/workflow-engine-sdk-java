@@ -20,37 +20,34 @@
 package com.openan.a2at.engine.client;
 
 import org.a2aproject.sdk.client.ClientEvent;
-import org.a2aproject.sdk.spec.AgentCard;
 import org.a2aproject.sdk.client.transport.spi.interceptors.ClientCallContext;
+import org.a2aproject.sdk.spec.AgentCard;
 import org.a2aproject.sdk.spec.MessageSendParams;
 
-import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * Runtime seam for sending A2A messages via the a2a-java SDK's
- * {@link org.a2aproject.sdk.client.Client}.
+ * Runtime seam for sending A2A messages via the a2a-java SDK's {@link
+ * org.a2aproject.sdk.client.Client}.
  *
- * <p>The engine's {@link DefaultWorkflowEngineClient} delegates message
- * sending to this runtime when one is provided (or auto-created). This
- * avoids hand-written HTTP code and reuses the SDK's transport, SSE
- * parsing, and error handling.
+ * <p>The engine's {@link DefaultWorkflowEngineClient} delegates message sending to this runtime
+ * when one is provided (or auto-created). This avoids hand-written HTTP code and reuses the SDK's
+ * transport, SSE parsing, and error handling.
  *
- * <p>Mirrors {@code A2AJavaClientRuntime} from the a2a-t-sdk-java
- * sample module, but lives in the engine package so the engine can
- * depend on it directly.
+ * <p>Mirrors {@code A2AJavaClientRuntime} from the a2a-t-sdk-java sample module, but lives in the
+ * engine package so the engine can depend on it directly.
  */
 public interface A2AJavaClientRuntime {
 
     /**
      * Send a message to an agent and collect the streaming events.
      *
-     * @param agentCard   the target agent's card as a map (from config or registry)
-     * @param params      the message send parameters (message, context, metadata)
+     * @param agentCard the target agent's card as a map (from config or registry)
+     * @param params the message send parameters (message, context, metadata)
      * @param callContext client call context with auth/extension headers
-     * @param eventSink   optional callback invoked for each intermediate event (status updates,
-     *                    artifact updates, messages). Null = no real-time forwarding.
-     * @param logSink     optional log consumer for SDK diagnostics
+     * @param eventSink optional callback invoked for each intermediate event (status updates,
+     *     artifact updates, messages). Null = no real-time forwarding.
+     * @param logSink optional log consumer for SDK diagnostics
      * @return an iterable of {@link ClientEvent} produced by the agent
      */
     Iterable<ClientEvent> sendMessage(
@@ -60,8 +57,6 @@ public interface A2AJavaClientRuntime {
             Consumer<ClientEvent> eventSink,
             Consumer<String> logSink);
 
-    /**
-     * Release any cached resources (e.g. HTTP clients).
-     */
+    /** Release any cached resources (e.g. HTTP clients). */
     void close();
 }

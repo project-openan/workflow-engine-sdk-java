@@ -19,12 +19,13 @@
 
 package com.openan.a2at.engine.model;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import org.a2aproject.sdk.spec.Task;
+
 import java.util.Map;
 
 @Data
@@ -32,10 +33,8 @@ import java.util.Map;
 @AllArgsConstructor
 @Builder
 public class SendMessageResult {
-    @Builder.Default
-    private String text = "";
+    @Builder.Default private String text = "";
     private Task task;
     private Map<String, Object> metadata;
-    @Builder.Default
-    private String taskState = "";
+    @Builder.Default private String taskState = "";
 }

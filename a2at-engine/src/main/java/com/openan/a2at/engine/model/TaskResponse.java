@@ -19,10 +19,11 @@
 
 package com.openan.a2at.engine.model;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.Map;
 
 @Data
@@ -31,8 +32,7 @@ import java.util.Map;
 @Builder
 public class TaskResponse {
     private boolean success;
-    @Builder.Default
-    private String output = "";
+    @Builder.Default private String output = "";
     private String error;
     private Map<String, Object> metadata;
 }

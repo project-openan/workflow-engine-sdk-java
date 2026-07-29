@@ -20,13 +20,13 @@
 package com.openan.a2at.engine.examples.agents;
 
 import com.openan.a2at.engine.client.WorkflowEngineClient;
-import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.DefaultControlPoint;
+import com.openan.a2at.engine.examples.StartAgentsServer;
 import com.openan.a2at.engine.model.JumpCondition;
 import com.openan.a2at.engine.model.RouteDecision;
 import com.openan.a2at.engine.model.TaskRequest;
 import com.openan.a2at.engine.model.TaskResponse;
-import com.openan.a2at.engine.examples.StartAgentsServer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,13 +37,12 @@ import java.util.concurrent.CompletableFuture;
 /**
  * ControlPoint for the SPN cross-city diagnosis workflow.
  *
- * <p>Handles task dispatch (with city-specific message enrichment),
- * route decisions (fault-based routing to recovery steps), and negotiation
- * responses. Authorization-T and Notification-T are pre-positioned
- * before the workflow starts, not handled here.
+ * <p>Handles task dispatch (with city-specific message enrichment), route decisions (fault-based
+ * routing to recovery steps), and negotiation responses. Authorization-T and Notification-T are
+ * pre-positioned before the workflow starts, not handled here.
  *
- * <p>SRP: this class only contains workflow decision logic, separating
- * it from the agent executor that handles message I/O.
+ * <p>SRP: this class only contains workflow decision logic, separating it from the agent executor
+ * that handles message I/O.
  */
 public class WorkbenchControlPoint extends DefaultControlPoint {
     private static final Logger log = LoggerFactory.getLogger(WorkbenchControlPoint.class);
@@ -61,8 +60,10 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
 
     public WorkbenchControlPoint(String a2atEnvPath, NegotiationStrategy negotiationStrategy) {
         this.a2atEnvPath = a2atEnvPath != null ? a2atEnvPath : StartAgentsServer.resolveEnvPath();
-        this.negotiationStrategy = negotiationStrategy != null ? negotiationStrategy
-                : new NegotiationStrategy(this.a2atEnvPath);
+        this.negotiationStrategy =
+                negotiationStrategy != null
+                        ? negotiationStrategy
+                        : new NegotiationStrategy(this.a2atEnvPath);
     }
 
     @Override
@@ -71,26 +72,38 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
         String step = request.getStepName();
         String agentName = request.getAgentName();
         String targetedMessage = buildTargetedTaskMessage(step);
-        return engineClient.sendMessage(agentName, targetedMessage)
-                .thenApply(r -> {
-                    boolean success = r.getText() != null && !r.getText().isEmpty();
-                    log.info("[onTask] Response from {}: {} chars, success={}",
-                            agentName, r.getText() != null ? r.getText().length() : 0, success);
-                    return TaskResponse.builder().success(success).output(r.getText()).build();
-                })
-                .exceptionally(e -> {
-                    log.error("[onTask] Failed for {}: {}", agentName, e.getMessage());
-                    return TaskResponse.builder()
-                            .success(false)
-                            .error("Agent call failed: " + e.getMessage())
-                            .build();
-                });
+        return engineClient
+                .sendMessage(agentName, targetedMessage)
+                .thenApply(
+                        r -> {
+                            boolean success = r.getText() != null && !r.getText().isEmpty();
+                            log.info(
+                                    "[onTask] Response from {}: {} chars, success={}",
+                                    agentName,
+                                    r.getText() != null ? r.getText().length() : 0,
+                                    success);
+                            return TaskResponse.builder()
+                                    .success(success)
+                                    .output(r.getText())
+                                    .build();
+                        })
+                .exceptionally(
+                        e -> {
+                            log.error("[onTask] Failed for {}: {}", agentName, e.getMessage());
+                            return TaskResponse.builder()
+                                    .success(false)
+                                    .error("Agent call failed: " + e.getMessage())
+                                    .build();
+                        });
     }
 
     @Override
     public CompletableFuture<TaskResponse> onSelfTask(TaskRequest request) {
         String step = request.getStepName();
-        log.info("[onSelfTask] Self-loop step={}, agent={} (local merge, no A2A-T)", step, request.getAgentName());
+        log.info(
+                "[onSelfTask] Self-loop step={}, agent={} (local merge, no A2A-T)",
+                step,
+                request.getAgentName());
         String message = request.getMessage();
         String fallback = analyzeFaultLocation(message);
         String sys = "你是SPN跨城故障协同诊断汇总专家。根据两地市OMC诊断结果，输出故障定位结论。简洁专业，中文。";
@@ -101,10 +114,12 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
     }
 
     private static String analyzeFaultLocation(String messageText) {
-        boolean hasYuedongFault = messageText.contains("粤东")
-                && (messageText.contains("故障") || messageText.contains("Down"));
-        boolean hasYuexiFault = messageText.contains("粤西")
-                && (messageText.contains("故障") || messageText.contains("Down"));
+        boolean hasYuedongFault =
+                messageText.contains("粤东")
+                        && (messageText.contains("故障") || messageText.contains("Down"));
+        boolean hasYuexiFault =
+                messageText.contains("粤西")
+                        && (messageText.contains("故障") || messageText.contains("Down"));
         if (hasYuedongFault) {
             return "汇总分析完成。故障定位：粤东地市OMC，端口Down，光功率-28dBm低于阈值。";
         }
@@ -115,10 +130,9 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
     }
 
     /**
-     * Build a targeted task message containing ONLY the parameters relevant
-     * to the target agent's city. The upstream context (which mixes both
-     * cities' info) is NOT forwarded -- each sub-agent receives a clean,
-     * self-contained task description with only its own scope.
+     * Build a targeted task message containing ONLY the parameters relevant to the target agent's
+     * city. The upstream context (which mixes both cities' info) is NOT forwarded -- each sub-agent
+     * receives a clean, self-contained task description with only its own scope.
      */
     private static String buildTargetedTaskMessage(String step) {
         return switch (step) {
@@ -129,7 +143,8 @@ public class WorkbenchControlPoint extends DefaultControlPoint {
     }
 
     private static String buildCity1Task() {
-        return """
+        return
+"""
 ## 任务
 SPN专线故障诊断 - 粤东OMC侧
 
@@ -139,11 +154,13 @@ SPN专线故障诊断 - 粤东OMC侧
 - 所属单板：line-card-03
 - 端口号：port-7
 
-请针对粤东OMC侧端口故障进行诊断。请用中文回复。""".stripIndent();
+请针对粤东OMC侧端口故障进行诊断。请用中文回复。"""
+                .stripIndent();
     }
 
     private static String buildCity2Task() {
-        return """
+        return
+"""
 ## 任务
 SPN专线故障诊断 - 粤西OMC侧
 
@@ -152,13 +169,13 @@ SPN专线故障诊断 - 粤西OMC侧
 - 确认光功率是否在正常范围
 - 确认是否存在异常告警
 
-请针对粤西OMC侧进行排查。请用中文回复。""".stripIndent();
+请针对粤西OMC侧进行排查。请用中文回复。"""
+                .stripIndent();
     }
 
     @Override
     public CompletableFuture<RouteDecision> onRoute(
-            String stepName, Map<String, Object> results,
-            List<JumpCondition> conditions) {
+            String stepName, Map<String, Object> results, List<JumpCondition> conditions) {
         // merge_analysis has an unconditional next -> endNode, so the executor
         // never calls onRoute for it. Recovery is self-triggered by SPN agents
         // via the pre-positioned Authorization-T whitelist and reported through
@@ -171,5 +188,4 @@ SPN专线故障诊断 - 粤西OMC侧
             String agentName, String negotiationText, Map<String, Object> receiveResult) {
         return negotiationStrategy.resolve(agentName, negotiationText, receiveResult);
     }
-
 }

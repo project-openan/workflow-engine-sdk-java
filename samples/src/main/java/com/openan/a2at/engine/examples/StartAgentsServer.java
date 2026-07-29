@@ -19,12 +19,13 @@
 
 package com.openan.a2at.engine.examples;
 
-import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity2Executor;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity1Executor;
+import com.openan.a2at.engine.examples.agents.SpnDomainAgentCity2Executor;
 import com.openan.a2at.engine.examples.agents.TransportWorkbenchAgentExecutor;
 import com.openan.a2at.engine.examples.server.EmbeddedA2AServer;
 import com.openan.a2at.engine.registry.RegistryClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.a2aproject.sdk.server.agentexecution.AgentExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,11 +39,11 @@ import java.util.concurrent.CountDownLatch;
 /**
  * Starts all sample A2A agents from agentcard JSON config files.
  *
- * <p>Each agent is an independent A2A server (client + server).
- * Agents register their AgentCards in the registry center on startup.
+ * <p>Each agent is an independent A2A server (client + server). Agents register their AgentCards in
+ * the registry center on startup.
  *
- * <p>Implements {@link Runnable} so it can be started in a background
- * thread by the demo, or run standalone via {@link #main}.
+ * <p>Implements {@link Runnable} so it can be started in a background thread by the demo, or run
+ * standalone via {@link #main}.
  *
  * <p>Mirrors Python: samples/start_agents_server.py
  */
@@ -80,24 +81,37 @@ public class StartAgentsServer implements Runnable {
         boolean sslVerify = false;
         String credPath = getClass().getClassLoader().getResource(CRED_FILE).getPath();
         String envPath = resolveEnvPath();
-        log.info("A2AT env file: {}", envPath != null ? envPath : "(not found, A2A-T extensions disabled)");
-        List<AgentEntry> agents = List.of(
-                loadAgent("agentcard/spn_domain_agent_city1.json", new SpnDomainAgentCity1Executor()),
-                loadAgent("agentcard/spn_domain_agent_city2.json", new SpnDomainAgentCity2Executor()),
-                loadAgent("agentcard/transport_workbench_agent.json",
-                        new TransportWorkbenchAgentExecutor(REGISTRY_URL, ORCH_URL, credPath, sslVerify, envPath))
-        );
+        log.info(
+                "A2AT env file: {}",
+                envPath != null ? envPath : "(not found, A2A-T extensions disabled)");
+        List<AgentEntry> agents =
+                List.of(
+                        loadAgent(
+                                "agentcard/spn_domain_agent_city1.json",
+                                new SpnDomainAgentCity1Executor()),
+                        loadAgent(
+                                "agentcard/spn_domain_agent_city2.json",
+                                new SpnDomainAgentCity2Executor()),
+                        loadAgent(
+                                "agentcard/transport_workbench_agent.json",
+                                new TransportWorkbenchAgentExecutor(
+                                        REGISTRY_URL, ORCH_URL, credPath, sslVerify, envPath)));
 
         for (AgentEntry entry : agents) {
             try {
-                EmbeddedA2AServer server = new EmbeddedA2AServer(
-                        entry.host, entry.port, entry.card, entry.executor);
+                EmbeddedA2AServer server =
+                        new EmbeddedA2AServer(entry.host, entry.port, entry.card, entry.executor);
                 server.start();
                 servers.add(server);
                 registerAgent(entry.card, sslVerify);
-                log.info("Started agent: {} on https://{}:{}/", entry.card.get("name"), entry.host, entry.port);
+                log.info(
+                        "Started agent: {} on https://{}:{}/",
+                        entry.card.get("name"),
+                        entry.host,
+                        entry.port);
             } catch (Exception e) {
-                log.error("Failed to start agent {}: {}", entry.card.get("name"), e.getMessage(), e);
+                log.error(
+                        "Failed to start agent {}: {}", entry.card.get("name"), e.getMessage(), e);
             }
         }
 
@@ -108,19 +122,25 @@ public class StartAgentsServer implements Runnable {
     public void stop() {
         running = false;
         log.info("Shutting down all agents...");
-        servers.forEach(s -> {
-            try { s.close(); } catch (Exception ignored) {}
-        });
+        servers.forEach(
+                s -> {
+                    try {
+                        s.close();
+                    } catch (Exception ignored) {
+                    }
+                });
         shutdownLatch.countDown();
     }
 
     @SuppressWarnings("unchecked")
-    private static AgentEntry loadAgent(String resourcePath, AgentExecutor executor) throws Exception {
+    private static AgentEntry loadAgent(String resourcePath, AgentExecutor executor)
+            throws Exception {
         String path = StartAgentsServer.class.getClassLoader().getResource(resourcePath).getPath();
         Map<String, Object> card = mapper.readValue(new java.io.File(path), Map.class);
         List<Map<String, Object>> ifaces =
                 (List<Map<String, Object>>) card.getOrDefault("supportedInterfaces", List.of());
-        String url = ifaces.isEmpty() ? "https://127.0.0.1:0" : String.valueOf(ifaces.get(0).get("url"));
+        String url =
+                ifaces.isEmpty() ? "https://127.0.0.1:0" : String.valueOf(ifaces.get(0).get("url"));
         URI uri = URI.create(url);
         String host = uri.getHost() != null ? uri.getHost() : "127.0.0.1";
         int port = uri.getPort() > 0 ? uri.getPort() : 0;
@@ -137,12 +157,13 @@ public class StartAgentsServer implements Runnable {
         }
     }
 
-    private record AgentEntry(String host, int port, Map<String, Object> card, AgentExecutor executor) {}
+    private record AgentEntry(
+            String host, int port, Map<String, Object> card, AgentExecutor executor) {}
 
     /**
-     * Resolve the A2AT {@code .env} file path. Searches classpath, then the
-     * project root (two levels up from the samples target/classes dir), then
-     * the current working directory. Returns null if not found.
+     * Resolve the A2AT {@code .env} file path. Searches classpath, then the project root (two
+     * levels up from the samples target/classes dir), then the current working directory. Returns
+     * null if not found.
      */
     public static String resolveEnvPath() {
         var url = StartAgentsServer.class.getClassLoader().getResource(A2AT_ENV_FILE);

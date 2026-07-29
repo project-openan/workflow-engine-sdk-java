@@ -20,17 +20,19 @@
 package com.openan.a2at.engine.examples.agents;
 
 import com.openan.a2at.engine.client.A2ATExtension;
+
 import net.openan.a2at.sdk.negotiation.runtime.NegotiationHandler;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Constants and helpers for the server-side negotiation flow, mirroring the
- * Python reference in orchestration-center/common/negotiation_utils.py.
+ * Constants and helpers for the server-side negotiation flow, mirroring the Python reference in
+ * orchestration-center/common/negotiation_utils.py.
  *
- * <p>Markers and key names align with the a2a-t-sdk-java negotiation payload
- * mapper (NEGOTIATION_CONTEXT_KEY / NEGOTIATION_TEXT_KEY) and the engine-side
- * NegotiationTHandler / autoNegotiate follow-up format.
+ * <p>Markers and key names align with the a2a-t-sdk-java negotiation payload mapper
+ * (NEGOTIATION_CONTEXT_KEY / NEGOTIATION_TEXT_KEY) and the engine-side NegotiationTHandler /
+ * autoNegotiate follow-up format.
  */
 final class NegotiationUtils {
 
@@ -43,6 +45,7 @@ final class NegotiationUtils {
     static final String TASK_PROMPT_KEY = A2ATExtension.TASK_T.uri();
 
     private NegotiationUtils() {}
+
     static boolean isFollowUpTask(String text) {
         return text != null && text.contains(NEGOTIATION_RESOLUTION_MARKER);
     }
@@ -94,9 +97,12 @@ final class NegotiationUtils {
 
     /** Build the [NEGOTIATION_RESOLUTION] follow-up text the client resends. */
     static String buildResolutionMessage(String originalTask, String resolutionText) {
-        return NEGOTIATION_RESOLUTION_MARKER + "\n"
+        return NEGOTIATION_RESOLUTION_MARKER
+                + "\n"
                 + "The engine has reviewed your negotiation request and provides the following clarification:\n\n"
-                + resolutionText + "\n\n---\nOriginal Task:\n" + originalTask
+                + resolutionText
+                + "\n\n---\nOriginal Task:\n"
+                + originalTask
                 + "\n\nPlease re-execute the task based on the clarification above.";
     }
 }

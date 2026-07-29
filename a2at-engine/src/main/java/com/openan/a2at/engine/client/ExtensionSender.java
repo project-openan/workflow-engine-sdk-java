@@ -26,40 +26,41 @@ import java.util.concurrent.CompletableFuture;
 /**
  * One-shot pre-positioning facade over a shared {@link A2ATransport}.
  *
- * <p>Single responsibility: send Authorization-T / Notification-T (and any
- * other one-shot extension) messages to agents <b>before</b> the workflow
- * starts. Bypasses Task-T prompt generation and the Negotiation-T auto-loop,
- * and does not emit events through the global EventCallback (the returned
- * {@link CompletableFuture} is the callback).
+ * <p>Single responsibility: send Authorization-T / Notification-T (and any other one-shot
+ * extension) messages to agents <b>before</b> the workflow starts. Bypasses Task-T prompt
+ * generation and the Negotiation-T auto-loop, and does not emit events through the global
+ * EventCallback (the returned {@link CompletableFuture} is the callback).
  *
- * <p>Kept separate from {@link WorkflowEngineClient} so a caller that only
- * wants to pre-position is not forced to hold a workflow-machinery facade.
+ * <p>Kept separate from {@link WorkflowEngineClient} so a caller that only wants to pre-position is
+ * not forced to hold a workflow-machinery facade.
  */
 public interface ExtensionSender {
 
     /**
      * Send a one-shot extension message for pre-positioning.
      *
-     * @param agentName             target agent name
-     * @param instruction           short instruction text (becomes message parts)
-     * @param naturalLanguageInput  input for SDK prompt generation
-     * @param extension             extension type (never hardcode URIs)
+     * @param agentName target agent name
+     * @param instruction short instruction text (becomes message parts)
+     * @param naturalLanguageInput input for SDK prompt generation
+     * @param extension extension type (never hardcode URIs)
      */
     CompletableFuture<SendMessageResult> sendExtensionMessage(
-            String agentName, String instruction,
-            String naturalLanguageInput, A2ATExtension extension);
+            String agentName,
+            String instruction,
+            String naturalLanguageInput,
+            A2ATExtension extension);
 
     /** Convenience for Authorization-T pre-positioning. */
     default CompletableFuture<SendMessageResult> sendAuthorization(
             String agentName, String instruction, String naturalLanguageInput) {
-        return sendExtensionMessage(agentName, instruction,
-                naturalLanguageInput, A2ATExtension.AUTHORIZATION_T);
+        return sendExtensionMessage(
+                agentName, instruction, naturalLanguageInput, A2ATExtension.AUTHORIZATION_T);
     }
 
     /** Convenience for Notification-T pre-positioning. */
     default CompletableFuture<SendMessageResult> sendNotification(
             String agentName, String instruction, String naturalLanguageInput) {
-        return sendExtensionMessage(agentName, instruction,
-                naturalLanguageInput, A2ATExtension.NOTIFICATION_T);
+        return sendExtensionMessage(
+                agentName, instruction, naturalLanguageInput, A2ATExtension.NOTIFICATION_T);
     }
 }

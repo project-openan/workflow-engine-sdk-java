@@ -19,26 +19,27 @@
 
 package com.openan.a2at.engine.client;
 
-import com.openan.a2at.engine.model.SendMessageResult;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.ExtensionCallback;
+import com.openan.a2at.engine.model.SendMessageResult;
+
 import net.openan.a2at.sdk.client.A2ATClient;
+
 import org.a2aproject.sdk.spec.AgentCard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * Negotiation-T extension handler.
  *
- * <p>Mirrors the Python SDK's {@code NegotiationTHandler}. When an agent
- * returns INPUT_REQUIRED and supports Negotiation-T, this handler calls
- * the A2ATClient to extract the negotiation context and message.
+ * <p>Mirrors the Python SDK's {@code NegotiationTHandler}. When an agent returns INPUT_REQUIRED and
+ * supports Negotiation-T, this handler calls the A2ATClient to extract the negotiation context and
+ * message.
  */
 class NegotiationTHandler implements ExtensionHandler {
 
@@ -55,8 +56,7 @@ class NegotiationTHandler implements ExtensionHandler {
             String messageText,
             Map<String, Object> metadata,
             A2ATClient a2atClient,
-            ControlPoint controlPoint
-    ) {
+            ControlPoint controlPoint) {
         return CompletableFuture.completedFuture(metadata);
     }
 
@@ -67,8 +67,7 @@ class NegotiationTHandler implements ExtensionHandler {
             A2ATClient a2atClient,
             ControlPoint controlPoint,
             ExtensionCallback extensionCallback,
-            EventCallback eventCallback
-    ) {
+            EventCallback eventCallback) {
         // Only process if ALL three conditions are met:
         //   1. a2atClient available (for receive_negotiation API)
         //   2. Agent returned INPUT_REQUIRED (wants to negotiate)
@@ -80,8 +79,10 @@ class NegotiationTHandler implements ExtensionHandler {
                 || !supportsNegotiation(agentCard)) {
             return CompletableFuture.completedFuture(result);
         }
-        Map<String, Object> metadata = result.getMetadata() != null
-                ? new HashMap<>(result.getMetadata()) : new HashMap<>();
+        Map<String, Object> metadata =
+                result.getMetadata() != null
+                        ? new HashMap<>(result.getMetadata())
+                        : new HashMap<>();
         try {
             // The negotiation context is nested under the DATA-NEGOTIATION-T key;
             // extract it before calling receiveNegotiation, which expects the
@@ -90,8 +91,8 @@ class NegotiationTHandler implements ExtensionHandler {
             if (contextMap == null) {
                 contextMap = metadata;
             }
-            Map<String, Object> receiveResult = a2atClient.receiveNegotiation(
-                    result.getText(), contextMap);
+            Map<String, Object> receiveResult =
+                    a2atClient.receiveNegotiation(result.getText(), contextMap);
             {
                 Map<String, Object> rr = receiveResult;
                 Boolean needResponse = (Boolean) rr.get("needResponse");
@@ -99,7 +100,10 @@ class NegotiationTHandler implements ExtensionHandler {
                     String negMsg = (String) rr.getOrDefault("message", "");
                     metadata.put("negotiation_message", negMsg);
                     metadata.put("negotiation_context", rr);
-                    log.info("[Negotiation-T] Agent '{}' requested negotiation: {}", getAgentName(agentCard), negMsg);
+                    log.info(
+                            "[Negotiation-T] Agent '{}' requested negotiation: {}",
+                            getAgentName(agentCard),
+                            negMsg);
                 }
             }
         } catch (Exception e) {
@@ -107,17 +111,23 @@ class NegotiationTHandler implements ExtensionHandler {
             // to direct metadata extraction. Both paths populate the
             // negotiation_message key consumed by the auto-loop.
             if (e.getMessage() != null && e.getMessage().contains("Unsupported negotiation type")) {
-                log.debug("[Negotiation-T] SDK receiveNegotiation has no handler for '{}' ({}); using direct extraction",
-                        getAgentName(agentCard), e.getMessage());
+                log.debug(
+                        "[Negotiation-T] SDK receiveNegotiation has no handler for '{}' ({}); using direct extraction",
+                        getAgentName(agentCard),
+                        e.getMessage());
             } else {
-                log.warn("[Negotiation-T] receiveNegotiation error for '{}': {}; using direct extraction",
-                        getAgentName(agentCard), e.getMessage());
+                log.warn(
+                        "[Negotiation-T] receiveNegotiation error for '{}': {}; using direct extraction",
+                        getAgentName(agentCard),
+                        e.getMessage());
             }
             String fallbackText = extractNegotiationText(metadata);
             if (fallbackText != null && !fallbackText.isEmpty()) {
                 metadata.put("negotiation_message", fallbackText);
-                log.info("[Negotiation-T] Agent '{}' requested negotiation (direct): {}",
-                        getAgentName(agentCard), fallbackText);
+                log.info(
+                        "[Negotiation-T] Agent '{}' requested negotiation (direct): {}",
+                        getAgentName(agentCard),
+                        fallbackText);
             }
         }
         result.setMetadata(metadata);
