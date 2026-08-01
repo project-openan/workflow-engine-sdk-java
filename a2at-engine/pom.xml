@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
@@ -6,16 +6,16 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.openan.a2at</groupId>
-        <artifactId>a2at-engine-java-parent</artifactId>
-        <version>1.0.0</version>
+        <groupId>dev.openan</groupId>
+        <artifactId>workflow-exec-engine-parent</artifactId>
+        <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>a2at-engine</artifactId>
+    <artifactId>workflow-exec-engine</artifactId>
     <packaging>jar</packaging>
 
-    <name>a2at-engine</name>
+    <name>workflow-exec-engine</name>
     <description>Standalone workflow execution engine for A2A-T multi-agent orchestration (Java)</description>
 
     <dependencies>
@@ -98,16 +98,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>attach-sources</id>
-                        <goals>
-                            <goal>jar-no-fork</goal>
-                        </goals>
-                    </execution>
-                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
             </plugin>
         </plugins>
     </build>
 </project>
-

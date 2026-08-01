@@ -1,16 +1,16 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.openan.a2at</groupId>
-    <artifactId>a2at-engine-java-parent</artifactId>
-    <version>1.0.0</version>
+    <groupId>dev.openan</groupId>
+    <artifactId>workflow-exec-engine-parent</artifactId>
+    <version>${revision}</version>
     <packaging>pom</packaging>
 
-    <name>a2at-engine-java-parent</name>
+    <name>workflow-exec-engine-parent</name>
     <description>A2A-T workflow execution engine for multi-agent orchestration (Java) - parent</description>
     <url>https://github.com/Zhoujie628/a2at-engine-java</url>
 
@@ -18,24 +18,28 @@
         <license>
             <name>Apache License, Version 2.0</name>
             <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
         </license>
     </licenses>
+
+    <organization>
+        <name>OpenAN</name>
+        <url>https://openan.dev</url>
+    </organization>
+
+    <developers>
+        <developer>
+            <name>Zhoujie</name>
+            <email>ivo.zhou@huawei.com</email>
+            <organization>OpenAN</organization>
+        </developer>
+    </developers>
 
     <scm>
         <connection>scm:git:git@github.com:Zhoujie628/a2at-engine-java.git</connection>
         <developerConnection>scm:git:git@github.com:Zhoujie628/a2at-engine-java.git</developerConnection>
         <url>https://github.com/Zhoujie628/a2at-engine-java</url>
     </scm>
-
-    <developers>
-        <developer>
-            <id>zhoujie628</id>
-            <name>Zhoujie</name>
-            <email>zhoujie@example.com</email>
-            <organization>OpenAN</organization>
-            <organizationUrl>https://github.com/Zhoujie628</organizationUrl>
-        </developer>
-    </developers>
 
     <modules>
         <module>a2at-engine</module>
@@ -44,6 +48,7 @@
     </modules>
 
     <properties>
+        <revision>0.0.1</revision>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <a2a.java.sdk.version>1.0.0.Beta1</a2a.java.sdk.version>
@@ -55,6 +60,10 @@
         <log4j2.version>2.24.3</log4j2.version>
         <spring-boot.version>3.3.10</spring-boot.version>
         <central.plugin.version>0.7.0</central.plugin.version>
+        <flatten.maven.plugin.version>1.6.0</flatten.maven.plugin.version>
+        <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
+        <maven.javadoc.plugin.version>3.11.2</maven.javadoc.plugin.version>
+        <maven.gpg.plugin.version>3.2.7</maven.gpg.plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -85,17 +94,38 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-source-plugin</artifactId>
-                    <version>3.3.1</version>
+                    <version>${maven.source.plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <goals>
+                                <goal>jar-no-fork</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-javadoc-plugin</artifactId>
-                    <version>3.11.2</version>
+                    <version>${maven.javadoc.plugin.version}</version>
+                    <configuration>
+                        <doclint>none</doclint>
+                        <failOnError>false</failOnError>
+                        <quiet>true</quiet>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>attach-javadocs</id>
+                            <goals>
+                                <goal>jar</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-gpg-plugin</artifactId>
-                    <version>3.2.7</version>
+                    <version>${maven.gpg.plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.sonatype.central</groupId>
@@ -106,50 +136,47 @@
         </pluginManagement>
 
         <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>${flatten.maven.plugin.version}</version>
+                <configuration>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                    <updatePomFile>true</updatePomFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
     <profiles>
-        <!-- Release profile: activate with -Prelease to sign and publish to Maven Central -->
         <profile>
             <id>release</id>
             <build>
                 <plugins>
-                    <!-- Source JAR (required by Maven Central) -->
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-source-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>attach-sources</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>jar-no-fork</goal>
-                                </goals>
-                            </execution>
-                        </executions>
                     </plugin>
-
-                    <!-- Javadoc JAR (required by Maven Central) -->
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>attach-javadocs</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>jar</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <doclint>none</doclint>
-                            <failOnError>false</failOnError>
-                        </configuration>
                     </plugin>
-
-                    <!-- GPG signing (required by Maven Central) -->
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
@@ -169,8 +196,6 @@
                             </execution>
                         </executions>
                     </plugin>
-
-                    <!-- Central Publishing Plugin -->
                     <plugin>
                         <groupId>org.sonatype.central</groupId>
                         <artifactId>central-publishing-maven-plugin</artifactId>

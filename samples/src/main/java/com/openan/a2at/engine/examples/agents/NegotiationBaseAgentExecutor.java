@@ -115,6 +115,15 @@ public abstract class NegotiationBaseAgentExecutor extends BaseAgentExecutor {
         String taskId = ctx.getTaskId();
         String contextId = ctx.getContextId();
         String input = extractText(ctx.getMessage());
+        // Read Task-T prompt from message metadata if present (mirrors Python SDK)
+        if (ctx.getMessage() != null && ctx.getMessage().metadata() != null) {
+            Object taskTPrompt = ctx.getMessage().metadata().get(NegotiationUtils.TASK_PROMPT_KEY);
+            if (taskTPrompt instanceof String taskTText
+                    && taskTText.length() > input.length()) {
+                log.info("[{}] Using Task-T prompt from message metadata", getClass().getSimpleName());
+                input = taskTText;
+            }
+        }
         log.info(
                 "[{}] Received task: taskId={}, text={} chars, followUp={}, prePositioned={}",
                 getClass().getSimpleName(),

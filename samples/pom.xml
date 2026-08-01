@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
@@ -6,30 +6,30 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.openan.a2at</groupId>
-        <artifactId>a2at-engine-java-parent</artifactId>
-        <version>1.0.0</version>
+        <groupId>dev.openan</groupId>
+        <artifactId>workflow-exec-engine-parent</artifactId>
+        <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>a2at-engine-java-samples</artifactId>
+    <artifactId>workflow-exec-engine-samples</artifactId>
     <packaging>jar</packaging>
 
-    <name>a2at-engine-java-samples</name>
+    <name>workflow-exec-engine-samples</name>
     <description>Sample applications demonstrating the A2A-T workflow execution SDK</description>
 
     <dependencies>
         <!-- The workflow execution SDK -->
         <dependency>
-            <groupId>com.openan.a2at</groupId>
-            <artifactId>a2at-engine</artifactId>
-            <version>${project.version}</version>
+            <groupId>dev.openan</groupId>
+            <artifactId>workflow-exec-engine</artifactId>
+            <version>${revision}</version>
         </dependency>
         <!-- Spring Boot starter: auto-assembles A2A server beans, partner only implements AgentExecutor -->
         <dependency>
-            <groupId>com.openan.a2at</groupId>
-            <artifactId>a2at-spring-boot-starter</artifactId>
-            <version>${project.version}</version>
+            <groupId>dev.openan</groupId>
+            <artifactId>workflow-exec-engine-spring-boot-starter</artifactId>
+            <version>${revision}</version>
         </dependency>
         <!-- Logging: Log4j2 (SLF4J 2.x binding) with console + rolling file appender -->
         <dependency>

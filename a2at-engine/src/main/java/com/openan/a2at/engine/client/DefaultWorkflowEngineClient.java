@@ -166,7 +166,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         if (!isNegotiationNeeded(result) || round > maxNegotiationRounds) {
             emit(
                     EventType.AGENT_RESPONSE,
-                    Map.of("agent", agentName, "response", result.getText()));
+                    Map.of("agent", agentName, "response", result.getText(), "metadata", result.getMetadata() != null ? result.getMetadata() : Map.of()));
             return CompletableFuture.completedFuture(result);
         }
         Map<String, Object> negMeta =
@@ -198,7 +198,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                                         "no clarification"));
                         emit(
                                 EventType.AGENT_RESPONSE,
-                                Map.of("agent", agentName, "response", result.getText()));
+                                Map.of("agent", agentName, "response", result.getText(), "metadata", result.getMetadata() != null ? result.getMetadata() : Map.of()));
                         return CompletableFuture.completedFuture(result);
                     }
                     log.info(

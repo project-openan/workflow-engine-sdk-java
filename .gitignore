@@ -14,3 +14,5 @@ verify_sdk.py
 cp.txt
 logs/
 
+
+.flattened-pom.xml
