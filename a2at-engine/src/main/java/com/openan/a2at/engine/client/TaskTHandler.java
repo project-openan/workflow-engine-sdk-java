@@ -80,7 +80,6 @@ class TaskTHandler implements ExtensionHandler {
         if (a2atClient == null) {
             return CompletableFuture.completedFuture(metadata);
         }
-        // Skip Task-T prompt generation for negotiation follow-up tasks
         if (messageText != null && messageText.contains("[NEGOTIATION_RESOLUTION]")) {
             log.info("[Task-T] Skipping prompt generation for negotiation follow-up");
             return CompletableFuture.completedFuture(metadata);
@@ -89,37 +88,40 @@ class TaskTHandler implements ExtensionHandler {
         if (taskTUri == null) {
             return CompletableFuture.completedFuture(metadata);
         }
-        // Skip if caller already pre-set the Task-T prompt in metadata
         Map<String, Object> result = metadata != null ? new HashMap<>(metadata) : new HashMap<>();
         if (result.containsKey(taskTUri)) {
             log.info("[Task-T] Metadata already preset, skipping generation");
             return CompletableFuture.completedFuture(result);
         }
-        try {
-            PromptGenerationResult promptResult = a2atClient.generateTaskPrompt(messageText);
-            if (promptResult.success()) {
-                String promptText = promptResult.promptText();
-                if (promptText != null && !promptText.isEmpty()) {
-                    result.put(taskTUri, promptText);
-                    log.info(
-                            "[Task-T] Generated prompt for '{}': {} chars",
-                            getAgentName(agentCard),
-                            promptText.length());
-                    log.debug("[Task-T] Prompt content: [{}]", promptText);
-                }
-            } else {
-                PromptGenerationFailure f = promptResult.failure();
-                log.warn(
-                        "[Task-T] Prompt generation failed for '{}': code={}, stage={}, message={}",
-                        getAgentName(agentCard),
-                        f != null ? f.code() : "unknown",
-                        f != null ? f.stage() : "unknown",
-                        f != null ? f.message() : "unknown");
-            }
-        } catch (Exception e) {
-            log.warn("[Task-T] Failed: {}", e.getMessage());
-        }
-        return CompletableFuture.completedFuture(result);
+        return CompletableFuture.supplyAsync(
+                () -> {
+                    try {
+                        PromptGenerationResult promptResult =
+                                a2atClient.generateTaskPrompt(messageText);
+                        if (promptResult.success()) {
+                            String promptText = promptResult.promptText();
+                            if (promptText != null && !promptText.isEmpty()) {
+                                result.put(taskTUri, promptText);
+                                log.info(
+                                        "[Task-T] Generated prompt for '{}': {} chars",
+                                        getAgentName(agentCard),
+                                        promptText.length());
+                                log.debug("[Task-T] Prompt content: [{}]", promptText);
+                            }
+                        } else {
+                            PromptGenerationFailure f = promptResult.failure();
+                            log.warn(
+                                    "[Task-T] Prompt generation failed for '{}': code={}, stage={}, message={}",
+                                    getAgentName(agentCard),
+                                    f != null ? f.code() : "unknown",
+                                    f != null ? f.stage() : "unknown",
+                                    f != null ? f.message() : "unknown");
+                        }
+                    } catch (Exception e) {
+                        log.warn("[Task-T] Failed: {}", e.getMessage());
+                    }
+                    return result;
+                });
     }
 
     @Override

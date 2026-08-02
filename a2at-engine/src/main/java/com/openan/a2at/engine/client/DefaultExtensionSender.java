@@ -68,33 +68,49 @@ public record DefaultExtensionSender(A2ATransport transport)
             return CompletableFuture.failedFuture(
                     new RuntimeException("Agent not found: " + agentName));
         }
-        String metadataValue = generateExtensionPrompt(extension, naturalLanguageInput);
-        if (metadataValue == null || metadataValue.isEmpty()) {
-            metadataValue = naturalLanguageInput;
-            log.info(
-                    "[ExtensionSender] SDK prompt generation unavailable for {} ({}), using input as metadata",
-                    agentName,
-                    extension.displayName());
-        }
-        log.info(
-                "[ExtensionSender] sendExtensionMessage to {}: extension={}, metadataValue={} chars",
-                agentName,
-                extension.displayName(),
-                metadataValue.length());
-        Map<String, Object> metadata = Map.of(extension.uri(), metadataValue);
-        if (extension == A2ATExtension.NOTIFICATION_T) {
-            return transport.sendNotificationStream(
-                    agentCard, agentName, instruction, transport.getContextId(), metadata, null);
-        }
-        return transport
-                .send(agentCard, agentName, instruction, transport.getContextId(), metadata, null)
-                .thenApply(
-                        result -> {
+        return CompletableFuture.supplyAsync(
+                        () -> generateExtensionPrompt(extension, naturalLanguageInput))
+                .thenCompose(
+                        metadataValue -> {
+                            String value = metadataValue;
+                            if (value == null || value.isEmpty()) {
+                                value = naturalLanguageInput;
+                                log.info(
+                                        "[ExtensionSender] SDK prompt generation unavailable for {} ({}), using input as metadata",
+                                        agentName,
+                                        extension.displayName());
+                            }
                             log.info(
-                                    "[ExtensionSender] Extension response from {}: state={}",
+                                    "[ExtensionSender] sendExtensionMessage to {}: extension={}, metadataValue={} chars",
                                     agentName,
-                                    result.getTaskState());
-                            return result;
+                                    extension.displayName(),
+                                    value.length());
+                            Map<String, Object> metadata = Map.of(extension.uri(), value);
+                            if (extension == A2ATExtension.NOTIFICATION_T) {
+                                return transport.sendNotificationStream(
+                                        agentCard,
+                                        agentName,
+                                        instruction,
+                                        transport.getContextId(),
+                                        metadata,
+                                        null);
+                            }
+                            return transport
+                                    .send(
+                                            agentCard,
+                                            agentName,
+                                            instruction,
+                                            transport.getContextId(),
+                                            metadata,
+                                            null)
+                                    .thenApply(
+                                            result -> {
+                                                log.info(
+                                                        "[ExtensionSender] Extension response from {}: state={}",
+                                                        agentName,
+                                                        result.getTaskState());
+                                                return result;
+                                            });
                         });
     }
 
@@ -110,21 +126,37 @@ public record DefaultExtensionSender(A2ATransport transport)
             return CompletableFuture.failedFuture(
                     new RuntimeException("Agent not found: " + agentName));
         }
-        String metadataValue = generateExtensionPrompt(A2ATExtension.NOTIFICATION_T, naturalLanguageInput);
-        if (metadataValue == null || metadataValue.isEmpty()) {
-            metadataValue = naturalLanguageInput;
-        }
-        Map<String, Object> metadata = Map.of(A2ATExtension.NOTIFICATION_T.uri(), metadataValue);
-        Consumer<ClientEvent> eventSink = eventCallback != null
-                ? event -> forwardNotificationEvent(event, agentName, eventCallback)
-                : null;
-        log.info(
-                "[ExtensionSender] sendNotification to {}: metadataValue={} chars, callback={}",
-                agentName,
-                metadataValue.length(),
-                eventCallback != null);
-        return transport.sendNotificationStream(
-                agentCard, agentName, instruction, transport.getContextId(), metadata, eventSink);
+        return CompletableFuture.supplyAsync(
+                        () ->
+                                generateExtensionPrompt(
+                                        A2ATExtension.NOTIFICATION_T, naturalLanguageInput))
+                .thenCompose(
+                        metadataValue -> {
+                            String value = metadataValue;
+                            if (value == null || value.isEmpty()) {
+                                value = naturalLanguageInput;
+                            }
+                            Map<String, Object> metadata =
+                                    Map.of(A2ATExtension.NOTIFICATION_T.uri(), value);
+                            Consumer<ClientEvent> eventSink =
+                                    eventCallback != null
+                                            ? event ->
+                                                    forwardNotificationEvent(
+                                                            event, agentName, eventCallback)
+                                            : null;
+                            log.info(
+                                    "[ExtensionSender] sendNotification to {}: metadataValue={} chars, callback={}",
+                                    agentName,
+                                    value.length(),
+                                    eventCallback != null);
+                            return transport.sendNotificationStream(
+                                    agentCard,
+                                    agentName,
+                                    instruction,
+                                    transport.getContextId(),
+                                    metadata,
+                                    eventSink);
+                        });
     }
 
     private void forwardNotificationEvent(

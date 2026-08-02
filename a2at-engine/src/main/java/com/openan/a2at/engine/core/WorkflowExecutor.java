@@ -204,8 +204,16 @@ public class WorkflowExecutor {
         }
         if (readySteps.isEmpty()) {
             if (!deferredSteps.isEmpty()) {
-                return CompletableFuture.completedFuture(null)
-                        .thenComposeAsync(v -> executeSteps(pending, executed, failed, deferCount));
+                return CompletableFuture.runAsync(
+                                () -> {
+                                    try {
+                                        Thread.sleep(50);
+                                    } catch (InterruptedException e) {
+                                        Thread.currentThread().interrupt();
+                                    }
+                                })
+                        .thenCompose(
+                                v -> executeSteps(pending, executed, failed, deferCount));
             }
             return CompletableFuture.completedFuture(null);
         }

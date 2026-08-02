@@ -221,72 +221,81 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
                                     + "\n\n---\nOriginal Task:\n"
                                     + originalMessage
                                     + "\n\nPlease re-execute the task based on the clarification above.";
-                    Map<String, Object> followUpMeta =
-                            buildNegotiationFollowUpMeta(agentName, negMeta, clarification);
-                    return runBeforeSendHandlers(agentCard, followUp, followUpMeta)
+                    return buildNegotiationFollowUpMeta(agentName, negMeta, clarification)
                             .thenCompose(
-                                    meta -> {
-                                        String ctx =
-                                                contextId != null
-                                                        ? contextId
-                                                        : transport.getContextId();
-                                        return transport
-                                                .send(
-                                                        agentCard,
-                                                        agentName,
-                                                        followUp,
-                                                        ctx,
-                                                        meta,
-                                                        event ->
-                                                                forwardIntermediateEvent(
-                                                                        event, agentName))
-                                                .thenCompose(
-                                                        r -> runAfterReceiveHandlers(agentCard, r))
-                                                .thenCompose(
-                                                        r ->
-                                                                autoNegotiate(
-                                                                        agentCard,
-                                                                        agentName,
-                                                                        originalMessage,
-                                                                        contextId,
-                                                                        r,
-                                                                        round + 1));
-                                    });
+                                    followUpMeta ->
+                                            runBeforeSendHandlers(agentCard, followUp, followUpMeta)
+                                                    .thenCompose(
+                                                            meta -> {
+                                                                String ctx =
+                                                                        contextId != null
+                                                                                ? contextId
+                                                                                : transport.getContextId();
+                                                                return transport
+                                                                        .send(
+                                                                                agentCard,
+                                                                                agentName,
+                                                                                followUp,
+                                                                                ctx,
+                                                                                meta,
+                                                                                event ->
+                                                                                        forwardIntermediateEvent(
+                                                                                                event, agentName))
+                                                                        .thenCompose(
+                                                                                r -> runAfterReceiveHandlers(agentCard, r))
+                                                                        .thenCompose(
+                                                                                r ->
+                                                                                        autoNegotiate(
+                                                                                                agentCard,
+                                                                                                agentName,
+                                                                                                originalMessage,
+                                                                                                contextId,
+                                                                                                r,
+                                                                                                round + 1));
+                                                            }));
                 });
     }
 
-    private Map<String, Object> buildNegotiationFollowUpMeta(
+    private CompletableFuture<Map<String, Object>> buildNegotiationFollowUpMeta(
             String agentName, Map<String, Object> negMeta, String clarification) {
         A2ATClient a2atClient = transport.getA2atClient();
-        if (a2atClient != null) {
-            try {
-                Object ctxObj = negMeta.get("negotiation_context");
-                if (ctxObj instanceof Map<?, ?> rr) {
-                    Object innerCtx = rr.get("context");
-                    if (innerCtx instanceof Map<?, ?> contextMap) {
-                        @SuppressWarnings("unchecked")
-                        NegotiationContext context =
-                                NegotiationPayloadMapper.contextFromMap(
-                                        (Map<String, Object>) contextMap);
-                        Map<String, Object> payload =
-                                a2atClient.continueNegotiation(
-                                        context, NegotiationStatus.AGREED, clarification);
-                        log.info(
-                                "[Negotiation] SDK continueNegotiation payload for '{}': round {} -> AGREED",
-                                agentName,
-                                context.round());
-                        return new HashMap<>(payload);
-                    }
-                }
-            } catch (Exception e) {
-                log.warn(
-                        "[Negotiation] continueNegotiation failed for '{}': {}; using fallback",
-                        agentName,
-                        e.getMessage());
-            }
+        if (a2atClient == null) {
+            return CompletableFuture.completedFuture(buildFallbackMeta(clarification));
         }
+        return CompletableFuture.supplyAsync(
+                () -> {
+                    try {
+                        Object ctxObj = negMeta.get("negotiation_context");
+                        if (ctxObj instanceof Map<?, ?> rr) {
+                            Object innerCtx = rr.get("context");
+                            if (innerCtx instanceof Map<?, ?> contextMap) {
+                                @SuppressWarnings("unchecked")
+                                NegotiationContext context =
+                                        NegotiationPayloadMapper.contextFromMap(
+                                                (Map<String, Object>) contextMap);
+                                Map<String, Object> payload =
+                                        a2atClient.continueNegotiation(
+                                                context, NegotiationStatus.AGREED, clarification);
+                                log.info(
+                                        "[Negotiation] SDK continueNegotiation payload for '{}': round {} -> AGREED",
+                                        agentName,
+                                        context.round());
+                                return new HashMap<>(payload);
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn(
+                                "[Negotiation] continueNegotiation failed for '{}': {}; using fallback",
+                                agentName,
+                                e.getMessage());
+                    }
+                    return buildFallbackMeta(clarification);
+                });
+    }
+
+    private static Map<String, Object> buildFallbackMeta(String clarification) {
         Map<String, Object> meta = new HashMap<>();
-       meta.put(
+        meta.put(
                 A2ATExtension.NEGOTIATION_T.uri(),
                 "## Data Return Confirmation\n" + clarification + "\n");
         return meta;

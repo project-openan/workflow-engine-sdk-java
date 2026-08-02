@@ -113,69 +113,62 @@ class NegotiationTHandler implements ExtensionHandler {
             ControlPoint controlPoint,
             ExtensionCallback extensionCallback,
             EventCallback eventCallback) {
-        // Only process if ALL three conditions are met:
-        //   1. a2atClient available (for receive_negotiation API)
-        //   2. Agent returned INPUT_REQUIRED (wants to negotiate)
-        //   3. AgentCard declares Negotiation-T extension
-        // Otherwise pass through unchanged.
         if (a2atClient == null
                 || result.getTaskState() == null
                 || !result.getTaskState().contains("INPUT_REQUIRED")
                 || !supportsNegotiation(agentCard)) {
             return CompletableFuture.completedFuture(result);
         }
-        Map<String, Object> metadata =
-                result.getMetadata() != null
-                        ? new HashMap<>(result.getMetadata())
-                        : new HashMap<>();
-        try {
-            // The negotiation context is nested under the DATA-NEGOTIATION-T key;
-            // extract it before calling receiveNegotiation, which expects the
-            // context map directly.
-            Map<String, Object> contextMap = extractNegotiationContext(metadata);
-            if (contextMap == null) {
-                contextMap = metadata;
-            }
-            Map<String, Object> receiveResult =
-                    a2atClient.receiveNegotiation(result.getText(), contextMap);
-            {
-                Map<String, Object> rr = receiveResult;
-                Boolean needResponse = (Boolean) rr.get("needResponse");
-                if (Boolean.TRUE.equals(needResponse)) {
-                    String negMsg = (String) rr.getOrDefault("message", "");
-                    metadata.put("negotiation_message", negMsg);
-                    metadata.put("negotiation_context", rr);
-                    log.info(
-                            "[Negotiation-T] Agent '{}' requested negotiation: {}",
-                            getAgentName(agentCard),
-                            negMsg);
-                }
-            }
-        } catch (Exception e) {
-            // When the SDK has no handler for the negotiation type, fall back
-            // to direct metadata extraction. Both paths populate the
-            // negotiation_message key consumed by the auto-loop.
-            if (e.getMessage() != null && e.getMessage().contains("Unsupported negotiation type")) {
-                log.debug(
-                        "[Negotiation-T] SDK receiveNegotiation has no handler for '{}' ({}); using direct extraction",
-                        getAgentName(agentCard),
-                        e.getMessage());
-            } else {
-                log.warn(
-                        "[Negotiation-T] receiveNegotiation error for '{}': {}; using direct extraction",
-                        getAgentName(agentCard),
-                        e.getMessage());
-            }
-            String fallbackText = extractNegotiationText(metadata);
-            if (fallbackText != null && !fallbackText.isEmpty()) {
-                metadata.put("negotiation_message", fallbackText);
-                log.info(
-                        "[Negotiation-T] Agent '{}' requested negotiation (direct): {}",
-                        getAgentName(agentCard),
-                        fallbackText);
-            }
-        }
-        result.setMetadata(metadata);
-        return CompletableFuture.completedFuture(result);
+        return CompletableFuture.supplyAsync(
+                () -> {
+                    Map<String, Object> metadata =
+                            result.getMetadata() != null
+                                    ? new HashMap<>(result.getMetadata())
+                                    : new HashMap<>();
+                    try {
+                        Map<String, Object> contextMap = extractNegotiationContext(metadata);
+                        if (contextMap == null) {
+                            contextMap = metadata;
+                        }
+                        Map<String, Object> receiveResult =
+                                a2atClient.receiveNegotiation(result.getText(), contextMap);
+                        {
+                            Map<String, Object> rr = receiveResult;
+                            Boolean needResponse = (Boolean) rr.get("needResponse");
+                            if (Boolean.TRUE.equals(needResponse)) {
+                                String negMsg = (String) rr.getOrDefault("message", "");
+                                metadata.put("negotiation_message", negMsg);
+                                metadata.put("negotiation_context", rr);
+                                log.info(
+                                        "[Negotiation-T] Agent '{}' requested negotiation: {}",
+                                        getAgentName(agentCard),
+                                        negMsg);
+                            }
+                        }
+                    } catch (Exception e) {
+                        if (e.getMessage() != null
+                                && e.getMessage().contains("Unsupported negotiation type")) {
+                            log.debug(
+                                    "[Negotiation-T] SDK receiveNegotiation has no handler for '{}' ({}); using direct extraction",
+                                    getAgentName(agentCard),
+                                    e.getMessage());
+                        } else {
+                            log.warn(
+                                    "[Negotiation-T] receiveNegotiation error for '{}': {}; using direct extraction",
+                                    getAgentName(agentCard),
+                                    e.getMessage());
+                        }
+                        String fallbackText = extractNegotiationText(metadata);
+                        if (fallbackText != null && !fallbackText.isEmpty()) {
+                            metadata.put("negotiation_message", fallbackText);
+                            log.info(
+                                    "[Negotiation-T] Agent '{}' requested negotiation (direct): {}",
+                                    getAgentName(agentCard),
+                                    fallbackText);
+                        }
+                    }
+                    result.setMetadata(metadata);
+                    return result;
+                });
     }
 }
