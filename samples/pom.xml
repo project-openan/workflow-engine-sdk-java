@@ -6,29 +6,29 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>io.github.zhoujie628</groupId>
+        <groupId>dev.openan.workflow.sdk</groupId>
         <artifactId>workflow-exec-engine-parent</artifactId>
         <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>workflow-exec-engine-samples</artifactId>
+    <artifactId>engine-sdk-samples</artifactId>
     <packaging>jar</packaging>
 
-    <name>workflow-exec-engine-samples</name>
+    <name>engine-sdk-samples</name>
     <description>Sample applications demonstrating the A2A-T workflow execution SDK</description>
 
     <dependencies>
         <!-- The workflow execution SDK -->
         <dependency>
-            <groupId>io.github.zhoujie628</groupId>
-            <artifactId>workflow-exec-engine</artifactId>
+            <groupId>dev.openan.workflow.sdk</groupId>
+            <artifactId>engine-sdk</artifactId>
             <version>${revision}</version>
         </dependency>
         <!-- Spring Boot starter: auto-assembles A2A server beans, partner only implements AgentExecutor -->
         <dependency>
-            <groupId>io.github.zhoujie628</groupId>
-            <artifactId>workflow-exec-engine-spring-boot-starter</artifactId>
+            <groupId>dev.openan.workflow.sdk</groupId>
+            <artifactId>engine-sdk-spring-boot-starter</artifactId>
             <version>${revision}</version>
         </dependency>
         <!-- Logging: Log4j2 (SLF4J 2.x binding) with console + rolling file appender -->

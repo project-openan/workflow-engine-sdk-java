@@ -159,7 +159,7 @@ public class ExecutePsop {
                 lang,
                 null,
                 null,
-                false,
+                true,
                 null,
                 a2aClientRuntime,
                 eventCallback,

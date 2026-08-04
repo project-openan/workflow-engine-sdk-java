@@ -6,13 +6,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>io.github.zhoujie628</groupId>
+        <groupId>dev.openan.workflow.sdk</groupId>
         <artifactId>workflow-exec-engine-parent</artifactId>
         <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>workflow-exec-engine-spring-boot-starter</artifactId>
+    <artifactId>engine-sdk-spring-boot-starter</artifactId>
     <packaging>jar</packaging>
 
     <name>workflow-exec-engine-spring-boot-starter</name>
@@ -24,8 +24,8 @@
 
     <dependencies>
         <dependency>
-            <groupId>io.github.zhoujie628</groupId>
-            <artifactId>workflow-exec-engine</artifactId>
+            <groupId>dev.openan.workflow.sdk</groupId>
+            <artifactId>engine-sdk</artifactId>
             <version>${revision}</version>
         </dependency>
 

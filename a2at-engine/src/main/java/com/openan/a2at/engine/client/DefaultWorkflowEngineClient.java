@@ -22,6 +22,7 @@ package com.openan.a2at.engine.client;
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
 import com.openan.a2at.engine.control.EventType;
+import com.openan.a2at.engine.control.ExtensionCallback;
 import com.openan.a2at.engine.model.SendMessageResult;
 
 import net.openan.a2at.sdk.client.A2ATClient;
@@ -63,7 +64,7 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     private final int maxNegotiationRounds;
     private EventCallback eventCallback = new EventCallback();
     private ControlPoint controlPoint;
-    private com.openan.a2at.engine.control.ExtensionCallback extensionCallback;
+    private ExtensionCallback extensionCallback;
 
     public DefaultWorkflowEngineClient(
             A2ATransport transport,
@@ -103,6 +104,11 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
     @Override
     public void setEventCallback(EventCallback callback) {
         this.eventCallback = callback != null ? callback : new EventCallback();
+    }
+
+    @Override
+    public void setExtensionCallback(ExtensionCallback callback) {
+        this.extensionCallback = callback;
     }
 
     // ------------------------------------------------------------------

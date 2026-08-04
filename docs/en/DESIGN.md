@@ -32,7 +32,6 @@ The guiding principle is a clean separation between **mechanics the SDK owns** a
 The SDK is structured in four layers. Each layer builds on the one below; each has a single responsibility and a clear
 entry point.
 
-```
 ```mermaid
 graph TD
     L2["Layer 2 - Orchestration<br/>execute_psop / ExecutePsop<br/>lifecycle, event stream, cancellation, onFinish persistence"]
@@ -42,7 +41,6 @@ graph TD
 
     L2 --> L1 --> L0
     L0 -.-> F
-```
 ```
 
 ### 2.1 Layer 0 - Communication
@@ -170,7 +168,6 @@ lands upstream.
 
 ### 4.3 Extension handler chain
 
-```
 ```mermaid
 graph TD
     SM["sendMessage(agent, message)"]
@@ -180,7 +177,6 @@ graph TD
     AN["auto_negotiate loop (if INPUT_REQUIRED)"]
 
     SM --> BS --> TS --> AR --> AN
-```
 ```
 
 `ExtensionRegistry.getHandlersForExtensions` matches an agent's declared extension URIs against handler keywords
@@ -225,7 +221,6 @@ Events are emitted to an optional `EventCallback` as stable string types (`Event
 
 ### 7.1 Workflow execution with negotiation
 
-```
 ```mermaid
 sequenceDiagram
     participant H as Host
@@ -246,11 +241,9 @@ sequenceDiagram
     C->>E: final result
     E->>H: ExecutionResult
 ```
-```
 
 ### 7.2 Pre-positioning authorization
 
-```
 ```mermaid
 sequenceDiagram
     participant H as Host
@@ -266,11 +259,9 @@ sequenceDiagram
     T-->>ES: auth result
     ES-->>H: result
 ```
-```
 
 ### 7.3 Notification subscription
 
-```
 ```mermaid
 sequenceDiagram
     participant H as Host
@@ -285,7 +276,6 @@ sequenceDiagram
     T-->>ES: first event -> future
     ES-->>H: result
     Note over T,A: later results stream back over the same connection
-```
 ```
 
 ---

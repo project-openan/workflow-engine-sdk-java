@@ -5,7 +5,7 @@
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.github.zhoujie628</groupId>
+    <groupId>dev.openan.workflow.sdk</groupId>
     <artifactId>workflow-exec-engine-parent</artifactId>
     <version>${revision}</version>
     <packaging>pom</packaging>
@@ -48,7 +48,7 @@
     </modules>
 
     <properties>
-        <revision>0.0.1</revision>
+        <revision>1.0.0</revision>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <a2a.java.sdk.version>1.0.0.Beta1</a2a.java.sdk.version>

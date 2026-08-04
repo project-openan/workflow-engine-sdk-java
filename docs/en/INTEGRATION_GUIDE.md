@@ -20,8 +20,8 @@ Negotiation-T auto-loop, authentication, TLS). You focus on business decisions o
 ```xml
 
 <dependency>
-    <groupId>com.openan.a2at</groupId>
-    <artifactId>a2at-engine</artifactId>
+    <groupId>dev.openan.workflow.sdk</groupId>
+    <artifactId>engine-sdk</artifactId>
 <version>1.0.0</version>
 </dependency>
 ```
@@ -82,7 +82,7 @@ AgentCard card = mapper.readValue(
         new File("agentcard/my_agent.json"), AgentCard.class);
 
 // Option B: From Registry Center
-RegistryClient registry = new RegistryClient("https://127.0.0.1:5001", false);
+RegistryClient registry = new RegistryClient("https://127.0.0.1:5000", false);
 List<Map<String, Object>> cards = registry.fetchAgentCards();
 ```
 
@@ -139,10 +139,9 @@ public class MyControlPoint extends DefaultControlPoint {
 | `onRoute`         | After step completes, before next step    | Pick the next step from candidates               |
 | `onNegotiation`   | Agent returns `INPUT_REQUIRED`            | Return clarification text                        |
 
-`onNegotiation` defaults to a generic clarification. Override only what you need. Authorization and notification
-reactive hooks (`onAuthorization` / `onNotification`) live on the `ExtensionCallback` interface, not on `ControlPoint`.
-To customize authorization approval or notification handling, implement `ExtensionCallback` and attach it via
-`engineClient.setExtensionCallback()`.
+`onNegotiation` defaults to a generic clarification. Override only what you need.
+
+**Pre-positioning (Authorization-T / Notification-T)**: These are one-shot operations sent via `ExtensionSender` before the workflow starts. The send result is returned directly as a `SendMessageResult` -- no separate callback interface is needed. The `ExtensionCallback` interface (`onAuthorization` / `onNotification`) is an extension point for custom inline handlers that you register manually via `customHandlers` in the config.
 
 **Self-loop steps (SelfLoop)**: When a step is the workflow-executing agent's own task (e.g. merging multiple agents'
 diagnostic results), set `stepType` to `SELF_LOOP`. The engine calls `onSelfTask` locally instead of sending an A2A-T
@@ -244,10 +243,10 @@ A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```bash
 # Option 1: set env var first
 set A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
-java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123"
+java -cp engine-sdk.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123"
 
 # Option 2: pass key as second argument
-java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+java -cp engine-sdk.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```
 
 Output:
@@ -409,12 +408,10 @@ Before the workflow starts, send a whitelist authorization strategy to SPN agent
 
 ```java
 ExtensionSender sender = new DefaultExtensionSender(transport);
-sender.
-
-sendAuthorization(
+sender.sendAuthorization(
     "SPN Domain Agent",
-            "Authorization-T pre-positioning",
-            "Task type: new authorization, operation: service recovery, ..."
+    "Authorization-T pre-positioning",
+    "Task type: new authorization, operation: service recovery, ..."
 );
 ```
 
@@ -461,11 +458,8 @@ notification channel.
 .sslVerify(false)
 
 // Production: enable verification + custom CA certs
-.
-
-sslVerify(true).
-
-caCertsPath("/path/to/ca-certs.pem")
+.sslVerify(true)
+.caCertsPath("/path/to/ca-certs.pem")
 ```
 
 ## 9. Logging
@@ -501,13 +495,9 @@ EventCallback callback = new EventCallback() {
     }
 };
 
-ExecutePsop.
-
-builder()
-    .
-
-eventCallback(callback)
-// ...
+ExecutePsop.builder()
+    .eventCallback(callback)
+    // ...
 ```
 
 Common event types: `STEP_START`, `STEP_COMPLETE`, `AGENT_REQUEST`,
@@ -560,12 +550,8 @@ Register via config:
 
 ```java
 WorkflowEngineClientConfig.builder()
-    .
-
-customHandlers(List.of(new MyExtensionHandler()))
-        .
-
-build();
+    .customHandlers(List.of(new MyExtensionHandler()))
+    .build();
 ```
 
 ## 13. Interface Reference

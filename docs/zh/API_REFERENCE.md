@@ -133,13 +133,22 @@ public interface ExtensionSender {
 
 | 参数                   | 类型            | 说明                                |
 |------------------------|-----------------|-------------------------------------|
-| `agentName`            | `String`        | 目标智能体名称                      |
-| `instruction`          | `String`        | 简短指令文本（成为 `parts[].text`） |
-| `naturalLanguageInput` | `String`        | SDK 提示词生成的自然语言输入        |
+| `agentName`            | `String`        | 目标智能体名称（须匹配 `AgentCard.name`） |
+| `instruction`          | `String`        | 简短指令文本；成为 A2A 消息体的 `parts[].text` |
+| `naturalLanguageInput` | `String`        | 自然语言输入，传给 A2A-T SDK 生成结构化扩展提示词。生成的值放入消息 `metadata` 中对应扩展 URI 键下（如 `https://.../Authorization-T/v1`）。SDK 不可用时回退为此文本 |
 | `extension`            | `A2ATExtension` | 扩展枚举（勿硬编码 URI）            |
 | `eventCallback`        | `Consumer<Map<String, Object>>` | 可选 SSE 事件回调（`sendNotification` 专用）。OMC 后续推送的抢通结果通过此回调实时接收，回调 Map 含 `agent`、`text`、`metadata`、`state`。不传（null）时后续事件被丢弃 |
 
-metadata 值由 A2A-T SDK 生成；SDK 不可用时回退为原始自然语言输入。
+**报文格式**：发送给智能体的 A2A 消息结构为 `parts[].text = instruction`，`metadata = { "<扩展URI>": "<SDK生成的结构化提示词>" }`。以 Authorization-T 为例：
+
+```json
+{
+  "parts": [{"text": "授权诊断操作"}],
+  "metadata": {
+    "https://projects.tmforum.org/a2aproject/telecommunication/extensions/Authorization-T/v1": "<结构化授权策略>"
+  }
+}
+```
 
 ### WorkflowEngineClientConfig
 
@@ -197,6 +206,7 @@ public interface ExtensionHandler {
     CompletableFuture<SendMessageResult> afterReceive(
             AgentCard agentCard, SendMessageResult result,
             A2ATClient a2atClient, ControlPoint controlPoint,
+            ExtensionCallback extensionCallback,
             EventCallback eventCallback);
 }
 ```
@@ -270,7 +280,10 @@ public interface ControlPoint {
 
 ### ExtensionCallback
 
-响应式钩子接口，用于处理智能体推送的 A2A-T 扩展数据。与 `ControlPoint` 分离：`ControlPoint` 驱动工作流前进（由执行器调用），`ExtensionCallback` 响应对端主动推送的授权请求和通知（由扩展处理器调用）。
+自定义内联处理器的扩展点，用于处理智能体推送的 A2A-T 扩展数据。
+Authorization-T 和 Notification-T 是前置操作（工作流开始前通过 `ExtensionSender` 发送），
+其结果直接通过 `SendMessageResult` 返回。此接口适用于高级场景：当你通过配置中的 `customHandlers`
+注册了自定义 `ExtensionHandler` 实现时使用。
 
 ```java
 public abstract class ExtensionCallback {
@@ -286,8 +299,8 @@ public abstract class ExtensionCallback {
 
 | 方法              | 触发时机                               | 返回值                        |
 |-------------------|----------------------------------------|-------------------------------|
-| `onAuthorization` | 智能体在 Task-T 响应中携带 Authorization-T | `Boolean`（true=通过）        |
-| `onNotification`  | 智能体在 Task-T 响应中携带 Notification-T | `Void`                        |
+| `onAuthorization` | 自定义处理器检测到响应中的 Authorization-T | `Boolean`（true=通过）        |
+| `onNotification`  | 自定义处理器检测到响应中的 Notification-T  | `Void`                        |
 
 挂载方式：
 
@@ -307,7 +320,7 @@ engineClient.setExtensionCallback(new ExtensionCallback() {
 });
 ```
 
-> 注意：通过 `ExtensionSender.sendNotification` 建立的 SSE 长连接，其后续推送的抢通结果通过回调 `Consumer<Map<String, Object>>` 接收，不经过 `onNotification`。后者仅在智能体于 `sendMessage` 响应中主动附带 Notification-T 时触发。
+> 注意：通过 `ExtensionSender.sendNotification` 建立的 SSE 长连接，其后续推送的抢通结果通过回调 `Consumer<Map<String, Object>>` 接收，不经过 `onNotification`。
 
 ### EventCallback
 
@@ -382,7 +395,7 @@ POST `/api/v1/orchestrate/search`。返回按自然语言意图匹配的工作�
 从注册中心获取和注册 AgentCard。
 
 ```java
-new RegistryClient("https://127.0.0.1:5001",false)
+new RegistryClient("https://127.0.0.1:5000",false)
 
 List<Map<String, Object>> fetchAgentCards()
 

@@ -6,13 +6,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>io.github.zhoujie628</groupId>
+        <groupId>dev.openan.workflow.sdk</groupId>
         <artifactId>workflow-exec-engine-parent</artifactId>
         <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>workflow-exec-engine</artifactId>
+    <artifactId>engine-sdk</artifactId>
     <packaging>jar</packaging>
 
     <name>workflow-exec-engine</name>

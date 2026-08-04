@@ -142,7 +142,6 @@ Notification-T 载荷时触发。
 
 ### 4.3 扩展处理器链
 
-```
 ```mermaid
 graph TD
     SM["sendMessage(agent, message)"]
@@ -152,7 +151,6 @@ graph TD
     AN["auto_negotiate 循环（如果 INPUT_REQUIRED）"]
 
     SM --> BS --> TS --> AR --> AN
-```
 ```
 
 `ExtensionRegistry.getHandlersForExtensions` 将智能体声明的扩展 URI 与处理器关键字
@@ -193,7 +191,6 @@ graph TD
 
 ### 7.1 带协商的工作流执行
 
-```
 ```mermaid
 sequenceDiagram
     participant H as 宿主
@@ -214,11 +211,9 @@ sequenceDiagram
     C->>E: final result
     E->>H: ExecutionResult
 ```
-```
 
 ### 7.2 前置下发授权
 
-```
 ```mermaid
 sequenceDiagram
     participant H as 宿主
@@ -234,11 +229,9 @@ sequenceDiagram
     T-->>ES: auth result
     ES-->>H: result
 ```
-```
 
 ### 7.3 Notification 订阅
 
-```
 ```mermaid
 sequenceDiagram
     participant H as 宿主
@@ -253,7 +246,6 @@ sequenceDiagram
     T-->>ES: first event -> future
     ES-->>H: result
     Note over T,A: 后续结果通过同一连接流回
-```
 ```
 
 ---

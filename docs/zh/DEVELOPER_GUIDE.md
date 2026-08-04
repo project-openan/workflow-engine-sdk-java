@@ -8,8 +8,8 @@
 
 ```xml
 <dependency>
-    <groupId>com.openan.a2at</groupId>
-    <artifactId>a2at-engine</artifactId>
+    <groupId>dev.openan.workflow.sdk</groupId>
+    <artifactId>engine-sdk</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
@@ -55,7 +55,6 @@ public class MyControlPoint implements ControlPoint {
 ```
 
 `onAuthorization` 和 `onNotification` 有默认实现。
-`onNegotiation` 有默认实现，返回通用澄清文本。
 `onNegotiation` 有默认实现，返回通用澄清文本。授权和通知的响应钩子 (`onAuthorization` / `onNotification`) 位于 `ExtensionCallback` 接口，不在 `ControlPoint` 上。
 
 ## 4. 通过 Builder 执行（推荐）
@@ -238,7 +237,7 @@ WorkflowEngineClientConfig config = WorkflowEngineClientConfig.builder()
 
 ```ini
 A2AT_LLM_PROVIDER=openai
-A2AT_LLM_MODEL=deepseek-v4-flash
+A2AT_LLM_MODEL=deepseek-chat
 A2AT_LLM_API_KEY=sk-...
 A2AT_LLM_BASE_URL=https://api.deepseek.com
 A2AT_LANGUAGE=zh-CN

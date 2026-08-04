@@ -21,6 +21,7 @@ package com.openan.a2at.engine.client;
 
 import com.openan.a2at.engine.control.ControlPoint;
 import com.openan.a2at.engine.control.EventCallback;
+import com.openan.a2at.engine.control.ExtensionCallback;
 import com.openan.a2at.engine.model.SendMessageResult;
 
 import java.util.Map;
@@ -70,6 +71,8 @@ public interface WorkflowEngineClient {
     void setControlPoint(ControlPoint controlPoint);
 
     void setEventCallback(EventCallback callback);
+
+    void setExtensionCallback(ExtensionCallback callback);
 
     void close();
 }

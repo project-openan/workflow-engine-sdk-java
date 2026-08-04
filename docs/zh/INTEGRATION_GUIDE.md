@@ -18,8 +18,8 @@ A2A-T 工作流执行引擎是一个 Java SDK，用于基于 A2A 协议和 A2A-T
 ```xml
 
 <dependency>
-    <groupId>com.openan.a2at</groupId>
-    <artifactId>a2at-engine</artifactId>
+    <groupId>dev.openan.workflow.sdk</groupId>
+    <artifactId>engine-sdk</artifactId>
 <version>1.0.0</version>
 </dependency>
 ```
@@ -80,7 +80,7 @@ AgentCard card = mapper.readValue(
         new File("agentcard/my_agent.json"), AgentCard.class);
 
 // 方式二：从注册中心拉取
-RegistryClient registry = new RegistryClient("https://127.0.0.1:5001", false);
+RegistryClient registry = new RegistryClient("https://127.0.0.1:5000", false);
 List<Map<String, Object>> cards = registry.fetchAgentCards();
 ```
 
@@ -136,7 +136,9 @@ public class MyControlPoint extends DefaultControlPoint {
 | `onRoute`         | 步骤完成后、决定下一步前       | 从候选分支中选择下一步                                   |
 | `onNegotiation`   | 智能体返回 `INPUT_REQUIRED` 时 | 返回补充说明文本                                         |
 
-`onNegotiation` 默认返回通用文本。只需覆盖你关心的方法。授权和通知的响应钩子 (`onAuthorization` / `onNotification`) 位于 `ExtensionCallback` 接口，不在 `ControlPoint` 上。如需自定义授权审批或通知处理，实现 `ExtensionCallback` 并通过 `engineClient.setExtensionCallback()` 挂载。
+`onNegotiation` 默认返回通用文本。只需覆盖你关心的方法。
+
+**前置操作（Authorization-T / Notification-T）**：这两个扩展是工作流开始前通过 `ExtensionSender` 发送的一次性操作。发送结果直接通过返回的 `SendMessageResult` 获取，无需额外的回调接口。`ExtensionCallback` 接口（`onAuthorization` / `onNotification`）是为自定义内联处理器预留的扩展点，可通过配置中的 `customHandlers` 手动注册。
 
 **自环节点（SelfLoop）**：当一个步骤是工作流执行智能体自身的任务（例如汇总多个智能体的诊断结果），把 `stepType` 设为
 `SELF_LOOP`。引擎会调用 `onSelfTask` 本地处理，而不是通过 A2A-T 协议给智能体自己发消息。`onSelfTask` 不接收 `engineClient`
@@ -237,10 +239,10 @@ A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```bash
 # 方式一：先设置环境变量
 set A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
-java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123"
+java -cp engine-sdk.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123"
 
 # 方式二：密钥作为第二个参数
-java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+java -cp engine-sdk.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```
 
 输出：
@@ -400,12 +402,10 @@ AgentCard 通过 `capabilities.extensions` 声明扩展点：
 
 ```java
 ExtensionSender sender = new DefaultExtensionSender(transport);
-sender.
-
-sendAuthorization(
+sender.sendAuthorization(
     "SPN Domain Agent",
-            "Authorization-T pre-positioning",
-            "任务类型：新增授权，操作：业务抢通，操作类型：光模块更换，..."
+    "Authorization-T pre-positioning",
+    "任务类型：新增授权，操作：业务抢通，操作类型：光模块更换，..."
 );
 ```
 
@@ -449,11 +449,8 @@ sender.sendNotification(
 .sslVerify(false)
 
 // 生产环境：启用验证 + 自定义 CA 证书
-.
-
-sslVerify(true).
-
-caCertsPath("/path/to/ca-certs.pem")
+.sslVerify(true)
+.caCertsPath("/path/to/ca-certs.pem")
 ```
 
 ## 9. 日志
@@ -488,13 +485,9 @@ EventCallback callback = new EventCallback() {
     }
 };
 
-ExecutePsop.
-
-builder()
-    .
-
-eventCallback(callback)
-// ...
+ExecutePsop.builder()
+    .eventCallback(callback)
+    // ...
 ```
 
 常用事件类型：`STEP_START`、`STEP_COMPLETE`、`AGENT_REQUEST`、`AGENT_RESPONSE`、`NEGOTIATION_REQUEST`、`NEGOTIATION_RESOLVED`、
@@ -546,12 +539,8 @@ public class MyExtensionHandler implements ExtensionHandler {
 
 ```java
 WorkflowEngineClientConfig.builder()
-    .
-
-customHandlers(List.of(new MyExtensionHandler()))
-        .
-
-build();
+    .customHandlers(List.of(new MyExtensionHandler()))
+    .build();
 ```
 
 ## 13. 你需要使用的接口一览

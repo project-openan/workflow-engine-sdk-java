@@ -9,8 +9,8 @@ Add to your `pom.xml`:
 
 ```xml
 <dependency>
-    <groupId>com.openan.a2at</groupId>
-    <artifactId>a2at-engine</artifactId>
+    <groupId>dev.openan.workflow.sdk</groupId>
+    <artifactId>engine-sdk</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
@@ -57,7 +57,6 @@ public class MyControlPoint implements ControlPoint {
 ```
 
 `onAuthorization` and `onNotification` have default implementations.
-`onNegotiation` has a default that returns a generic clarification.
 `onNegotiation` has a default that returns a generic clarification. Authorization and notification
 reactive hooks (`onAuthorization` / `onNotification`) live on the `ExtensionCallback` interface, not on `ControlPoint`.
 
@@ -255,7 +254,7 @@ Set `sslVerify=false` only for dev with self-signed certs.
 
 ```ini
 A2AT_LLM_PROVIDER=openai
-A2AT_LLM_MODEL=deepseek-v4-flash
+A2AT_LLM_MODEL=deepseek-chat
 A2AT_LLM_API_KEY=sk-...
 A2AT_LLM_BASE_URL=https://api.deepseek.com
 A2AT_LANGUAGE=zh-CN

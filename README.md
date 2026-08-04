@@ -23,8 +23,8 @@ The engine handles all protocol mechanics: A2A message transport, SSE streaming,
 
 ```xml
 <dependency>
-    <groupId>com.openan.a2at</groupId>
-    <artifactId>a2at-engine</artifactId>
+    <groupId>dev.openan.workflow.sdk</groupId>
+    <artifactId>engine-sdk</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
@@ -33,8 +33,8 @@ For Spring Boot server-side integration:
 
 ```xml
 <dependency>
-    <groupId>com.openan.a2at</groupId>
-    <artifactId>a2at-spring-boot-starter</artifactId>
+    <groupId>dev.openan.workflow.sdk</groupId>
+    <artifactId>engine-sdk-spring-boot-starter</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
@@ -55,7 +55,7 @@ Workflow workflow = LoadPsop.load(
         "https://127.0.0.1:5001", "psop-id", null, false);
 
 // 2. Load agent cards
-RegistryClient registry = new RegistryClient("https://127.0.0.1:5001", false);
+RegistryClient registry = new RegistryClient("https://127.0.0.1:5000", false);
 List<AgentCard> agentCards = registry.fetchAgentCards();
 
 // 3. Create transport + engine client
