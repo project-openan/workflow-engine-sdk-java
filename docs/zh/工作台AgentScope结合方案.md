@@ -80,8 +80,7 @@ ExecutePsop.builder()               <- 高层工作流执行器（加载->执行
 | 组件 | 接口/类 | 职责 | 是否 AgentScope 插入点 |
 |------|--------|------|---------------------|
 | AgentExecutor | `org.a2aproject.sdk.server.agentexecution.AgentExecutor` | A2A 服务端入口，接收 Task-T | 入站入口，可委派 |
-| ControlPoint | `com.openan.a2at.engine.control.ControlPoint` | 工作流决策回调（4 个方法） | **是，主要插入点** |
-| ExtensionCallback | `com.openan.a2at.engine.control.ExtensionCallback` | 授权/通知响应钩子（可选） | 是，可选 |
+| ControlPoint | `dev.openan.workflow.engine.control.ControlPoint` | 工作流决策回调（4 个方法） | **是，主要插入点** |
 
 ### 3.4 A2A-T 四类扩展的承载划分
 
@@ -223,7 +222,7 @@ sequenceDiagram
     ORCH-->>WB: PSOP 工作流拓扑
     Note over WB: ExecutePsop 开始执行工作流
 
-    rect rgb(240,248,255)
+    rect rgba(240, 248, 255, 1)
         Note right of WB: 步骤: diagnosis_city1
         WB->>AS: buildTaskMessage(city1, 上游上下文)
         Note over AS: ReActAgent 推理 + 工具查参数
@@ -232,7 +231,7 @@ sequenceDiagram
         OMC-->>WB: 诊断结果
     end
 
-    rect rgb(240,248,255)
+    rect rgba(240, 248, 255, 1)
         Note right of WB: 步骤: diagnosis_city2
         WB->>AS: buildTaskMessage(city2, 上游上下文)
         AS-->>WB: 自包含城市2任务消息
@@ -240,14 +239,14 @@ sequenceDiagram
         OMC-->>WB: 诊断结果
     end
 
-    rect rgb(255,250,240)
+    rect rgba(255, 250, 240, 1)
         Note right of WB: 步骤: merge_analysis (SELF_LOOP)
         WB->>AS: selfProcess(汇总, 各城结果)
         Note over AS: ReActAgent 多步推理<br/>查告警->查拓扑->定位根因
         AS-->>WB: 故障定位结论
     end
 
-    rect rgb(240,255,240)
+    rect rgba(240, 255, 240, 1)
         Note right of WB: 步骤: route_decision
         WB->>AS: decideRoute(结果内容, 分支条件)
         AS-->>WB: 走恢复授权分支
@@ -344,12 +343,12 @@ public interface ReasoningBridge {
 ```java
 package com.kaitong.workbench.control;
 
-import com.openan.a2at.engine.client.WorkflowEngineClient;
-import com.openan.a2at.engine.control.DefaultControlPoint;
-import com.openan.a2at.engine.model.JumpCondition;
-import com.openan.a2at.engine.model.RouteDecision;
-import com.openan.a2at.engine.model.TaskRequest;
-import com.openan.a2at.engine.model.TaskResponse;
+import dev.openan.workflow.engine.client.WorkflowEngineClient;
+import dev.openan.workflow.engine.control.DefaultControlPoint;
+import dev.openan.workflow.engine.model.JumpCondition;
+import dev.openan.workflow.engine.model.RouteDecision;
+import dev.openan.workflow.engine.model.TaskRequest;
+import dev.openan.workflow.engine.model.TaskResponse;
 import com.kaitong.workbench.bridge.ReasoningBridge;
 
 import java.util.List;

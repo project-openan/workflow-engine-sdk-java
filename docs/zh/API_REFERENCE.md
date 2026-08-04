@@ -4,15 +4,15 @@
 
 | 包                                | 说明                                  |
 |-----------------------------------|---------------------------------------|
-| `com.openan.a2at.engine.client`   | A2A 消息传输、认证、扩展、配置        |
-| `com.openan.a2at.engine.control`  | 用户决策点和事件系统                  |
-| `com.openan.a2at.engine.model`    | 数据模型（Workflow、Task、Result 等） |
-| `com.openan.a2at.engine.registry` | PSOP 加载和 AgentCard 注册            |
-| `com.openan.a2at.engine.runner`   | 工作流执行入口                        |
+| `dev.openan.workflow.engine.client`   | A2A 消息传输、认证、扩展、配置        |
+| `dev.openan.workflow.engine.control`  | 用户决策点和事件系统                  |
+| `dev.openan.workflow.engine.model`    | 数据模型（Workflow、Task、Result 等） |
+| `dev.openan.workflow.engine.registry` | PSOP 加载和 AgentCard 注册            |
+| `dev.openan.workflow.engine.runner`   | 工作流执行入口                        |
 
 ---
 
-## com.openan.a2at.engine.runner
+## dev.openan.workflow.engine.runner
 
 ### ExecutePsop
 
@@ -53,7 +53,7 @@ ExecutionResult result = ExecutePsop.builder()
 
 ---
 
-## com.openan.a2at.engine.client
+## dev.openan.workflow.engine.client
 
 ### WorkflowEngineClient
 
@@ -206,7 +206,6 @@ public interface ExtensionHandler {
     CompletableFuture<SendMessageResult> afterReceive(
             AgentCard agentCard, SendMessageResult result,
             A2ATClient a2atClient, ControlPoint controlPoint,
-            ExtensionCallback extensionCallback,
             EventCallback eventCallback);
 }
 ```
@@ -233,7 +232,7 @@ public interface A2AJavaClientRuntime {
 
 ---
 
-## com.openan.a2at.engine.control
+## dev.openan.workflow.engine.control
 
 ### ControlPoint
 
@@ -278,50 +277,6 @@ public interface ControlPoint {
 
 继承此类，只需覆盖需要自定义的方法。
 
-### ExtensionCallback
-
-自定义内联处理器的扩展点，用于处理智能体推送的 A2A-T 扩展数据。
-Authorization-T 和 Notification-T 是前置操作（工作流开始前通过 `ExtensionSender` 发送），
-其结果直接通过 `SendMessageResult` 返回。此接口适用于高级场景：当你通过配置中的 `customHandlers`
-注册了自定义 `ExtensionHandler` 实现时使用。
-
-```java
-public abstract class ExtensionCallback {
-    // 授权审批。默认：自动通过。
-    CompletableFuture<Boolean> onAuthorization(
-            String agentName, Map<String, Object> authRequest);
-
-    // 处理通知。默认：空操作。
-    CompletableFuture<Void> onNotification(
-            String agentName, Map<String, Object> notification);
-}
-```
-
-| 方法              | 触发时机                               | 返回值                        |
-|-------------------|----------------------------------------|-------------------------------|
-| `onAuthorization` | 自定义处理器检测到响应中的 Authorization-T | `Boolean`（true=通过）        |
-| `onNotification`  | 自定义处理器检测到响应中的 Notification-T  | `Void`                        |
-
-挂载方式：
-
-```java
-engineClient.setExtensionCallback(new ExtensionCallback() {
-    @Override
-    public CompletableFuture<Boolean> onAuthorization(
-            String agentName, Map<String, Object> authRequest) {
-        return CompletableFuture.completedFuture(true);
-    }
-
-    @Override
-    public CompletableFuture<Void> onNotification(
-            String agentName, Map<String, Object> notification) {
-        return CompletableFuture.completedFuture(null);
-    }
-});
-```
-
-> 注意：通过 `ExtensionSender.sendNotification` 建立的 SSE 长连接，其后续推送的抢通结果通过回调 `Consumer<Map<String, Object>>` 接收，不经过 `onNotification`。
-
 ### EventCallback
 
 ```java
@@ -360,7 +315,7 @@ public class EventCallback {
 
 ---
 
-## com.openan.a2at.engine.registry
+## dev.openan.workflow.engine.registry
 
 ### LoadPsop
 
@@ -412,7 +367,7 @@ Map<String, Object> registerAgentCard(Map<String, Object> agentCard)
 
 ---
 
-## com.openan.a2at.engine.model
+## dev.openan.workflow.engine.model
 
 ### Workflow
 

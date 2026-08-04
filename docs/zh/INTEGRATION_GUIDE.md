@@ -138,7 +138,7 @@ public class MyControlPoint extends DefaultControlPoint {
 
 `onNegotiation` 默认返回通用文本。只需覆盖你关心的方法。
 
-**前置操作（Authorization-T / Notification-T）**：这两个扩展是工作流开始前通过 `ExtensionSender` 发送的一次性操作。发送结果直接通过返回的 `SendMessageResult` 获取，无需额外的回调接口。`ExtensionCallback` 接口（`onAuthorization` / `onNotification`）是为自定义内联处理器预留的扩展点，可通过配置中的 `customHandlers` 手动注册。
+**前置操作（Authorization-T / Notification-T）**：这两个扩展是工作流开始前通过 `ExtensionSender` 发送的一次性操作。发送结果直接通过返回的 `SendMessageResult` 获取，无需额外的回调接口。
 
 **自环节点（SelfLoop）**：当一个步骤是工作流执行智能体自身的任务（例如汇总多个智能体的诊断结果），把 `stepType` 设为
 `SELF_LOOP`。引擎会调用 `onSelfTask` 本地处理，而不是通过 A2A-T 协议给智能体自己发消息。`onSelfTask` 不接收 `engineClient`
@@ -239,10 +239,10 @@ A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```bash
 # 方式一：先设置环境变量
 set A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
-java -cp engine-sdk.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123"
+java -cp engine-sdk.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123"
 
 # 方式二：密钥作为第二个参数
-java -cp engine-sdk.jar com.openan.a2at.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+java -cp engine-sdk.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```
 
 输出：
@@ -257,7 +257,7 @@ enc:uHQcTeKZMVNRM9Ga:o5vm4weRozBXBs04phrLq7j7+/yRVyDsrw==
 
 1. 生成新密钥：`openssl rand -hex 32`
 2. 更新 `.env` 中的 `A2AT_CRED_KEY`
-3. 用新密钥重新加密所有密码：`java -cp a2at-engine.jar com.openan.a2at.engine.client.CredentialCrypto "明文密码" 新密钥`
+3. 用新密钥重新加密所有密码：`java -cp engine-sdk.jar dev.openan.workflow.engine.client.CredentialCrypto "明文密码" 新密钥`
 4. 将新的 `enc:...` 结果更新到凭证 JSON 文件
 
 > `.env` 文件不应提交到版本库，建议加入 `.gitignore`。

@@ -4,15 +4,15 @@
 
 | Package                           | Description                                     |
 |-----------------------------------|-------------------------------------------------|
-| `com.openan.a2at.engine.client`   | A2A message transport, auth, extensions, config |
-| `com.openan.a2at.engine.control`  | User decision points and event system           |
-| `com.openan.a2at.engine.model`    | Data models (Workflow, Task, results)           |
-| `com.openan.a2at.engine.registry` | PSOP loading and AgentCard registry             |
-| `com.openan.a2at.engine.runner`   | Entry point for workflow execution              |
+| `dev.openan.workflow.engine.client`   | A2A message transport, auth, extensions, config |
+| `dev.openan.workflow.engine.control`  | User decision points and event system           |
+| `dev.openan.workflow.engine.model`    | Data models (Workflow, Task, results)           |
+| `dev.openan.workflow.engine.registry` | PSOP loading and AgentCard registry             |
+| `dev.openan.workflow.engine.runner`   | Entry point for workflow execution              |
 
 ---
 
-## com.openan.a2at.engine.runner
+## dev.openan.workflow.engine.runner
 
 ### ExecutePsop
 
@@ -53,7 +53,7 @@ ExecutionResult result = ExecutePsop.builder()
 
 ---
 
-## com.openan.a2at.engine.client
+## dev.openan.workflow.engine.client
 
 ### WorkflowEngineClient
 
@@ -209,7 +209,6 @@ public interface ExtensionHandler {
     CompletableFuture<SendMessageResult> afterReceive(
             AgentCard agentCard, SendMessageResult result,
             A2ATClient a2atClient, ControlPoint controlPoint,
-            ExtensionCallback extensionCallback,
             EventCallback eventCallback);
 }
 ```
@@ -237,7 +236,7 @@ A default implementation is provided. Implement this interface only if you need 
 
 ---
 
-## com.openan.a2at.engine.control
+## dev.openan.workflow.engine.control
 
 ### ControlPoint
 
@@ -282,53 +281,6 @@ Default implementation with sensible defaults:
 
 Extend this class and override only the methods you need.
 
-### ExtensionCallback
-
-Extension point for custom inline handling of agent-pushed A2A-T extension data.
-Authorization-T and Notification-T are pre-positioning operations (sent via `ExtensionSender`
-before the workflow); their results are returned directly as `SendMessageResult`.
-This interface is for advanced use cases where you register custom `ExtensionHandler`
-implementations via `customHandlers` in the config.
-
-```java
-public abstract class ExtensionCallback {
-    // Authorization approval. Default: auto-approve.
-    CompletableFuture<Boolean> onAuthorization(
-            String agentName, Map<String, Object> authRequest);
-
-    // Handle a notification. Default: no-op.
-    CompletableFuture<Void> onNotification(
-            String agentName, Map<String, Object> notification);
-}
-```
-
-| Method            | When Called                                        | Return                     |
-|-------------------|----------------------------------------------------|----------------------------|
-| `onAuthorization` | Custom handler detects Authorization-T in response | `Boolean` (true=approve)  |
-| `onNotification`  | Custom handler detects Notification-T in response  | `Void`                     |
-
-Attach to the engine client:
-
-```java
-engineClient.setExtensionCallback(new ExtensionCallback() {
-    @Override
-    public CompletableFuture<Boolean> onAuthorization(
-            String agentName, Map<String, Object> authRequest) {
-        return CompletableFuture.completedFuture(true);
-    }
-
-    @Override
-    public CompletableFuture<Void> onNotification(
-            String agentName, Map<String, Object> notification) {
-        return CompletableFuture.completedFuture(null);
-    }
-});
-```
-
-> Note: recovery results pushed through the long-lived SSE stream established by
-> `ExtensionSender.sendNotification` are received via the `Consumer<Map<String, Object>>`
-> callback parameter, not through `onNotification`.
-
 ### EventCallback
 
 ```java
@@ -367,7 +319,7 @@ Override to receive real-time execution events. Event types are defined in `Even
 
 ---
 
-## com.openan.a2at.engine.registry
+## dev.openan.workflow.engine.registry
 
 ### LoadPsop
 
@@ -419,7 +371,7 @@ Map<String, Object> registerAgentCard(Map<String, Object> agentCard)
 
 ---
 
-## com.openan.a2at.engine.model
+## dev.openan.workflow.engine.model
 
 ### Workflow
 

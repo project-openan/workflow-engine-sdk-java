@@ -36,8 +36,8 @@ Layer 1 - 遍历层       WorkflowExecutor
    |     DAG 遍历、并行下发、上下文组装、路由
 Layer 0 - 通信层       A2ATransport + 两个门面
    |     WorkflowEngineClient（工作流发送）| ExtensionSender（一次性前置下发）
-基础层 - 决策          ControlPoint / ExtensionCallback
-                         用户实现的业务决策
+基础层 - 决策          ControlPoint
+                          用户实现的业务决策
 ```
 
 ### 2.1 Layer 0 - 通信层
@@ -50,7 +50,7 @@ Layer 0 - 通信层       A2ATransport + 两个门面
 **两个门面构建在 transport 之上，各司其职：**
 
 - **`WorkflowEngineClient`** — 工作流执行发送路径。拥有 Task-T 提示词生成（发送前）、
-  Negotiation-T 自动循环（接收后）、全局 `EventCallback`、`ControlPoint` / `ExtensionCallback` 装配。
+  Negotiation-T 自动循环（接收后）、全局 `EventCallback`、`ControlPoint` 装配。
   这是执行器在工作流执行期间调用的门面。
 - **`ExtensionSender`** — 一次性前置下发。在工作流启动前向智能体发送 Authorization-T 和 Notification-T 消息。
   绕过 Task-T 生成和协商循环，不通过全局回调发射事件 — 返回的结果就是回调。
@@ -97,20 +97,7 @@ SDK 暴露两个用户实现的接口，按职责拆分。
 | `onRoute`        | 执行器       | 在条件步骤选择分支                          |
 | `onNegotiation`  | 客户端自动循环 | 在 INPUT_REQUIRED 时提供澄清文本            |
 
-### 3.2 ExtensionCallback — 响应式钩子
-
-响应智能体推送的 A2A-T 数据。与流程决策不同：它们响应对端发起的扩展流量，不驱动工作流前进。
-
-| 方法              | 触发时机                                  | 决策           |
-|-------------------|------------------------------------------|---------------|
-| `onAuthorization` | 智能体在任务响应中推送 Authorization-T 请求 | 批准或拒绝     |
-| `onNotification`  | 智能体在任务响应中推送 Notification-T 载荷 | 处理通知       |
-
-#### 为什么拆分 ControlPoint 和 ExtensionCallback？
-
-流程决策和响应式钩子有不同的调用时机和职责。`onTask` 和 `onRoute` 由执行器在 DAG 遍历时调用；
-`onAuthorization` 和 `onNotification` 由扩展处理器响应智能体推送的数据时调用。
-分开接口意味着只关心路由的宿主不需要实现授权钩子，反之亦然。
+Authorization-T 和 Notification-T 是预置操作，通过 `ExtensionSender` 在工作流启动前发送，不在工作流执行中回调。
 
 ---
 
@@ -265,10 +252,7 @@ SDK 是独立的：不依赖编排中心。
    `WorkflowEngineClient` 和 `ExtensionSender` 各自拥有一个编排职责，委托通信工作。
    避免强制门面耦合和通信代码重复。
 
-2. **ControlPoint / ExtensionCallback 拆分** — 流程决策和响应式钩子有不同的调用时机和职责；
-   分开保持每个接口的内聚性，宿主只实现需要的部分。
-
-3. **工作流内扩展 vs 前置下发扩展** — Task-T 和 Negotiation-T 是 `sendMessage` 链的一部分；
+2. **工作流内扩展 vs 前置下发扩展** — Task-T 和 Negotiation-T 是 `sendMessage` 链的一部分；
    Authorization-T 和 Notification-T 是工作流启动前的一次性发送。
    注册表只自动注册工作流内的一对。
 
