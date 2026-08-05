@@ -2,7 +2,7 @@
 
 ## 一、引擎职责边界
 
-**引擎层 (`a2at-engine`) 只提供 workflow 执行调度能力，不包含任何 Agent server 代码。**
+**引擎层 (`workflow-engine`) 只提供 workflow 执行调度能力，不包含任何 Agent server 代码。**
 
 - 引擎依赖只保留 a2a-java SDK 客户端侧（`a2a-java-sdk-client`、`a2a-java-sdk-client-transport-rest`）
 - 不依赖服务端侧（`a2a-java-sdk-server-common`、`a2a-java-sdk-transport-rest`）
@@ -125,7 +125,7 @@ static {
 
 ## 十、验证清单
 
-- `mvn compile -pl a2at-engine,samples` 编译通过
-- `mvn test -pl a2at-engine,samples` 71 个测试通过（引擎 69 + samples 2）
+- `mvn compile -pl workflow-engine,samples` 编译通过
+- `mvn test -pl workflow-engine,samples` 71 个测试通过（引擎 69 + samples 2）
 - `EmbeddedA2AServerTest` 验证：启动 server → sendMessage → 从 SSE 流提取诊断结果
 - `SpnCrossCityDiagnosisDemo` 端到端：3 个 Agent 启动 → 触发工作流 → 5 步全部执行成功

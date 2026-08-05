@@ -47,8 +47,8 @@ A2A-T 执行引擎 SDK 和 AgentScope 解决的是完全不同层次的问题：
 
 | 模块 | 作用 | 工作台是否需要实现 |
 |------|------|------------------|
-| `a2at-engine` | 核心 SDK：客户端、工作流执行、控制点、模型 | 否，直接引用 |
-| `a2at-spring-boot-starter` | Spring Boot 自动配置，暴露 A2A-T 服务端端点 | 只需提供 `@Component AgentExecutor` |
+| `workflow-engine` | 核心 SDK：客户端、工作流执行、控制点、模型 | 否，直接引用 |
+| `spring-boot-starter` | Spring Boot 自动配置，暴露 A2A-T 服务端端点 | 只需提供 `@Component AgentExecutor` |
 | `samples` | demo（打桩工作台 + 城市 OMC 智能体） | 参考用，不集成 |
 
 ### 3.2 核心 API 表面
@@ -187,7 +187,7 @@ CompletableFuture<String> onNegotiation(String agentName, String negotiationText
 graph TD
     WAIMO["WAIMO 故障中心<br/>(上层业务系统)"]
     ORCH["编排中心<br/>(Python/FastAPI)<br/>PSOP 存储 + 搜索 + 智能体注册"]
-    WB["凯通工作台智能体<br/>(Spring Boot + a2at-spring-boot-starter)"]
+    WB["凯通工作台智能体<br/>(Spring Boot + spring-boot-starter)"]
     BRIDGE["ReasoningBridge<br/>(Java 薄 HTTP 桥)"]
     AS["AgentScope 推理服务<br/>(Python/FastAPI)<br/>ReActAgent + tools + memory"]
     OMC1["城市 OMC 智能体<br/>(下游)"]
@@ -271,7 +271,7 @@ sequenceDiagram
 | 分支路由决策 | **AgentScope** | 语义理解结果内容后决策 |
 | 参数补充协商内容 | **AgentScope** | 解析缺参 + 工具取参 |
 | 业务工具调用（查告警/拓扑/工单） | **AgentScope** | AgentScope 工具集对接工作台业务系统 |
-| Spring Boot 服务容器 | **工作台（a2at-spring-boot-starter）** | 只需一个 @Component AgentExecutor |
+| Spring Boot 服务容器 | **工作台（spring-boot-starter）** | 只需一个 @Component AgentExecutor |
 
 ---
 
@@ -676,7 +676,7 @@ graph LR
 
 | 步骤 | 工作台做 | SDK 侧 |
 |------|---------|--------|
-| 1. 引入 starter | Maven 依赖 `a2at-spring-boot-starter`，写 `@Component AgentExecutor` | 提供 starter + autoconfig |
+| 1. 引入 starter | Maven 依赖 `spring-boot-starter`，写 `@Component AgentExecutor` | 提供 starter + autoconfig |
 | 2. 部署 AgentScope | 起 Python FastAPI 服务，四个端点骨架（可先返回固定文本） | 不涉及 |
 | 3. 实现桥 | 写 `HttpReasoningBridge`，配置 `a2a.reasoning-url` | 不涉及 |
 | 4. 委派 ControlPoint | `KaitongControlPoint` 四方法委派给桥 | 提供 ControlPoint 接口 + DefaultControlPoint |

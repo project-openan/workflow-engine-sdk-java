@@ -19,7 +19,7 @@ A2A-T 工作流执行引擎是一个 Java SDK，用于基于 A2A 协议和 A2A-T
 
 <dependency>
     <groupId>dev.openan.workflow.sdk</groupId>
-    <artifactId>engine-sdk</artifactId>
+    <artifactId>workflow-engine</artifactId>
 <version>1.0.0</version>
 </dependency>
 ```
@@ -239,10 +239,10 @@ A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```bash
 # 方式一：先设置环境变量
 set A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
-java -cp engine-sdk.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123"
+java -cp workflow-engine.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123"
 
 # 方式二：密钥作为第二个参数
-java -cp engine-sdk.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+java -cp workflow-engine.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```
 
 输出：
@@ -257,7 +257,7 @@ enc:uHQcTeKZMVNRM9Ga:o5vm4weRozBXBs04phrLq7j7+/yRVyDsrw==
 
 1. 生成新密钥：`openssl rand -hex 32`
 2. 更新 `.env` 中的 `A2AT_CRED_KEY`
-3. 用新密钥重新加密所有密码：`java -cp engine-sdk.jar dev.openan.workflow.engine.client.CredentialCrypto "明文密码" 新密钥`
+3. 用新密钥重新加密所有密码：`java -cp workflow-engine.jar dev.openan.workflow.engine.client.CredentialCrypto "明文密码" 新密钥`
 4. 将新的 `enc:...` 结果更新到凭证 JSON 文件
 
 > `.env` 文件不应提交到版本库，建议加入 `.gitignore`。

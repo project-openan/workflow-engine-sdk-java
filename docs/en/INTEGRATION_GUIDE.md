@@ -21,7 +21,7 @@ Negotiation-T auto-loop, authentication, TLS). You focus on business decisions o
 
 <dependency>
     <groupId>dev.openan.workflow.sdk</groupId>
-    <artifactId>engine-sdk</artifactId>
+    <artifactId>workflow-engine</artifactId>
 <version>1.0.0</version>
 </dependency>
 ```
@@ -243,10 +243,10 @@ A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```bash
 # Option 1: set env var first
 set A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
-java -cp engine-sdk.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123"
+java -cp workflow-engine.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123"
 
 # Option 2: pass key as second argument
-java -cp engine-sdk.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+java -cp workflow-engine.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```
 
 Output:
@@ -261,7 +261,7 @@ Paste the output into the `value` field of the credentials JSON.
 
 1. Generate a new key: `openssl rand -hex 32`
 2. Update `A2AT_CRED_KEY` in `.env`
-3. Re-encrypt all passwords: `java -cp engine-sdk.jar dev.openan.workflow.engine.client.CredentialCrypto "plaintext" new-key`
+3. Re-encrypt all passwords: `java -cp workflow-engine.jar dev.openan.workflow.engine.client.CredentialCrypto "plaintext" new-key`
 4. Update the `enc:...` results in the credentials JSON file
 
 > The `.env` file should not be committed to version control. Add it to `.gitignore`.

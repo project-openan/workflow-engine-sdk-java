@@ -21,8 +21,8 @@ mvn -o test
 
 ```
 a2at-engine-java/
-|-- a2at-engine/          SDK engine module
-|   +-- src/main/java/com/openan/a2at/engine/
+|-- workflow-engine/       SDK engine module
+|   +-- src/main/java/dev/openan/workflow/engine/
 |       |-- client/       A2A transport, auth, extensions (package-private internals)
 |       |-- control/      User-facing: ControlPoint, EventCallback, EventType
 |       |-- core/         Internal: WorkflowExecutor, ContextBuilder (package-private)

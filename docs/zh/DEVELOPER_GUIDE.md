@@ -9,7 +9,7 @@
 ```xml
 <dependency>
     <groupId>dev.openan.workflow.sdk</groupId>
-    <artifactId>engine-sdk</artifactId>
+    <artifactId>workflow-engine</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```

@@ -24,7 +24,7 @@ The engine handles all protocol mechanics: A2A message transport, SSE streaming,
 ```xml
 <dependency>
     <groupId>dev.openan.workflow.sdk</groupId>
-    <artifactId>engine-sdk</artifactId>
+    <artifactId>workflow-engine</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
@@ -34,7 +34,7 @@ For Spring Boot server-side integration:
 ```xml
 <dependency>
     <groupId>dev.openan.workflow.sdk</groupId>
-    <artifactId>engine-sdk-spring-boot-starter</artifactId>
+    <artifactId>spring-boot-starter</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
@@ -157,8 +157,8 @@ dev.openan.workflow.engine
 
 | Module | Description |
 |--------|-------------|
-| `a2at-engine` | Core SDK: workflow execution, A2A transport, extensions, auth |
-| `a2at-spring-boot-starter` | Spring Boot auto-configuration for A2A server side |
+| `workflow-engine` | Core SDK: workflow execution, A2A transport, extensions, auth |
+| `spring-boot-starter` | Spring Boot auto-configuration for A2A server side |
 | `samples` | Demo applications (embedded + Spring Boot variants) |
 
 ## License

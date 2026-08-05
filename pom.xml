@@ -6,11 +6,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>dev.openan.workflow.sdk</groupId>
-    <artifactId>workflow-exec-engine-parent</artifactId>
+    <artifactId>workflow-engine-parent</artifactId>
     <version>${revision}</version>
     <packaging>pom</packaging>
 
-    <name>workflow-exec-engine-parent</name>
+    <name>workflow-engine-parent</name>
     <description>A2A-T workflow execution engine for multi-agent orchestration (Java) - parent</description>
     <url>https://github.com/Zhoujie628/a2at-engine-java</url>
 
@@ -24,7 +24,7 @@
 
     <organization>
         <name>OpenAN</name>
-        <url>https://openan.net</url>
+        <url>https://openan.dev</url>
     </organization>
 
     <developers>
@@ -42,8 +42,8 @@
     </scm>
 
     <modules>
-        <module>a2at-engine</module>
-        <module>a2at-spring-boot-starter</module>
+        <module>workflow-engine</module>
+        <module>spring-boot-starter</module>
         <module>samples</module>
     </modules>
 

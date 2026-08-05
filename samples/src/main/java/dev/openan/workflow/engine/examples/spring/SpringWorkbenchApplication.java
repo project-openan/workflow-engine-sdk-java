@@ -28,7 +28,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * Spring Boot Workbench Agent -- northbound A2A server.
  *
  * <p>This is the Workbench Agent itself: a Spring Boot service that exposes A2A-T endpoints
- * (message:send, message:stream) via the {@code a2at-spring-boot-starter} auto-configuration. The
+ * (message:send, message:stream) via the {@code spring-boot-starter} auto-configuration. The
  * business logic lives in {@link SpringWorkbenchExecutor} (implements {@code AgentExecutor}).
  *
  * <p>Demo orchestration (starting OMC agents, sending Task-T, shutting down) is handled separately

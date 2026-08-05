@@ -186,14 +186,14 @@ This pattern is correct and requires no modification.
 
 ## File Locations
 
-- Engine client: a2at-engine/src/main/java/com/openan/a2at/engine/client/DefaultWorkflowEngineClient.java
-- SPN agent base: samples/src/main/java/com/openan/a2at/engine/examples/agents/NegotiationBaseAgentExecutor.java
-- SPN agent city1: samples/src/main/java/com/openan/a2at/engine/examples/agents/SpnDomainAgentCity1Executor.java
-- SPN agent city2: samples/src/main/java/com/openan/a2at/engine/examples/agents/SpnDomainAgentCity2Executor.java
-- Workbench control: samples/src/main/java/com/openan/a2at/engine/examples/agents/WorkbenchControlPoint.java
-- Demo entry: samples/src/main/java/com/openan/a2at/engine/examples/SpnCrossCityDiagnosisDemo.java
-- Agent server: samples/src/main/java/com/openan/a2at/engine/examples/StartAgentsServer.java
-- E2E test: samples/src/test/java/com/openan/a2at/engine/examples/SpnCrossCityE2ETest.java
+- Engine client: workflow-engine/src/main/java/dev/openan/workflow/engine/client/DefaultWorkflowEngineClient.java
+- SPN agent base: samples/src/main/java/dev/openan/workflow/engine/examples/agents/NegotiationBaseAgentExecutor.java
+- SPN agent city1: samples/src/main/java/dev/openan/workflow/engine/examples/agents/SpnDomainAgentCity1Executor.java
+- SPN agent city2: samples/src/main/java/dev/openan/workflow/engine/examples/agents/SpnDomainAgentCity2Executor.java
+- Workbench control: samples/src/main/java/dev/openan/workflow/engine/examples/agents/WorkbenchControlPoint.java
+- Demo entry: samples/src/main/java/dev/openan/workflow/engine/examples/SpnCrossCityDiagnosisDemo.java
+- Agent server: samples/src/main/java/dev/openan/workflow/engine/examples/StartAgentsServer.java
+- E2E test: samples/src/test/java/dev/openan/workflow/engine/examples/SpnCrossCityE2ETest.java
 - AgentCard city1: samples/src/main/resources/agentcard/spn_domain_agent_city1.json
 - AgentCard city2: samples/src/main/resources/agentcard/spn_domain_agent_city2.json
 - AgentCard workbench: samples/src/main/resources/agentcard/transport_workbench_agent.json
