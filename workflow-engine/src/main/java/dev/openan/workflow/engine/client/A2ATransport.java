@@ -174,6 +174,10 @@ public class A2ATransport implements AutoCloseable {
                 mergeTaskMetadata(te.getTask(), metadata);
             } else if (event instanceof TaskUpdateEvent tue) {
                 mergeTaskMetadata(tue.getTask(), metadata);
+                if (tue.getUpdateEvent() instanceof TaskStatusUpdateEvent sue) {
+                    Map<String, Object> em = sue.metadata();
+                    if (em != null && !em.isEmpty()) metadata.putAll(em);
+                }
             }
         }
         return metadata;

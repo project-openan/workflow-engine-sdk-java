@@ -170,7 +170,8 @@ public class DefaultWorkflowEngineClient implements WorkflowEngineClient, AutoCl
         }
         Map<String, Object> negMeta =
                 result.getMetadata() != null ? result.getMetadata() : new HashMap<>();
-        String negText = negMeta.getOrDefault("negotiation_message", "").toString();
+        String negText = negMeta.getOrDefault("negotiation_message",
+                negMeta.getOrDefault("negotiationConcern", "")).toString();
         log.info("[Negotiation] Round {} for '{}': {}", round, agentName, negText);
         emit(
                 EventType.NEGOTIATION_REQUEST,
