@@ -42,56 +42,53 @@ For Spring Boot server-side integration:
 ### 2. Execute a workflow
 
 ```java
-
-
 import java.util.concurrent.*;
 
 // 1. Load workflow (PSOP) from orchestration center
 Workflow workflow = LoadPsop.load(
         "https://127.0.0.1:5001", "psop-id", null, false);
 
-        // 2. Load agent cards
-        RegistryClient registry = new RegistryClient("https://127.0.0.1:5000", false);
-        List<AgentCard> agentCards = registry.fetchAgentCards();
+// 2. Load agent cards
+RegistryClient registry = new RegistryClient("https://127.0.0.1:5000", false);
+List<AgentCard> agentCards = registry.fetchAgentCards();
 
-        // 3. Create transport + engine client
-        A2ATransport transport = new A2ATransport(agentCards, null,
-                WorkflowEngineClientConfig.builder()
-                        .sslVerify(false)
-                        .a2atEnvPath(".env")
-                        .credentialsConfigPath("credentials.json")
+// 3. Create transport + engine client
+A2ATransport transport = new A2ATransport(agentCards, null,
+        WorkflowEngineClientConfig.builder()
+                .sslVerify(false)
+                .a2atEnvPath(".env")
+                .credentialsConfigPath("credentials.json")
+                .build());
+WorkflowEngineClient client = new DefaultWorkflowEngineClient(transport);
+
+// 4. Implement ControlPoint (business decisions only)
+ControlPoint controlPoint = new DefaultControlPoint() {
+    @Override
+    public CompletableFuture<TaskResponse> onTask(
+            TaskRequest request, WorkflowEngineClient engineClient) {
+        return engineClient
+                .sendMessage(request.getAgentName(), request.getMessage())
+                .thenApply(r -> TaskResponse.builder()
+                        .success(true)
+                        .output(r.getText())
                         .build());
-        WorkflowEngineClient client = new DefaultWorkflowEngineClient(transport);
+    }
+};
 
-        // 4. Implement ControlPoint (business decisions only)
-        ControlPoint controlPoint = new DefaultControlPoint() {
-            @Override
-            public CompletableFuture<TaskResponse> onTask(
-                    TaskRequest request, WorkflowEngineClient engineClient) {
-                return engineClient
-                        .sendMessage(request.getAgentName(), request.getMessage())
-                        .thenApply(r -> TaskResponse.builder()
-                                .success(true)
-                                .output(r.getText())
-                                .build());
-            }
-        };
+// 5. Execute
+ExecutionResult result = ExecutePsop.builder()
+        .psop(workflow)
+        .agentCards(agentCards)
+        .controlPoint(controlPoint)
+        .engineClient(client)
+        .runtimeIntent("Diagnose fault")
+        .lang("zh")
+        .execute()
+        .get(10, TimeUnit.MINUTES);
 
-        // 5. Execute
-        ExecutionResult result = ExecutePsop.builder()
-                .psop(workflow)
-                .agentCards(agentCards)
-                .controlPoint(controlPoint)
-                .engineClient(client)
-                .runtimeIntent("Diagnose fault")
-                .lang("zh")
-                .execute()
-                .get(10, TimeUnit.MINUTES);
-
-System.out.
-
-        println("Success: "+result.isSuccess());
+System.out.println("Success: " + result.isSuccess());
 ```
+
 
 ## Architecture
 

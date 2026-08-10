@@ -289,8 +289,8 @@ The SDK is standalone: it does not depend on the orchestration center.
    Authorization-T and Notification-T are one-shot sends before the workflow. The registry auto-registers only the
    in-workflow pair.
 
-4. **Auto-negotiation loop** - the engine owns the resend loop so hosts only supply clarification text
+3. **Auto-negotiation loop** - the engine owns the resend loop so hosts only supply clarification text
    (`onNegotiation`), never the protocol mechanics of resending.
 
-5. **Condition routing semantics** - empty conditions mean fan-out (parallel), conditional branches mean N-choose-1 via
+4. **Condition routing semantics** - empty conditions mean fan-out (parallel), conditional branches mean N-choose-1 via
    `onRoute`. Keeps the routing model predictable.

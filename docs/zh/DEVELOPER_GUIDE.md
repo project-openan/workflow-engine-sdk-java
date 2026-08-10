@@ -54,7 +54,6 @@ public class MyControlPoint implements ControlPoint {
 }
 ```
 
-`onAuthorization` 和 `onNotification` 有默认实现。
 `onNegotiation` 有默认实现，返回通用澄清文本。授权和通知是预置操作，通过 `ExtensionSender` 在工作流启动前发送，不在 `ControlPoint` 上。
 
 ## 4. 通过 Builder 执行（推荐）
