@@ -6,7 +6,6 @@ This file lists the maintainers of this repository. Maintainers have write acces
 | ------------ | ---- | ------------- |
 | Huawei  | Fei Guo | @guofei66 |
 | Huawei  | Jie Zhou | @Zhoujie628 |
-| The Linux Foundation  | Casey Cain | @wrathwolf |
 
 ## Emeritus Maintainers
 
