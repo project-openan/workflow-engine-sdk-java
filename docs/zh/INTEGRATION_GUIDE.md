@@ -18,7 +18,7 @@ A2A-T 工作流执行引擎是一个 Java SDK，用于基于 A2A 协议和 A2A-T
 ```xml
 
 <dependency>
-    <groupId>dev.openan.workflow.sdk</groupId>
+    <groupId>net.openan.workflow.sdk</groupId>
     <artifactId>workflow-engine</artifactId>
 <version>1.0.0</version>
 </dependency>

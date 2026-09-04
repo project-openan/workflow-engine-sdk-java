@@ -9,7 +9,7 @@ Add to your `pom.xml`:
 
 ```xml
 <dependency>
-    <groupId>dev.openan.workflow.sdk</groupId>
+    <groupId>net.openan.workflow.sdk</groupId>
     <artifactId>workflow-engine</artifactId>
     <version>1.0.0</version>
 </dependency>

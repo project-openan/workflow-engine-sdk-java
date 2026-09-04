@@ -5,7 +5,7 @@
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>dev.openan.workflow.sdk</groupId>
+    <groupId>net.openan.workflow.sdk</groupId>
     <artifactId>workflow-engine-parent</artifactId>
     <version>${revision}</version>
     <packaging>pom</packaging>

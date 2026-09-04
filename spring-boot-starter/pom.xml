@@ -6,7 +6,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>dev.openan.workflow.sdk</groupId>
+        <groupId>net.openan.workflow.sdk</groupId>
         <artifactId>workflow-engine-parent</artifactId>
         <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
@@ -24,7 +24,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>dev.openan.workflow.sdk</groupId>
+            <groupId>net.openan.workflow.sdk</groupId>
             <artifactId>workflow-engine</artifactId>
             <version>${revision}</version>
         </dependency>

@@ -9,9 +9,10 @@ name: Release to Maven Central
 # One-time setup (required before the first release can succeed):
 #   1. Central Portal account: https://central.sonatype.com (register, then generate a
 #      User Token under Account settings — this is the MAVEN_CENTRAL_USERNAME/PASSWORD pair).
-#   2. Namespace `dev.openan`: claim it in the Portal once the openan.dev domain is
-#      available, by adding the TXT record the Portal specifies to the domain's DNS.
-#      Until the namespace is verified, the Portal rejects every dev.openan upload.
+#   2. Namespace `net.openan`: already owned by the Central Portal account that
+#      publishes the a2a-t-sdk artifacts (same user token), so no extra namespace
+#      claim is needed. Migrating to `dev.openan` is a future change once the
+#      openan.dev domain is verified.
 #   3. GPG signing key: generate one (RSA 4096, no expiry or far expiry), publish the
 #      public key to a keyserver (e.g. https://keyserver.ubuntu.com). The Portal
 #      validates artifact signatures against keyservers.
@@ -22,10 +23,11 @@ name: Release to Maven Central
 #        SIGNING_KEY_ID          key id (last 8 hex chars is enough)
 #        SIGNING_PASSWORD        private key passphrase
 #
-# Publishing scope: only workflow-engine and spring-boot-starter are deployed.
-# samples is excluded from deployment via maven.deploy.skip, but the release gate still
-# builds and tests the full main reactor (main has no vendor-jar dependency; the Eastcom
-# adapter exists only on the dev branch).
+# Publishing scope: the parent pom, workflow-engine and spring-boot-starter are deployed.
+# The parent must ship: module poms take their groupId from it, and Central rejects a
+# bundle whose module coordinates cannot be resolved. samples is excluded from deployment
+# via maven.deploy.skip, but the release gate still builds and tests the full main reactor
+# (main has no vendor-jar dependency; the Eastcom adapter exists only on the dev branch).
 
 on:
   push:
@@ -133,7 +135,6 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           echo "Publishing version ${VERSION} from tag ${GITHUB_REF_NAME}"
           mvn -B -Prelease deploy \
-            -pl workflow-engine,spring-boot-starter \
             -Drevision="${VERSION}" \
             -Dgpg.executable=gpg \
             -Dgpg.keyname="${SIGNING_KEY_ID}"
