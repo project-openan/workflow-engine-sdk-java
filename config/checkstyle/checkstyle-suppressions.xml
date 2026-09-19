@@ -20,18 +20,7 @@
     <suppress checks="HideUtilityClassConstructor"
               files="SpringWorkbenchApplication\.java"/>
 
-    <!-- Cohesive protocol/demo entry methods exceeding the length budget
-         (EastcomOrderSimulatorServer exists on the dev branch only) -->
+    <!-- Cohesive protocol/demo entry methods exceeding the length budget -->
     <suppress checks="MethodLength"
-              files="SpringSpnDemo\.java|EastcomOrderSimulatorServer\.java"/>
-
-    <!-- Vendor adapter: wire-compatibility parse/fallback complexity is intrinsic
-         (dev branch only) -->
-    <suppress checks="CyclomaticComplexity"
-              files="EastcomOrderSimulatorServer\.java"/>
-
-    <!-- Conventional lowercase static-final holders: loggers, mappers, encoding flags
-         (OrderGatewayClientRuntime exists on the dev branch only) -->
-    <suppress checks="ConstantName"
-              files="EastcomOrderSimulatorServer\.java|OrderGatewayClientRuntime\.java"/>
+              files="SpringSpnDemo\.java"/>
 </suppressions>

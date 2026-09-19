@@ -79,15 +79,13 @@
         </Or>
     </Match>
 
-    <!-- Vendor SDK adapter classes: the vendor API shape is out of our control. -->
+    <!-- The gateway adapter and protocol simulator packages exist only on the dev
+         branch: their vendor-driven API shape, catch-and-continue request loops,
+         token-service login retries, and Spring-style configuration holders are
+         accepted there. On main the package does not exist and this filter
+         matches nothing. -->
     <Match>
-        <Or>
-            <Class name="~.*OrderHttpClientAdapter.*"/>
-            <Class name="~.*OrderGatewayClientRuntime.*"/>
-            <Class name="~.*EastcomOrderByteBufWorkaround.*"/>
-            <Class name="~.*MockGatewayServer.*"/>
-            <Class name="~.*MockOrderHttpSessionClient.*"/>
-        </Or>
+        <Package name="dev.openan.workflow.engine.examples.gateway"/>
     </Match>
 
     <!-- Samples/demo code: accepted demo-quality items; review on next touch.

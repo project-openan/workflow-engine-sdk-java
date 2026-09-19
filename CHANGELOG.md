@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.0] — 2026-09-18
 
 - Send SSE heartbeat comments on streaming endpoints (`message:stream`, `tasks/{id}:subscribe`) at a configurable
   interval (`a2at.server.heartbeat-interval-seconds`, default 15 seconds, `0` disables). Keeps intermediaries
@@ -11,6 +11,10 @@
   `TaskResult`, `BusinessFailure`, and the message records). Source- and binary-compatible; callers
   that mutate the collections returned by these getters now receive `UnsupportedOperationException`
   instead of silently corrupting engine-owned snapshots.
+- Template the sample OMC agent credentials file: the tracked
+  `samples/src/main/resources/spn_agent_credentials.json` is replaced by
+  `spn_agent_credentials.example.json` (real file is now git-ignored; copy the example to run the
+  demos). Missing credentials now fail with an actionable message instead of a bare NPE.
 
 ## [0.0.10] — 2026-09-16
 
@@ -35,7 +39,7 @@
   carries no taskId. Invalid negotiation metadata on a bare message now fails explicitly instead of being silently
   treated as a normal successful response.
 - Converge non-functional formatting and javadoc drift between `main` and `dev` so the branches differ only in the
-  Eastcom platform integration.
+  instruction-platform integration.
 
 ## [0.0.8] — 2026-09-13
 

@@ -38,12 +38,12 @@ subscription remains open until the host-defined terminal event, explicit cancel
 
 ### 1. Add Maven dependency
 
-The current engine release is `0.0.9` on [Maven Central](https://repo.maven.apache.org/maven2/net/openan/workflow/sdk/).
+The current engine release is `0.1.0` on [Maven Central](https://repo.maven.apache.org/maven2/net/openan/workflow/sdk/).
 
-A2A-T SDK `1.1.0` is published to Maven Central. Maven resolves it automatically; no SDK source checkout or local SDK
+A2A-T SDK `1.1.1` is published to Maven Central. Maven resolves it automatically; no SDK source checkout or local SDK
 build is required. The engine depends only on
-`a2a-t-core`; host agents using content generation explicitly add `a2a-t-client:1.1.0`. A dispatched-agent service that
-validates received extension content adds `a2a-t-server:1.1.0`. See the bilingual
+`a2a-t-core`; host agents using content generation explicitly add `a2a-t-client:1.1.1`. A dispatched-agent service that
+validates received extension content adds `a2a-t-server:1.1.1`. See the bilingual
 [Developer Guide](docs/en/DEVELOPER_GUIDE.md) / [开发者指南](docs/zh/DEVELOPER_GUIDE.md) for dependency and
 upgrade guidance.
 
@@ -51,7 +51,7 @@ upgrade guidance.
 <dependency>
     <groupId>net.openan.workflow.sdk</groupId>
     <artifactId>workflow-engine</artifactId>
-    <version>0.0.9</version>
+    <version>0.1.0</version>
 </dependency>
 ```
 
@@ -61,9 +61,18 @@ For Spring Boot server-side integration:
 <dependency>
     <groupId>net.openan.workflow.sdk</groupId>
     <artifactId>spring-boot-starter</artifactId>
-    <version>0.0.9</version>
+    <version>0.1.0</version>
 </dependency>
 ```
+
+### Agent credentials for the samples
+
+The sample demos read `samples/src/main/resources/spn_agent_credentials.json`, which is
+git-ignored. Copy `spn_agent_credentials.example.json` to that name to run against the bundled
+demo OMC — the checked-in defaults pair with the demo's embedded OMC server. When targeting a
+real OMC, replace the endpoint and user name, and encrypt the password with `CredentialCrypto`
+(set `A2AT_CRED_KEY`, then use the `enc:`-prefixed output). Tests use the tracked test resource
+and need no setup.
 
 ### 2. Execute a workflow
 

@@ -47,7 +47,16 @@ public final class OmcAgentLauncher implements AutoCloseable {
 
   /** Path of a classpath resource as an absolute file path (demo credentials lookup). */
   public static String resourcePath(String resourcePath) {
-    return OmcAgentLauncher.class.getClassLoader().getResource(resourcePath).getPath();
+    var url = OmcAgentLauncher.class.getClassLoader().getResource(resourcePath);
+    if (url == null) {
+      throw new IllegalStateException(
+          "Classpath resource not found: "
+              + resourcePath
+              + ". If this is the OMC credentials file, copy"
+              + " spn_agent_credentials.example.json to spn_agent_credentials.json"
+              + " and fill in the target OMC credentials.");
+    }
+    return url.getPath();
   }
 
   /** Load an agentcard resource, bind to the address declared in its first interface, and start. */
