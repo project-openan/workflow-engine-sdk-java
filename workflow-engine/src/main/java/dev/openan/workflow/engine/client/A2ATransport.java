@@ -661,6 +661,7 @@ public class A2ATransport implements AutoCloseable {
                           subscription.completeStream();
                         }
                       } finally {
+                        closeConversation(agentCard, contextId);
                         notificationSubscriptions.remove(subscription);
                         subscription.markStreamTerminated();
                       }

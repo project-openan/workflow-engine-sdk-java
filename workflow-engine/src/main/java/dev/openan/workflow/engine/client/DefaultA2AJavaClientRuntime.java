@@ -35,6 +35,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.a2aproject.sdk.client.Client;
@@ -185,8 +186,15 @@ public class DefaultA2AJavaClientRuntime
       List<ClientEvent> events,
       AtomicReference<ClientEvent> lastEventRef,
       Consumer<ClientEvent> eventSink,
-      CountDownLatch done) {
-    events.add(event);
+      CountDownLatch done,
+      AtomicLong lastActivityNanos,
+      AtomicLong eventCount) {
+    if (lastActivityNanos != null) {
+      lastActivityNanos.set(System.nanoTime());
+      eventCount.incrementAndGet();
+    } else {
+      events.add(event);
+    }
     lastEventRef.set(event);
     logEvent(agentName, event);
     ProtocolLogger.logResponseEvent(agentName, event);
@@ -330,9 +338,21 @@ public class DefaultA2AJavaClientRuntime
             ? null
             : callContext.getState().get(A2AJavaClientRuntime.TRANSPORT_ACTIVITY_STATE_KEY);
     Runnable activityListener = configuredActivity instanceof Runnable runnable ? runnable : null;
+    boolean notificationStream = isNotificationStream(callContext);
+    AtomicLong lastActivityNanos = notificationStream ? new AtomicLong(System.nanoTime()) : null;
+    AtomicLong eventCount = notificationStream ? new AtomicLong() : null;
+    Runnable observedActivity =
+        notificationStream
+            ? () -> {
+              lastActivityNanos.set(System.nanoTime());
+              if (activityListener != null) activityListener.run();
+            }
+            : activityListener;
     return TransportActivityMonitor.call(
-        activityListener,
-        () -> sendMessageObserved(agentCard, params, callContext, eventSink, logSink));
+        observedActivity,
+        () ->
+            sendMessageObserved(
+                agentCard, params, callContext, eventSink, logSink, lastActivityNanos, eventCount));
   }
 
   private Iterable<ClientEvent> sendMessageObserved(
@@ -340,7 +360,9 @@ public class DefaultA2AJavaClientRuntime
       org.a2aproject.sdk.spec.MessageSendParams params,
       ClientCallContext callContext,
       Consumer<ClientEvent> eventSink,
-      Consumer<String> logSink) {
+      Consumer<String> logSink,
+      AtomicLong lastActivityNanos,
+      AtomicLong eventCount) {
     if (closed.get()) throw new IllegalStateException("A2A client runtime is closed");
     String agentUrl = extractAgentUrl(agentCard);
     Client client =
@@ -356,27 +378,55 @@ public class DefaultA2AJavaClientRuntime
     if (logSink != null) logSink.accept("[A2A] Sending message to " + agentCard.name());
 
     try {
-      client.sendMessage(
-          params,
-          List.of(
-              (event, card) ->
-                  onEvent(agentCard.name(), event, events, lastEventRef, eventSink, done)),
-          error -> onError(agentCard.name(), error, done, errorRef),
-          callContext);
-    } catch (A2AClientException e) {
-      throw new RuntimeException(
-          "A2A message:send failed for " + agentCard.name() + ": " + e.getMessage(), e);
-    }
+      try {
+        client.sendMessage(
+            params,
+            List.of(
+                (event, card) ->
+                    onEvent(
+                        agentCard.name(),
+                        event,
+                        events,
+                        lastEventRef,
+                        eventSink,
+                        done,
+                        lastActivityNanos,
+                        eventCount)),
+            error -> onError(agentCard.name(), error, done, errorRef),
+            callContext);
+      } catch (A2AClientException e) {
+        throw new RuntimeException(
+            "A2A message:send failed for " + agentCard.name() + ": " + e.getMessage(), e);
+      }
 
-    awaitCompletion(agentCard.name(), done, events, lastEventRef);
+      if (lastActivityNanos != null) {
+        awaitNotificationActivity(agentCard.name(), done, lastActivityNanos::get);
+      } else {
+        awaitCompletion(agentCard.name(), done, events, lastEventRef);
+      }
 
-    if (errorRef.get() != null) {
-      throw new RuntimeException(
-          "A2A message:send failed for " + agentCard.name() + ": " + errorRef.get().getMessage(),
-          errorRef.get());
+      if (errorRef.get() != null) {
+        throw new RuntimeException(
+            "A2A message:send failed for " + agentCard.name() + ": " + errorRef.get().getMessage(),
+            errorRef.get());
+      }
+      log.info(
+          "[A2ARuntime] Completed for '{}': {} event(s)",
+          agentCard.name(),
+          eventCount != null ? eventCount.get() : events.size());
+      return events;
+    } finally {
+      if (lastActivityNanos != null && params.message() != null) {
+        try {
+          closeConversation(agentCard, params.message().contextId());
+        } catch (RuntimeException closeError) {
+          log.warn(
+              "[A2ARuntime] Failed to close Notification-T transport for '{}'",
+              agentCard.name(),
+              closeError);
+        }
+      }
     }
-    log.info("[A2ARuntime] Completed for '{}': {} event(s)", agentCard.name(), events.size());
-    return events;
   }
 
   private Client getOrCreateClient(AgentCard agentCard, String agentUrl) {
@@ -523,6 +573,44 @@ public class DefaultA2AJavaClientRuntime
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException("A2A message:send interrupted for " + agentName, e);
+    }
+  }
+
+  /**
+   * Waits for a Notification-T stream to end without expecting task finality.
+   *
+   * <p>Subscription tasks stay {@code WORKING} for their whole lifetime and deliver events
+   * (heartbeats included) without ever completing, so a finality-based wait would tear down a
+   * healthy subscription once {@code sendTimeoutSeconds} elapsed. The stream instead ends through
+   * the error/terminal-event latch: a server-side close, a transport failure, or {@link
+   * dev.openan.workflow.engine.client.NotificationSubscription#close()}. The stream is only reaped
+   * when no transport activity or decoded event has arrived for {@code sendTimeoutSeconds}.
+   *
+   * @param agentName target agent display name, for diagnostics only
+   * @param done latch released on terminal event or stream error
+   * @param lastActivityNanos monotonic time of the most recent stream activity
+   */
+  void awaitNotificationActivity(
+      String agentName, CountDownLatch done, java.util.function.LongSupplier lastActivityNanos) {
+    long idleBudgetNanos = TimeUnit.SECONDS.toNanos(sendTimeoutSeconds);
+    while (true) {
+      if (done.getCount() == 0) return;
+      long idleNanos = System.nanoTime() - lastActivityNanos.getAsLong();
+      long remainingNanos = idleBudgetNanos - idleNanos;
+      if (remainingNanos <= 0) {
+        log.error(
+            "[A2ARuntime] TIMEOUT for '{}' after {}s without Notification-T activity",
+            agentName,
+            sendTimeoutSeconds);
+        throw new RuntimeException(
+            "A2A notification stream idle for " + sendTimeoutSeconds + "s for " + agentName);
+      }
+      try {
+        if (done.await(remainingNanos, TimeUnit.NANOSECONDS)) return;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("A2A notification stream interrupted for " + agentName, e);
+      }
     }
   }
 
