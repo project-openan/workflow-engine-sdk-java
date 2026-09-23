@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.openan.workflow.engine.StubWorkflowEngineClient;
@@ -89,6 +90,119 @@ class WorkflowExecutorTest {
 
   private JumpCondition jump(String step, String cond) {
     return JumpCondition.builder().step(step).condition(cond).build();
+  }
+
+  @Test
+  void mergeWaitsForActiveAncestorsBeforeItsDirectPredecessorIsActivated() {
+    List<String> mergeSources = new ArrayList<>();
+    List<WorkflowStep> steps = new ArrayList<>();
+    for (String name : List.of("short", "long1", "long2", "long3", "merge")) {
+      String next =
+          switch (name) {
+            case "short", "long3" -> "merge";
+            case "long1" -> "long2";
+            case "long2" -> "long3";
+            default -> null;
+          };
+      steps.add(
+          WorkflowStep.builder()
+              .name(name)
+              .stepType(StepType.SELF_LOOP)
+              .subtasks(List.of(task("local", name)))
+              .next(next == null ? List.of() : List.of(jump(next, "")))
+              .build());
+    }
+    ControlPoint callbacks =
+        ControlPoint.builder()
+            .onSelfTask(
+                request -> {
+                  if (request.getStepName().equals("merge")) {
+                    request
+                        .getWorkflowInput()
+                        .upstreamResults()
+                        .forEach(result -> mergeSources.add(result.stepName()));
+                  }
+                  return CompletableFuture.completedFuture(
+                      TaskResult.success(List.of(request.getStepName())));
+                })
+            .build();
+
+    ExecutionResult result =
+        new WorkflowExecutor(
+                Workflow.builder().steps(steps).build(),
+                callbacks,
+                new StubWorkflowEngineClient(),
+                null,
+                "",
+                "en")
+            .run()
+            .join();
+
+    assertTrue(result.isSuccess());
+    assertEquals(Set.of("short", "long3"), new HashSet<>(mergeSources));
+    assertEquals(5, result.getHistory().size());
+  }
+
+  @Test
+  void cancellationPropagatesToPendingLocalCallback() throws Exception {
+    CompletableFuture<TaskResult> local = new CompletableFuture<>();
+    CompletableFuture<Void> entered = new CompletableFuture<>();
+    ControlPoint callbacks =
+        ControlPoint.builder()
+            .onSelfTask(
+                request -> {
+                  entered.complete(null);
+                  return local;
+                })
+            .build();
+    WorkflowStep step =
+        WorkflowStep.builder()
+            .name("local")
+            .stepType(StepType.SELF_LOOP)
+            .subtasks(List.of(task("local", "work")))
+            .build();
+    var run =
+        new WorkflowExecutor(
+                Workflow.builder().steps(List.of(step)).build(),
+                callbacks,
+                new StubWorkflowEngineClient(),
+                null,
+                "",
+                "en")
+            .run();
+    entered.get(3, TimeUnit.SECONDS);
+    run.cancel(true);
+    // The callback can return concurrently with cancellation; await propagation without sleeps.
+    assertThrows(
+        java.util.concurrent.CancellationException.class, () -> local.get(3, TimeUnit.SECONDS));
+  }
+
+  @Test
+  void cancellationPropagatesToPendingRouteCallback() throws Exception {
+    CompletableFuture<RouteDecision> route = new CompletableFuture<>();
+    CompletableFuture<Void> entered = new CompletableFuture<>();
+    ControlPoint callbacks =
+        ControlPoint.builder()
+            .onRoute(
+                request -> {
+                  entered.complete(null);
+                  return route;
+                })
+            .build();
+    WorkflowStep start =
+        WorkflowStep.builder().name("start").next(List.of(jump("end", "condition"))).build();
+    var run =
+        new WorkflowExecutor(
+                Workflow.builder().steps(List.of(start)).build(),
+                callbacks,
+                new StubWorkflowEngineClient(),
+                null,
+                "",
+                "en")
+            .run();
+    entered.get(3, TimeUnit.SECONDS);
+    run.cancel(true);
+    assertTrue(route.isCancelled());
   }
 
   /** ControlPoint that prepares task content and allows every conditional edge. */

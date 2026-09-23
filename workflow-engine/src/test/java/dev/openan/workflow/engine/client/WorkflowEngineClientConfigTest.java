@@ -59,6 +59,15 @@ class WorkflowEngineClientConfigTest {
   void rejectsInvalidResourceLimits() {
     assertThrows(
         IllegalArgumentException.class,
+        () -> WorkflowEngineClientConfig.builder().taskPollIntervalMillis(99).build());
+    assertEquals(
+        100,
+        WorkflowEngineClientConfig.builder()
+            .taskPollIntervalMillis(100)
+            .build()
+            .getTaskPollIntervalMillis());
+    assertThrows(
+        IllegalArgumentException.class,
         () -> WorkflowEngineClientConfig.builder().maxNegotiationExchanges(0).build());
     assertThrows(
         IllegalArgumentException.class,

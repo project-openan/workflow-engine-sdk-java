@@ -257,6 +257,9 @@ public class WorkflowEngineClientConfig {
       if (maxNegotiationExchanges <= 0) {
         throw new IllegalArgumentException("maxNegotiationExchanges must be positive");
       }
+      if (taskPollIntervalMillis < 100) {
+        throw new IllegalArgumentException("taskPollIntervalMillis must be at least 100ms");
+      }
       if (credentialsConfigPath != null && credentialsConfig != null) {
         throw new IllegalArgumentException(
             "credentialsConfigPath and credentialsConfig are mutually exclusive");

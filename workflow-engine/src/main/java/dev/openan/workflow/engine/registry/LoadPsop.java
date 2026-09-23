@@ -116,11 +116,7 @@ public class LoadPsop {
           .append(URLEncoder.encode(accessToken, StandardCharsets.UTF_8));
     }
     String url = urlBuilder.toString();
-    log.info(
-        "[Registry] Searching PSOP at {} (intent={}, top_n={})",
-        anonymousUrl(url, accessToken),
-        intent,
-        topN);
+    log.info("[Registry] Searching PSOP at {} (top_n={})", anonymousUrl(url, accessToken), topN);
     String jsonBody = mapper.writeValueAsString(Map.of("intent", intent, "top_n", topN));
     HttpResult resp = execute("POST", url, jsonBody, sslVerify, timeouts);
     if (resp.statusCode() != 200) {

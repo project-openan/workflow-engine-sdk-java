@@ -97,17 +97,17 @@ public final class SensitiveDataRedactor {
   public static boolean sensitive(String name) {
     String key = name.toLowerCase(Locale.ROOT);
     if (key.contains("://")) return false;
-    return key.contains("authorization")
+    String normalized = key.replace("-", "").replace("_", "");
+    return normalized.contains("authorization")
         || key.contains("cookie")
-        || key.contains("token")
-        || key.contains("secret")
-        || key.contains("password")
-        || key.equals("pwd")
-        || key.equals("passwd")
-        || key.equals("accesssession")
-        || key.equals("x-api-key")
-        || key.equals("api-key")
-        || key.equals("apikey");
+        || normalized.contains("token")
+        || normalized.contains("secret")
+        || normalized.contains("password")
+        || normalized.equals("pwd")
+        || normalized.equals("passwd")
+        || normalized.equals("accesssession")
+        || normalized.equals("xapikey")
+        || normalized.equals("apikey");
   }
 
   public static Map<String, List<String>> safeHeaders(Map<String, List<String>> headers) {

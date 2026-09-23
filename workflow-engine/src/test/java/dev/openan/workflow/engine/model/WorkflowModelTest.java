@@ -29,6 +29,42 @@ import org.junit.jupiter.api.Test;
 class WorkflowModelTest {
 
   @Test
+  void mapLoadingPreservesStructuredBusinessInput() {
+    Map<String, Object> input = Map.of("data", Map.of("serviceId", "service-42"));
+    Workflow workflow =
+        Workflow.fromMap(
+            Map.of(
+                "steps",
+                List.of(
+                    Map.of(
+                        "name",
+                        "start",
+                        "subtasks",
+                        List.of(
+                            Map.of("agent", "A", "description", "diagnose", "input", input))))));
+    assertEquals(
+        BusinessInput.data(Map.of("serviceId", "service-42")),
+        workflow.getSteps().get(0).getSubtasks().get(0).getInput());
+  }
+
+  @Test
+  void mapLoadingRejectsAmbiguousBusinessInput() {
+    Map<String, Object> input = Map.of("text", "diagnose", "data", Map.of("id", 42));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            Workflow.fromMap(
+                Map.of(
+                    "steps",
+                    List.of(
+                        Map.of(
+                            "name",
+                            "start",
+                            "subtasks",
+                            List.of(Map.of("agent", "A", "input", input)))))));
+  }
+
+  @Test
   void parsesLinearWorkflow() {
     Map<String, Object> data =
         Map.of(

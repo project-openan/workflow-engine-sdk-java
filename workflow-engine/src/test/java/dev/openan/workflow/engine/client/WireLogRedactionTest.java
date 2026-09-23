@@ -27,6 +27,16 @@ import org.junit.jupiter.api.Test;
 
 class WireLogRedactionTest {
   @Test
+  void masksUnderscoredCredentialNamesInJsonAndHeaders() {
+    assertEquals(
+        "{\"api_key\":\"***\",\"access_session\":\"***\"}",
+        WireLog.redact("{\"api_key\":\"hidden\",\"access_session\":\"hidden\"}"));
+    assertEquals(
+        List.of("***"),
+        WireLog.safeHeaders(Map.of("X-Api_Key", List.of("hidden"))).get("X-Api_Key"));
+  }
+
+  @Test
   void masksAuthorizationValuesInRemoteErrorText() {
     assertEquals(
         "Rejected Bearer ***; Basic ***",

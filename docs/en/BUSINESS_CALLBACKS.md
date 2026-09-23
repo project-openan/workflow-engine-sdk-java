@@ -1,6 +1,6 @@
 # Business callback integration contract
 
-Release `0.0.9` API; A2A-T SDK `1.1.0`, A2A Java `1.2.0.Final`. The engine owns DAG scheduling, standard A2A envelopes,
+Release `0.1.0` API; A2A-T SDK `1.1.1`, A2A Java `1.2.0.Final`. The engine owns DAG scheduling, standard A2A envelopes,
 auth, transport and task waiting. The host owns content, schemas, templates, semantic validation and any LLM calls.
 The business contracts are independent of the transport runtime.
 
@@ -247,7 +247,7 @@ independent extension lifecycles, failure propagation, cancellation, and protoco
 fixtures and do not shadow SDK schemas/templates. They are release regression evidence, not certification of production
 endpoints or live model semantics. See [Integration guide](INTEGRATION_GUIDE.md) for logging and authentication.
 
-## 9. Business-side A2A-T 1.1.0 reference
+## 9. Business-side A2A-T 1.1.1 reference
 
 Content generation, validation, filling and domain decisions belong to host-agent and dispatched-agent business code,
 not the engine. Each role calls only the APIs needed for the message it owns.

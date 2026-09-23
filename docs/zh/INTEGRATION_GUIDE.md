@@ -20,11 +20,11 @@ A2A-T 工作流执行引擎是一个 Java SDK，用于基于 A2A 协议和 A2A-T
 <dependency>
     <groupId>net.openan.workflow.sdk</groupId>
     <artifactId>workflow-engine</artifactId>
-<version>0.0.9</version>
+    <version>0.1.0</version>
 </dependency>
 ```
 
-`0.0.9` 已发布到 Maven Central，包含本文说明的接口。
+`0.1.0` 已发布到 Maven Central；当前仓库构建版本为 `0.1.0-SNAPSHOT`。
 
 ## 4. 快速上手
 
@@ -217,17 +217,17 @@ A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 
 **加密密码**
 
-先执行 `mvn -pl workflow-engine -am "-Drevision=0.0.9" package`，以下命令在仓库根目录运行，仅需 SDK jar 和 JDK。
+先执行 `mvn -pl workflow-engine -am "-Drevision=0.1.0" package`，以下命令在仓库根目录运行，仅需 SDK jar 和 JDK。
 `set` 是 Windows cmd 语法，PowerShell 应使用 `$env:A2AT_CRED_KEY='...'`。
 以下参数仅用于演示；命令行口令/密钥可能进入终端历史和进程参数。生产应由集成方安全读取密钥并调用 Java 加密 API。
 
 ```bash
 # 方式一：先设置环境变量
 set A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
-java -cp workflow-engine/target/workflow-engine-0.0.9.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123"
+java -cp workflow-engine/target/workflow-engine-0.1.0.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123"
 
 # 方式二：密钥作为第二个参数
-java -cp workflow-engine/target/workflow-engine-0.0.9.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+java -cp workflow-engine/target/workflow-engine-0.1.0.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```
 
 输出：
@@ -242,7 +242,7 @@ enc:uHQcTeKZMVNRM9Ga:o5vm4weRozBXBs04phrLq7j7+/yRVyDsrw==
 
 1. 生成新密钥：`openssl rand -hex 32`
 2. 更新集成方密钥存储及显式 `credentialEncryptionKey`，或 OS/JVM 的 `A2AT_CRED_KEY`；引擎不自动加载 `.env`
-3. 用新密钥重新加密所有密码：`java -cp workflow-engine/target/workflow-engine-0.0.9.jar dev.openan.workflow.engine.client.CredentialCrypto "明文密码" 新密钥`
+3. 用新密钥重新加密所有密码：`java -cp workflow-engine/target/workflow-engine-0.1.0.jar dev.openan.workflow.engine.client.CredentialCrypto "明文密码" 新密钥`
 4. 将新的 `enc:...` 结果更新到凭证 JSON 文件
 
 > `.env` 文件不应提交到版本库，建议加入 `.gitignore`。

@@ -22,11 +22,11 @@ callbacks own A2A-T generation, semantic validation, schemas and any LLM calls.
 <dependency>
     <groupId>net.openan.workflow.sdk</groupId>
     <artifactId>workflow-engine</artifactId>
-<version>0.0.9</version>
+    <version>0.1.0</version>
 </dependency>
 ```
 
-Version `0.0.9` is published to Maven Central and contains the APIs documented in this guide.
+Version `0.1.0` is published to Maven Central. The repository currently builds `0.1.0-SNAPSHOT`.
 
 ## 4. Quick Start
 
@@ -227,7 +227,7 @@ configuration without modifying system properties. Never log plaintext or the ke
 
 **Encrypt a password**
 
-Build the jar with `mvn -pl workflow-engine -am "-Drevision=0.0.9" package`; commands below run from the repository root.
+Build the jar with `mvn -pl workflow-engine -am "-Drevision=0.1.0" package`; commands below run from the repository root.
 `set` is Windows cmd syntax (PowerShell: `$env:A2AT_CRED_KEY='...'`). This CLI needs only the SDK jar and JDK.
 Use disposable example values here: command-line passwords/keys can appear in shell history and process listings.
 For production, obtain secrets securely in the host and use the Java encryption API.
@@ -235,10 +235,10 @@ For production, obtain secrets securely in the host and use the Java encryption 
 ```bash
 # Option 1: set env var first
 set A2AT_CRED_KEY=4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
-java -cp workflow-engine/target/workflow-engine-0.0.9.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123"
+java -cp workflow-engine/target/workflow-engine-0.1.0.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123"
 
 # Option 2: pass key as second argument
-java -cp workflow-engine/target/workflow-engine-0.0.9.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+java -cp workflow-engine/target/workflow-engine-0.1.0.jar dev.openan.workflow.engine.client.CredentialCrypto "Admin@123" 4f8a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
 ```
 
 Output:
@@ -254,7 +254,7 @@ Paste the output into the `value` field of the credentials JSON.
 1. Generate a new key: `openssl rand -hex 32`
 2. Update the host secret store / explicit `credentialEncryptionKey`, or its OS/JVM `A2AT_CRED_KEY`
 3. Re-encrypt all passwords:
-   `java -cp workflow-engine/target/workflow-engine-0.0.9.jar dev.openan.workflow.engine.client.CredentialCrypto "plaintext" new-key`
+   `java -cp workflow-engine/target/workflow-engine-0.1.0.jar dev.openan.workflow.engine.client.CredentialCrypto "plaintext" new-key`
 4. Update the `enc:...` results in the credentials JSON file
 
 > The `.env` file should not be committed to version control. Add it to `.gitignore`.

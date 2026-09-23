@@ -115,10 +115,7 @@ public class ExecutePsop {
               runtimeIntent != null ? runtimeIntent : "",
               lang != null ? lang : "zh");
       log.info(
-          "[execute_psop] Starting: workflow={}, {} steps, intent={}",
-          psop.getName(),
-          psop.getSteps().size(),
-          runtimeIntent);
+          "[execute_psop] Starting: workflow={}, {} steps", psop.getName(), psop.getSteps().size());
       collectingCallback.onEvent(
           EventType.START, Map.of("workflow", psop.getName(), "steps", psop.getSteps().size()));
       execution = executor.run();
