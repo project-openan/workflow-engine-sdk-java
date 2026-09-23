@@ -346,6 +346,45 @@ class A2ATransportHeaderTest {
   }
 
   @Test
+  void failedNotificationCallReleasesConversation() throws Exception {
+    AgentCard card = agentCard();
+    AtomicInteger closes = new AtomicInteger();
+    class FailingRuntime implements A2AJavaClientRuntime, ConversationScopedA2AJavaClientRuntime {
+      @Override
+      public Iterable<ClientEvent> sendMessage(
+          AgentCard agentCard,
+          MessageSendParams params,
+          ClientCallContext callContext,
+          Consumer<ClientEvent> eventSink,
+          Consumer<String> logSink) {
+        throw new IllegalStateException("stream failed");
+      }
+
+      @Override
+      public void closeConversation(AgentCard agentCard, String contextId) {
+        assertEquals("context-failed", contextId);
+        closes.incrementAndGet();
+      }
+
+      @Override
+      public void close() {}
+    }
+    A2ATransport transport =
+        new A2ATransport(
+            List.of(card), new FailingRuntime(), WorkflowEngineClientConfig.builder().build());
+    try {
+      NotificationSubscription subscription =
+          transport.openNotificationStream(
+              card, card.name(), content("subscribe", Map.of()), "context-failed", null);
+
+      assertThrows(CompletionException.class, () -> subscription.completion().join());
+      assertEquals(1, closes.get());
+    } finally {
+      transport.close();
+    }
+  }
+
+  @Test
   void borrowedClientDoesNotCloseCallerOwnedTransport() throws Exception {
     AtomicInteger closeCalls = new AtomicInteger();
     A2ATransport transport =
