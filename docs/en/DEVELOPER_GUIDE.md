@@ -11,11 +11,11 @@ Add to your `pom.xml`:
 <dependency>
     <groupId>net.openan.workflow.sdk</groupId>
     <artifactId>workflow-engine</artifactId>
-    <version>0.0.9</version>
+    <version>0.1.0</version>
 </dependency>
 ```
 
-Version `0.0.9` is published to Maven Central and contains the APIs documented in this guide.
+Version `0.1.0` is published to Maven Central. The repository currently builds `0.1.0-SNAPSHOT`.
 
 The engine pulls in A2A protocol transports and a2a-t-core only. Host agents generating A2A-T content explicitly add
 a2a-t-client; dispatched-agent services that validate received content also add a2a-t-server.

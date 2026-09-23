@@ -101,10 +101,9 @@ public class WorkflowExecutor {
     this.contextBuilder = new ContextBuilder(this.workflow, runtimeIntent);
     this.lang = lang != null ? lang : "zh";
     log.info(
-        "[Executor] Workflow: {}, steps={}, intent={}, lang={}",
+        "[Executor] Workflow: {}, steps={}, lang={}",
         workflow.getName(),
         workflow.getSteps().size(),
-        runtimeIntent,
         lang);
   }
 
@@ -114,6 +113,10 @@ public class WorkflowExecutor {
 
   private static <T> void completeFrom(
       CompletableFuture<T> destination, CompletableFuture<T> source) {
+    destination.whenComplete(
+        (value, error) -> {
+          if (error != null && !source.isDone()) source.cancel(true);
+        });
     source.whenComplete(
         (value, error) -> {
           if (error != null) destination.completeExceptionally(error);
@@ -198,9 +201,11 @@ public class WorkflowExecutor {
         continue;
       }
       var step = workflow.getSteps().get(idx);
-      var preds = contextBuilder.getStepPredecessors(step.getName());
+      // A direct predecessor can still be inactive while an earlier branch is running and may
+      // activate it later. Wait for every active ancestor before deciding which join inputs exist.
+      var ancestors = contextBuilder.getAllPredecessors(step.getName());
       boolean activePredecessorsComplete =
-          preds.stream()
+          ancestors.stream()
               .filter(
                   predecessor -> {
                     Integer predecessorIndex = contextBuilder.findStepIndex(predecessor);
@@ -225,7 +230,7 @@ public class WorkflowExecutor {
                     idx -> {
                       WorkflowStep step = workflow.getSteps().get(idx);
                       List<String> missing =
-                          contextBuilder.getStepPredecessors(step.getName()).stream()
+                          contextBuilder.getAllPredecessors(step.getName()).stream()
                               .filter(
                                   predecessor -> {
                                     Integer predecessorIndex =
@@ -368,6 +373,10 @@ public class WorkflowExecutor {
             var prepared =
                 java.util.Objects.requireNonNull(
                     controlPoint.onTask(request), "onTask returned null future");
+            result.whenComplete(
+                (value, error) -> {
+                  if (error != null && !prepared.isDone()) prepared.cancel(true);
+                });
             prepared.whenComplete(
                 (content, error) -> {
                   if (result.isDone() || stopped.get()) {
@@ -690,7 +699,13 @@ public class WorkflowExecutor {
             "status",
             task.getStatus().getValue()));
     String status = response.isSuccess() ? "success" : "failed";
-    log.info("[Executor] Task {} -> {}: {}", task.getDescription(), task.getAgent(), status);
+    log.info(
+        "[Executor] Task executionId={}, step={}, taskId={}, agent={}, status={}",
+        executionId,
+        step.getName(),
+        taskId(step.getName(), subtaskIndex),
+        task.getAgent(),
+        status);
     if (!response.isSuccess()) {
       log.warn(
           "[Executor] TASK_FAILED executionId={}, step={}, taskId={}, agent={}, errorCode={},"
@@ -703,9 +718,6 @@ public class WorkflowExecutor {
           SensitiveDataRedactor.redact(response.getError())
               .replace("\r", "\\r")
               .replace("\n", "\\n"));
-    }
-    if (response.isSuccess() && !response.getOutputs().isEmpty()) {
-      log.debug("[Executor] Task outputs from {}: [{}]", task.getAgent(), response.getOutputs());
     }
     List<Object> outputs = response.getOutputs();
     executionHistory.add(
@@ -893,25 +905,36 @@ public class WorkflowExecutor {
               routeEvaluationFailure(
                   step, edge, new NullPointerException("onRoute returned null future")));
     }
+    CompletableFuture<RouteDecision> callbackDecision = decision;
+    CompletableFuture<RouteDecision> bounded = new CompletableFuture<>();
+    activeTasks.add(bounded);
+    bounded.whenComplete(
+        (value, error) -> {
+          activeTasks.remove(bounded);
+          if (error != null && !callbackDecision.isDone()) callbackDecision.cancel(true);
+        });
+    callbackDecision.whenComplete(
+        (value, error) -> {
+          if (error != null) bounded.completeExceptionally(error);
+          else bounded.complete(value);
+        });
+    bounded.orTimeout(engineClient.callbackTimeoutSeconds(), TimeUnit.SECONDS);
+    if (stopped.get()) bounded.cancel(true);
     return new RouteEvaluation(
         edge,
         true,
-        decision
-            .orTimeout(engineClient.callbackTimeoutSeconds(), TimeUnit.SECONDS)
-            .handle(
-                (value, error) -> {
-                  if (error != null) {
-                    throw new CompletionException(routeEvaluationFailure(step, edge, error));
-                  }
-                  if (value == null) {
-                    throw new CompletionException(
-                        routeEvaluationFailure(
-                            step,
-                            edge,
-                            new NullPointerException("onRoute returned null decision")));
-                  }
-                  return value;
-                }));
+        bounded.handle(
+            (value, error) -> {
+              if (error != null) {
+                throw new CompletionException(routeEvaluationFailure(step, edge, error));
+              }
+              if (value == null) {
+                throw new CompletionException(
+                    routeEvaluationFailure(
+                        step, edge, new NullPointerException("onRoute returned null decision")));
+              }
+              return value;
+            }));
   }
 
   private List<Integer> collectAllowedTargets(
@@ -936,11 +959,10 @@ public class WorkflowExecutor {
     String condition =
         evaluation.edge().getCondition() == null ? "" : evaluation.edge().getCondition();
     log.info(
-        "Route edge '{} -> {}': allowed={} ({})",
+        "Route edge '{} -> {}': allowed={}",
         step.getName(),
         evaluation.edge().getStep(),
-        decision.allowed(),
-        decision.reason());
+        decision.allowed());
     emit(
         EventType.ROUTE_DECISION,
         Map.of(

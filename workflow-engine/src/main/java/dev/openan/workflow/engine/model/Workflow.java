@@ -107,9 +107,27 @@ public class Workflow {
               .agent(stringValue(t, "agent", ""))
               .skill(stringValue(t, "skill", ""))
               .description(stringValue(t, "description", ""))
+              .input(parseBusinessInput(t.get("input")))
               .build());
     }
     return subtasks;
+  }
+
+  private static BusinessInput parseBusinessInput(Object raw) {
+    if (raw == null) return null;
+    if (!(raw instanceof Map<?, ?> input)) {
+      throw new IllegalArgumentException("subtask input must be an object with text or data");
+    }
+    if (input.size() != 1 || input.containsKey("text") == input.containsKey("data")) {
+      throw new IllegalArgumentException("subtask input must contain exactly one of text or data");
+    }
+    Object value = input.get(input.containsKey("text") ? "text" : "data");
+    if (value == null) {
+      throw new IllegalArgumentException("subtask input value must not be null");
+    }
+    return input.containsKey("text")
+        ? BusinessInput.text(requireString(value, "subtask input text"))
+        : BusinessInput.data(value);
   }
 
   private static List<JumpCondition> parseNextSteps(List<Map<String, Object>> jcList) {
