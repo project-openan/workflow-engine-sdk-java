@@ -180,7 +180,7 @@ public class DefaultA2AJavaClientRuntime
     return "?";
   }
 
-  private static void onEvent(
+  static void onEvent(
       String agentName,
       ClientEvent event,
       List<ClientEvent> events,
@@ -210,7 +210,10 @@ public class DefaultA2AJavaClientRuntime
             e);
       }
     }
-    if (isTerminal(event)) {
+    // Notification-T is a channel-scoped subscription, not the lifetime of a
+    // Task-T task. Result statuses on its stream must not release the stream
+    // latch while heartbeats and later notifications may still arrive.
+    if (lastActivityNanos == null && isTerminal(event)) {
       log.info("[A2ARuntime] Terminal event for '{}': {}", agentName, describeTerminalEvent(event));
       done.countDown();
     }
@@ -581,13 +584,13 @@ public class DefaultA2AJavaClientRuntime
    *
    * <p>Subscription tasks stay {@code WORKING} for their whole lifetime and deliver events
    * (heartbeats included) without ever completing, so a finality-based wait would tear down a
-   * healthy subscription once {@code sendTimeoutSeconds} elapsed. The stream instead ends through
-   * the error/terminal-event latch: a server-side close, a transport failure, or {@link
+   * healthy subscription once {@code sendTimeoutSeconds} elapsed. Task status is not a subscription
+   * termination signal. The stream instead ends through a transport failure or {@link
    * dev.openan.workflow.engine.client.NotificationSubscription#close()}. The stream is only reaped
    * when no transport activity or decoded event has arrived for {@code sendTimeoutSeconds}.
    *
    * @param agentName target agent display name, for diagnostics only
-   * @param done latch released on terminal event or stream error
+   * @param done latch released on stream error or explicit local close
    * @param lastActivityNanos monotonic time of the most recent stream activity
    */
   void awaitNotificationActivity(
