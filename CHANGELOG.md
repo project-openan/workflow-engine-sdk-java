@@ -10,6 +10,17 @@
   loading. These APIs are current-source capabilities, not part of the published 0.1.1 artifact.
 - Refresh bilingual examples, release boundaries and constructor/transport ownership guidance.
 
+## [0.1.2] — 2026-10-14
+
+Released from tag `v0.1.2` (`c926446`). Compared with 0.1.1:
+
+- Apply the configured blocking-call timeouts to the builder-built `DefaultRequestHandler`
+  (a2a-java hardcodes 5s and never consults `A2AConfigProvider` on the builder path) and raise
+  `A2AProperties` defaults to agent=900s / consumption=960s / reconciliation=60s.
+- Echo requested supported extensions via the `A2A-Extensions` response header on success
+  responses, so extension-aware clients can verify server participation.
+- Keep workbench notification subscriptions state-independent from workflow task sessions.
+
 ## [0.1.1] — 2026-09-23
 
 Released from tag `v0.1.1` (`952cde2`). Compared with 0.1.0:
