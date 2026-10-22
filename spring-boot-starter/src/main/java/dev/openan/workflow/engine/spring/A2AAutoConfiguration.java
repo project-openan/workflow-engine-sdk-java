@@ -47,6 +47,7 @@ import org.a2aproject.sdk.transport.rest.handler.RestHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -159,8 +160,15 @@ public class A2AAutoConfiguration {
     return new InMemoryPushNotificationConfigStore();
   }
 
-  @Bean(destroyMethod = "shutdownNow")
-  @ConditionalOnMissingBean
+  /**
+   * The A2A server executor. Matches by bean <em>name</em>, never by type: a host application may
+   * legitimately define any number of its own {@link ExecutorService} beans (dispatchers, SSE
+   * schedulers, pub-sub workers), and a type-based condition would silently suppress this pool
+   * while {@link #requestHandler} and {@link #restHandler} still need a single unambiguous
+   * candidate. Hosts override it by declaring their own {@code agentExecutorPool} bean.
+   */
+  @Bean(name = "agentExecutorPool", destroyMethod = "shutdownNow")
+  @ConditionalOnMissingBean(name = "agentExecutorPool")
   public ExecutorService agentExecutorPool(A2AProperties properties) {
     if (properties.getExecutorMaxSize() < properties.getExecutorCoreSize()) {
       throw new IllegalArgumentException(
@@ -201,7 +209,7 @@ public class A2AAutoConfiguration {
       InMemoryQueueManager qm,
       PushNotificationConfigStore pushStore,
       MainEventBusProcessor proc,
-      ExecutorService pool,
+      @Qualifier("agentExecutorPool") ExecutorService pool,
       A2AProperties properties,
       ObjectProvider<TaskAuthorizationProvider> authorizationProvider) {
     DefaultRequestHandler delegate =
@@ -232,7 +240,10 @@ public class A2AAutoConfiguration {
 
   @Bean
   @ConditionalOnMissingBean
-  public RestHandler restHandler(AgentCard card, RequestHandler handler, ExecutorService pool) {
+  public RestHandler restHandler(
+      AgentCard card,
+      RequestHandler handler,
+      @Qualifier("agentExecutorPool") ExecutorService pool) {
     return new RestHandler(card, new AgentCardCacheMetadata(card, null), handler, pool);
   }
 
