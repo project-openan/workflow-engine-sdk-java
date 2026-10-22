@@ -21,6 +21,7 @@ package dev.openan.workflow.engine.spring;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,7 +44,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Flow;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -724,6 +727,76 @@ class A2AAutoConfigurationTest {
         .withBean(AgentExecutor.class, () -> mock(AgentExecutor.class))
         .withPropertyValues("a2at.server.enabled=true")
         .run(context -> assertTrue(context.containsBean("requestHandler")));
+  }
+
+  /**
+   * A host may legitimately own any number of {@link ExecutorService} beans (dispatchers, SSE
+   * heartbeat schedulers, pub-sub workers) and {@link ScheduledExecutorService} is a subtype, so a
+   * type-based condition or injection can never be unique. The auto-configured pool must still be
+   * registered and the handlers must wire to it — before the fix this context failed to refresh
+   * with {@code required a single bean, but N were found}.
+   */
+  @Test
+  void autoConfiguredPoolSurvivesForeignExecutorServiceBeans() {
+    new WebApplicationContextRunner()
+        .withConfiguration(AutoConfigurations.of(A2AAutoConfiguration.class))
+        .withBean(
+            "spaceAiDispatcherExecutor",
+            ExecutorService.class,
+            () ->
+                Executors.newSingleThreadExecutor(
+                    r -> {
+                      Thread t = new Thread(r, "foreign-dispatcher");
+                      t.setDaemon(true);
+                      return t;
+                    }))
+        .withBean(
+            "spaceSseHeartbeatScheduler",
+            ScheduledExecutorService.class,
+            () ->
+                Executors.newSingleThreadScheduledExecutor(
+                    r -> {
+                      Thread t = new Thread(r, "foreign-heartbeat");
+                      t.setDaemon(true);
+                      return t;
+                    }))
+        .withBean(AgentCard.class, () -> mock(AgentCard.class))
+        .withBean(AgentExecutor.class, () -> mock(AgentExecutor.class))
+        .withPropertyValues("a2at.server.enabled=true")
+        .run(
+            context -> {
+              assertTrue(context.containsBean("agentExecutorPool"));
+              ExecutorService pool = context.getBean("agentExecutorPool", ExecutorService.class);
+              assertTrue(
+                  pool instanceof ThreadPoolExecutor,
+                  "the auto-configured pool must be the A2A ThreadPoolExecutor, not a foreign bean");
+              assertTrue(context.containsBean("requestHandler"));
+              assertTrue(context.containsBean("restHandler"));
+            });
+  }
+
+  /** A host that declares its own {@code agentExecutorPool} by name takes over the wiring. */
+  @Test
+  void hostDefinedAgentExecutorPoolReplacesTheAutoConfiguredOne() {
+    ExecutorService hostPool =
+        Executors.newSingleThreadExecutor(
+            r -> {
+              Thread t = new Thread(r, "host-a2a-pool");
+              t.setDaemon(true);
+              return t;
+            });
+    new WebApplicationContextRunner()
+        .withConfiguration(AutoConfigurations.of(A2AAutoConfiguration.class))
+        .withBean("agentExecutorPool", ExecutorService.class, () -> hostPool)
+        .withBean(AgentCard.class, () -> mock(AgentCard.class))
+        .withBean(AgentExecutor.class, () -> mock(AgentExecutor.class))
+        .withPropertyValues("a2at.server.enabled=true")
+        .run(
+            context -> {
+              assertSame(hostPool, context.getBean("agentExecutorPool", ExecutorService.class));
+              assertTrue(context.containsBean("requestHandler"));
+              assertTrue(context.containsBean("restHandler"));
+            });
   }
 
   @Test
