@@ -188,29 +188,11 @@ public class A2ATProtocolCases {
     omc.close();
   }
 
-  /** Case 0: enumerate available A2A-T templates via the host-owned SDK. */
+  /** Case 0: identify the standard template used by the Task-T cases. */
   private void case_0() {
-    log.info("[Case 0] Enumerate A2A-T templates");
-    var prompts = contentClient.getPrompts();
-    log.info("[Case 0] All templates: {}", prompts.size());
-    for (var t : prompts) {
-      log.info(
-          "[Case 0]   {} ({} chars)",
-          t.templateUri().uri(),
-          t.content() != null ? t.content().length() : 0);
-    }
-    var negPrompts =
-        contentClient.getPrompts().stream()
-            .filter(p -> p.templateUri().extensionName().equals("Negotiation-T"))
-            .toList();
-    log.info("[Case 0] Negotiation templates: {}", negPrompts.size());
-    for (var t : negPrompts) {
-      log.info("[Case 0]   {} -> {}", t.templateUri().uri(), t.description());
-    }
-    var one =
-        contentClient.getPrompt(
-            net.openan.a2at.sdk.core.model.StandardTemplates.PRIVATE_LINE_COMPLAINT.uri());
-    log.info("[Case 0] getTaskTemplate(private-line-complaint): present={}", one.isPresent());
+    log.info(
+        "[Case 0] Task-T template: {}",
+        net.openan.a2at.sdk.core.model.StandardTemplates.PRIVATE_LINE_COMPLAINT.uri());
   }
 
   private void case_7_1() throws Exception {

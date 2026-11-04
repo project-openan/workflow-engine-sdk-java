@@ -27,6 +27,36 @@ import org.junit.jupiter.api.Test;
 
 class RegistryClientTest {
   @Test
+  void singleCardLookupRejectsAmbiguousNames() throws Exception {
+    var server = com.sun.net.httpserver.HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/rest/v1/registry-center/agent-cards",
+        exchange -> {
+          String south = "{\"name\":\"Shared\",\"provider\":{\"organization\":\"South\"}}";
+          String north = "{\"name\":\"Shared\",\"provider\":{\"organization\":\"North\"}}";
+          String query = exchange.getRequestURI().getQuery();
+          String cards = query.contains("organization=South") ? south : north + "," + south;
+          byte[] response =
+              ("{\"agentCards\":[" + cards + "]}")
+                  .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, response.length);
+          try (var body = exchange.getResponseBody()) {
+            body.write(response);
+          }
+        });
+    server.start();
+    try {
+      var client = new RegistryClient("http://127.0.0.1:" + server.getAddress().getPort(), true);
+      assertThrows(IllegalStateException.class, () -> client.fetchAgentCard("Shared"));
+      assertEquals(
+          Map.of("organization", "South"),
+          client.fetchAgentCard("Shared", "South").get("provider"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
   void rejectsNonPositiveDeadline() {
     assertThrows(
         IllegalArgumentException.class,

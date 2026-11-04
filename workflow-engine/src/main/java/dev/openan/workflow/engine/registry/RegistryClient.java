@@ -126,7 +126,7 @@ public class RegistryClient {
     return baseUrl;
   }
 
-  @SuppressWarnings("unchecked")
+  /** Fetch a card by name and optional organization. Ambiguous matches are rejected. */
   public Map<String, Object> fetchAgentCard(String name, String organization) throws Exception {
     StringBuilder urlBuilder =
         new StringBuilder(baseUrl)
@@ -148,24 +148,17 @@ public class RegistryClient {
     if (resp.statusCode() != 200) {
       throw requestFailure("Registry", resp);
     }
-    Map<String, Object> card =
-        HttpResponseParser.parse(
-            "Registry",
-            "fetch agent card",
-            resp.statusCode(),
-            resp.body(),
-            data -> {
-              List<Map<String, Object>> cards =
-                  (List<Map<String, Object>>)
-                      data.getOrDefault("agentCards", data.getOrDefault("data", List.of()));
-              return cards.isEmpty() ? null : AgentCardNormalizer.normalize(cards.get(0));
-            });
-    if (card == null) {
+    List<Map<String, Object>> cards = parseCards(resp);
+    if (cards.isEmpty()) {
       log.warn("[Registry] Agent card not found: name={}", name);
       return null;
     }
+    if (cards.size() > 1) {
+      throw new IllegalStateException(
+          "Multiple AgentCards matched. Supply a unique organization and name.");
+    }
     log.info("[Registry] Agent card found: name={}", name);
-    return card;
+    return cards.get(0);
   }
 
   /**

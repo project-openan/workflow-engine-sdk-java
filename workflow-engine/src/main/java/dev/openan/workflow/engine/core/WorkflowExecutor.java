@@ -174,7 +174,11 @@ public class WorkflowExecutor {
       correlated.put("executionId", executionId);
       eventCallback.onEvent(type, Collections.unmodifiableMap(correlated));
     } catch (Exception e) {
-      log.warn("Event callback error: {}", e.getMessage());
+      log.warn(
+          "Event callback failed: executionId={}, eventType={}, errorType={}",
+          executionId,
+          type,
+          e.getClass().getSimpleName());
     }
   }
 
@@ -332,12 +336,14 @@ public class WorkflowExecutor {
 
   private TaskRequest buildTaskRequest(
       WorkflowStep step, Task task, int subtaskIndex, WorkflowInput workflowInput) {
+    String taskId = taskId(step.getName(), subtaskIndex);
     log.info(
-        "[Executor] Dispatching task: step={}, agent={}, subtask_index={}, desc={}",
+        "[Executor] Dispatching task: executionId={}, taskId={}, step={}, agent={}, subtask_index={}",
+        executionId,
+        taskId,
         step.getName(),
         task.getAgent(),
-        subtaskIndex,
-        task.getDescription());
+        subtaskIndex);
     return TaskRequest.builder()
         .agentName(task.getAgent())
         .skill(task.getSkill())
@@ -345,7 +351,7 @@ public class WorkflowExecutor {
         .language(lang)
         .stepName(step.getName())
         .executionId(executionId)
-        .taskId(taskId(step.getName(), subtaskIndex))
+        .taskId(taskId)
         .input(
             task.getInput() == null
                 ? dev.openan.workflow.engine.model.BusinessInput.text(task.getDescription())
