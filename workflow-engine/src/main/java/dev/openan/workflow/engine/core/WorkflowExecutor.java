@@ -327,7 +327,8 @@ public class WorkflowExecutor {
     state[node] = 2;
   }
 
-  private CompletableFuture<StepResult> executeSubtasks(WorkflowStep step) {
+  private CompletableFuture<StepResult> executeSubtasks(
+      WorkflowStep step, WorkflowObservability.StepObservation stepTelemetry) {
     var workflowInput = contextBuilder.buildWorkflowInput(step, stepExecutionResults);
     List<CompletableFuture<StepResult>> futures = new ArrayList<>();
     for (int i = 0; i < step.getSubtasks().size(); i++) {
@@ -348,7 +349,7 @@ public class WorkflowExecutor {
               subtaskIndex,
               "taskId",
               request.getTaskId()));
-      CompletableFuture<TaskResult> dispatch = dispatchTask(step, request);
+      CompletableFuture<TaskResult> dispatch = dispatchTask(step, request, stepTelemetry);
       var settled = new AtomicBoolean();
       CompletableFuture<StepResult> processed =
           new CompletableFuture<>() {
@@ -416,7 +417,8 @@ public class WorkflowExecutor {
         .build();
   }
 
-  private CompletableFuture<TaskResult> dispatchTask(WorkflowStep step, TaskRequest request) {
+  private CompletableFuture<TaskResult> dispatchTask(
+      WorkflowStep step, TaskRequest request, WorkflowObservability.StepObservation stepTelemetry) {
     CompletableFuture<TaskResult> result = new CompletableFuture<>();
     activeTasks.add(result);
     result.orTimeout(engineClient.callbackTimeoutSeconds(), java.util.concurrent.TimeUnit.SECONDS);
@@ -426,72 +428,89 @@ public class WorkflowExecutor {
       return result;
     }
     CompletableFuture.runAsync(
-        () -> {
-          try {
-            if (result.isDone() || stopped.get()) return;
-            if (step.getStepType() == StepType.SELF_LOOP) {
-              completeFrom(
-                  result,
-                  java.util.Objects.requireNonNull(
-                      controlPoint.onSelfTask(request), "onSelfTask returned null future"));
-              return;
-            }
-            var prepared =
-                java.util.Objects.requireNonNull(
-                    controlPoint.onTask(request), "onTask returned null future");
-            result.whenComplete(
-                (value, error) -> {
-                  if (error != null && !prepared.isDone()) prepared.cancel(true);
-                });
-            prepared.whenComplete(
-                (content, error) -> {
-                  if (result.isDone() || stopped.get()) {
-                    log.debug(
-                        "[Executor] Late callback ignored step={}, taskId={}",
-                        request.getStepName(),
-                        request.getTaskId());
-                    return;
-                  }
-                  if (error != null) {
-                    result.completeExceptionally(error);
-                    return;
-                  }
+        () ->
+            withStepContext(
+                stepTelemetry,
+                () -> {
                   try {
-                    Map<String, String> trace =
-                        Map.of(
-                            "executionId", request.getExecutionId(),
-                            "logicalTaskId", request.getTaskId());
-                    var sent =
-                        WireLog.call(
-                            trace,
-                            () ->
-                                engineClient.sendWorkflowTask(
-                                    request,
-                                    java.util.Objects.requireNonNull(
-                                        content, "onTask returned null content"),
-                                    negotiation ->
-                                        controlPoint.onNegotiation(
-                                            new NegotiationRequest(
-                                                request,
-                                                negotiation.originalSubmission(),
-                                                negotiation.received(),
-                                                negotiation.previousExchanges(),
-                                                negotiation.remainingWait())),
-                                    eventCallback));
+                    if (result.isDone() || stopped.get()) return;
+                    if (step.getStepType() == StepType.SELF_LOOP) {
+                      completeFrom(
+                          result,
+                          java.util.Objects.requireNonNull(
+                              controlPoint.onSelfTask(request), "onSelfTask returned null future"));
+                      return;
+                    }
+                    var prepared =
+                        java.util.Objects.requireNonNull(
+                            controlPoint.onTask(request), "onTask returned null future");
                     result.whenComplete(
-                        (value, failure) -> {
-                          if (!sent.isDone()) sent.cancel(true);
+                        (value, error) -> {
+                          if (error != null && !prepared.isDone()) prepared.cancel(true);
                         });
-                    completeFrom(result, sent.thenApply(ProtocolResultAdapter::toTaskResult));
-                  } catch (RuntimeException failure) {
-                    result.completeExceptionally(failure);
+                    prepared.whenComplete(
+                        (content, error) ->
+                            withStepContext(
+                                stepTelemetry,
+                                () -> {
+                                  if (result.isDone() || stopped.get()) {
+                                    log.debug(
+                                        "[Executor] Late callback ignored step={}, taskId={}",
+                                        request.getStepName(),
+                                        request.getTaskId());
+                                    return;
+                                  }
+                                  if (error != null) {
+                                    result.completeExceptionally(error);
+                                    return;
+                                  }
+                                  try {
+                                    Map<String, String> trace =
+                                        Map.of(
+                                            "executionId", request.getExecutionId(),
+                                            "logicalTaskId", request.getTaskId());
+                                    var sent =
+                                        WireLog.call(
+                                            trace,
+                                            () ->
+                                                engineClient.sendWorkflowTask(
+                                                    request,
+                                                    java.util.Objects.requireNonNull(
+                                                        content, "onTask returned null content"),
+                                                    negotiation ->
+                                                        controlPoint.onNegotiation(
+                                                            new NegotiationRequest(
+                                                                request,
+                                                                negotiation.originalSubmission(),
+                                                                negotiation.received(),
+                                                                negotiation.previousExchanges(),
+                                                                negotiation.remainingWait())),
+                                                    eventCallback));
+                                    result.whenComplete(
+                                        (value, failure) -> {
+                                          if (!sent.isDone()) sent.cancel(true);
+                                        });
+                                    completeFrom(
+                                        result,
+                                        sent.thenApply(ProtocolResultAdapter::toTaskResult));
+                                  } catch (RuntimeException failure) {
+                                    result.completeExceptionally(failure);
+                                  }
+                                }));
+                  } catch (RuntimeException error) {
+                    result.completeExceptionally(error);
                   }
-                });
-          } catch (RuntimeException error) {
-            result.completeExceptionally(error);
-          }
-        });
+                }));
     return result;
+  }
+
+  private void withStepContext(
+      WorkflowObservability.StepObservation stepTelemetry, Runnable action) {
+    if (workflowTelemetry == null) {
+      action.run();
+      return;
+    }
+    workflowTelemetry.withStepContext(stepTelemetry, action);
   }
 
   private StepResult collectAllSuccess(List<CompletableFuture<StepResult>> futures) {
@@ -695,7 +714,7 @@ public class WorkflowExecutor {
     AtomicBoolean stepSucceeded = new AtomicBoolean(true);
     emit(EventType.STEP_START, Map.of("step", step.getName()));
     log.info("--- Executing step: {} ---", step.getName());
-    return executeSubtasks(step)
+    return executeSubtasks(step, stepTelemetry)
         .thenCompose(
             result -> {
               if (stopped.get()) return CompletableFuture.completedFuture(null);
