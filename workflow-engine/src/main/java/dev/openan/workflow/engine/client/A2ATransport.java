@@ -22,6 +22,7 @@ package dev.openan.workflow.engine.client;
 import dev.openan.workflow.engine.model.MessageContent;
 import dev.openan.workflow.engine.model.ReceivedMessage;
 import dev.openan.workflow.engine.model.SendMessageResult;
+import io.opentelemetry.context.Context;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -454,72 +455,75 @@ public class A2ATransport implements AutoCloseable {
         content.extensions().contains(A2ATExtension.AUTHORIZATION_T.uri())
             ? "authorization"
             : "task");
+    Context callerContext = Context.current();
     return CompletableFuture.supplyAsync(
         () ->
             WireLog.call(
                 trace,
                 () -> {
-                  try {
-                    if (!active.getAsBoolean())
-                      throw new java.util.concurrent.CancellationException("Late send ignored");
-                    MessageSendParams params = buildMessageSendParams(content, contextId, taskId);
-                    ClientCallContext callContext =
-                        buildContentCallContext(agentCard, agentName, content);
-                    if (!active.getAsBoolean())
-                      throw new java.util.concurrent.CancellationException(
-                          "Late authenticated send ignored");
-                    String endpoint =
-                        agentCard.supportedInterfaces().isEmpty()
-                            ? "?"
-                            : agentCard.supportedInterfaces().get(0).url();
-                    ProtocolLogger.logRequest(
-                        agentName, endpoint, params, callContext.getHeaders());
-                    log.info("[Transport] Sending via A2A SDK to {}", agentName);
-                    Iterable<ClientEvent> events =
-                        a2aClientRuntime.sendMessage(
-                            agentCard,
-                            params,
-                            callContext,
-                            eventSink,
-                            s -> log.info("[A2A] {}", s));
-                    String responseText = extractResponseText(events);
-                    String taskState = extractResponseTaskState(events);
-                    Map<String, Object> respMetadata = extractResponseMetadata(events);
-                    Task task = extractResponseTask(events);
-                    log.info(
-                        "[Transport] Response from {}: {} chars, state={}",
-                        agentName,
-                        responseText.length(),
-                        taskState);
-                    return SendMessageResult.builder()
-                        .text(responseText)
-                        .task(task)
-                        .metadata(respMetadata)
-                        .taskState(taskState)
-                        .receivedMessages(ProtocolResponses.assemble(events))
-                        .build();
-                  } catch (Exception e) {
-                    RemoteA2AErrorException remoteError = RemoteA2AErrorException.findIn(e);
-                    if (remoteError != null) {
-                      log.warn(
-                          "[Transport] A2A_ERROR agent={}, contextId={}, httpStatus={}, status={}, reason={}, message={}",
+                  try (var scope = callerContext.makeCurrent()) {
+                    try {
+                      if (!active.getAsBoolean())
+                        throw new java.util.concurrent.CancellationException("Late send ignored");
+                      MessageSendParams params = buildMessageSendParams(content, contextId, taskId);
+                      ClientCallContext callContext =
+                          buildContentCallContext(agentCard, agentName, content);
+                      if (!active.getAsBoolean())
+                        throw new java.util.concurrent.CancellationException(
+                            "Late authenticated send ignored");
+                      String endpoint =
+                          agentCard.supportedInterfaces().isEmpty()
+                              ? "?"
+                              : agentCard.supportedInterfaces().get(0).url();
+                      ProtocolLogger.logRequest(
+                          agentName, endpoint, params, callContext.getHeaders());
+                      log.info("[Transport] Sending via A2A SDK to {}", agentName);
+                      Iterable<ClientEvent> events =
+                          a2aClientRuntime.sendMessage(
+                              agentCard,
+                              params,
+                              callContext,
+                              eventSink,
+                              s -> log.info("[A2A] {}", s));
+                      String responseText = extractResponseText(events);
+                      String taskState = extractResponseTaskState(events);
+                      Map<String, Object> respMetadata = extractResponseMetadata(events);
+                      Task task = extractResponseTask(events);
+                      log.info(
+                          "[Transport] Response from {}: {} chars, state={}",
                           agentName,
-                          contextId,
-                          remoteError.getHttpStatus(),
-                          remoteError.getStatus(),
-                          remoteError.getReason(),
-                          remoteError.getMessage().replace("\r", "\\r").replace("\n", "\\n"));
-                    } else {
-                      log.error(
-                          "[Transport] Failed to send message to {}: {}",
-                          agentName,
-                          e.getMessage(),
-                          e);
+                          responseText.length(),
+                          taskState);
+                      return SendMessageResult.builder()
+                          .text(responseText)
+                          .task(task)
+                          .metadata(respMetadata)
+                          .taskState(taskState)
+                          .receivedMessages(ProtocolResponses.assemble(events))
+                          .build();
+                    } catch (Exception e) {
+                      RemoteA2AErrorException remoteError = RemoteA2AErrorException.findIn(e);
+                      if (remoteError != null) {
+                        log.warn(
+                            "[Transport] A2A_ERROR agent={}, contextId={}, httpStatus={}, status={}, reason={}, message={}",
+                            agentName,
+                            contextId,
+                            remoteError.getHttpStatus(),
+                            remoteError.getStatus(),
+                            remoteError.getReason(),
+                            remoteError.getMessage().replace("\r", "\\r").replace("\n", "\\n"));
+                      } else {
+                        log.error(
+                            "[Transport] Failed to send message to {}: {}",
+                            agentName,
+                            e.getMessage(),
+                            e);
+                      }
+                      if (e instanceof SecurityException securityException) {
+                        throw securityException;
+                      }
+                      throw new RuntimeException("Agent call failed: " + e.getMessage(), e);
                     }
-                    if (e instanceof SecurityException securityException) {
-                      throw securityException;
-                    }
-                    throw new RuntimeException("Agent call failed: " + e.getMessage(), e);
                   }
                 }),
         asyncExecutor);
